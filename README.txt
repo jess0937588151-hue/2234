@@ -1,3 +1,26 @@
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyBOmGn6HQI0O6RU6Iu2hh44TbFoneblbyk",
+  authDomain: "webpos-1f626.firebaseapp.com",
+  databaseURL: "https://webpos-1f626-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "webpos-1f626",
+  storageBucket: "webpos-1f626.firebasestorage.app",
+  messagingSenderId: "203764995518",
+  appId: "1:203764995518:web:8ebdf39837c5c59c4995ef",
+  measurementId: "G-34XEG1QCHW"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+
 餐廳 POS V2.1.6 重製完整版
 
 本版整合重點：
