@@ -1,26 +1,3 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyBOmGn6HQI0O6RU6Iu2hh44TbFoneblbyk",
-  authDomain: "webpos-1f626.firebaseapp.com",
-  databaseURL: "https://webpos-1f626-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "webpos-1f626",
-  storageBucket: "webpos-1f626.firebasestorage.app",
-  messagingSenderId: "203764995518",
-  appId: "1:203764995518:web:8ebdf39837c5c59c4995ef",
-  measurementId: "G-34XEG1QCHW"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-
 餐廳 POS V2.1.6 重製完整版
 
 本版整合重點：
@@ -131,3 +108,32 @@ V2.1.19 線上點餐頁：
 - 採圖片菜單、分類瀏覽、單頁購物車抽屜
 - 顧客可填姓名、電話、地址 / 取餐備註
 - 送出後會建立本機待付款線上訂單
+
+
+V2.1.20 線上點餐流程修正版：
+- 線上點餐加入購物車流程改為和 POS 點餐一樣，先在商品彈窗內直接選規格後加入
+- 加入購物車後不再自動跳到購物車
+- 改為顯示加入成功提示，讓顧客可繼續選品
+
+
+V2.1.21 即時接單版：
+- 新增 Firebase 即時接單設定
+- 顧客送單後 POS 會即時收到線上待確認訂單
+- POS 按確認接單後，顧客畫面才會顯示完成訂購
+- POS 可拒絕訂單，顧客畫面會同步顯示拒絕結果
+- 線上點餐頁改為內用 / 外帶 + 姓名 + 電話 + 顧客備註
+
+
+V2.1.22 Firebase安全規則版 + POS Google登入版：
+- POS 端新增 Google 登入 / 登出
+- 顧客端改為匿名登入送單
+- 線上訂單自動寫入 customerUid
+- 內附 Firebase Realtime Database 安全規則範本
+- 內附 Firebase 安全規則版使用說明
+
+
+V2.1.23 接單自動印單通知版：
+- 線上新單可播放提醒聲
+- POS 確認線上訂單後可自動列印廚房單
+- POS 確認線上訂單後可選擇自動列印顧客單
+- 即時接單設定頁新增上述開關

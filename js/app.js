@@ -5,6 +5,7 @@ import { renderOrders, initOrdersPage } from './pages/orders-page.js';
 import { renderReports, initReportsPage } from './pages/reports-page.js';
 import { renderCategoryOptions, renderCategoryList, renderModuleSelect, renderModuleLibrary, renderProductModulesEditor, renderProductsTable, renderPendingMenuList, initProductsPage } from './pages/products-page.js';
 import { initSettingsPage } from './pages/settings-page.js';
+import { startPOSRealtimeListener, waitForAuthReady } from './modules/realtime-order-service.js';
 import { startGoogleAutoBackup } from './modules/google-backup-service.js';
 
 function safeRun(fn, name){
@@ -58,6 +59,16 @@ function setupPWA(){
   }
 }
 
+async function autoStartRealtimeListener(){
+  try{
+    const user = await waitForAuthReady();
+    if(!user) return;
+    await startPOSRealtimeListener(()=> window.refreshAllViews());
+  }catch(err){
+    console.error('Auto start realtime listener failed:', err);
+  }
+}
+
 setupNavigation();
 safeRun(initPOSPage, 'initPOSPage');
 safeRun(initOrdersPage, 'initOrdersPage');
@@ -66,4 +77,5 @@ safeRun(initProductsPage, 'initProductsPage');
 safeRun(initSettingsPage, 'initSettingsPage');
 window.refreshAllViews();
 startGoogleAutoBackup();
+autoStartRealtimeListener();
 setupPWA();

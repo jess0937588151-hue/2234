@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>餐廳 POS V2.1.18 商品圖片完成版</title>
+  <title>餐廳 POS V2.1.23 接單自動印單通知版</title>
   <meta name="theme-color" content="#0f172a" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="assets/icon-192.png" />
@@ -19,7 +19,7 @@
 <body>
 <div id="app">
   <aside class="sidebar">
-    <div class="brand">餐廳 POS V2.1.18 商品圖片完成版</div>
+    <div class="brand">餐廳 POS V2.1.23 接單自動印單通知版</div>
     <button class="nav-btn active" data-view="posView">點餐</button>
     <button class="nav-btn" data-view="ordersView">訂單查詢</button>
     <button class="nav-btn" data-view="reportsView">報表</button>
@@ -105,6 +105,10 @@
         </div>
       </header>
       <div class="content-grid one">
+        <section class="card page-block">
+          <h2>線上待確認</h2>
+          <div id="incomingOnlineOrdersList" class="stack"></div>
+        </section>
         <section class="card page-block">
           <h2>待付款</h2>
           <div id="pendingOrdersList" class="stack"></div>
@@ -305,6 +309,31 @@
           <div id="googleBackupFileList" class="muted"></div>
           <div id="googleBackupStatusBox" class="muted"></div>
           <div class="muted">此功能改為 Google OAuth + Drive API 直連，不使用 Apps Script，也不支援手動輸入 Google 帳號密碼。</div>
+        </section>
+        <section class="card settings-list">
+          <h2>即時接單設定</h2>
+          <label class="inline-check"><input id="realtimeOrderEnabled" type="checkbox"> 啟用 Firebase 即時接單</label>
+          <label>Firebase API Key<input id="firebaseApiKey"></label>
+          <label>Firebase Auth Domain<input id="firebaseAuthDomain"></label>
+          <label>Firebase Realtime Database URL<input id="firebaseDatabaseUrl" placeholder="https://xxx-default-rtdb.firebaseio.com"></label>
+          <label>Firebase Project ID<input id="firebaseProjectId"></label>
+          <label>Firebase Storage Bucket<input id="firebaseStorageBucket"></label>
+          <label>Firebase Messaging Sender ID<input id="firebaseMessagingSenderId"></label>
+          <label>Firebase App ID<input id="firebaseAppId"></label>
+          <label>Firebase Measurement ID（可選）<input id="firebaseMeasurementId"></label>
+          <label>線上點餐頁店名<input id="onlineStoreTitle"></label>
+          <label>線上點餐頁副標<input id="onlineStoreSubtitle"></label>
+          <label class="inline-check"><input id="onlineConfirmAutoPrintKitchen" type="checkbox"> 線上訂單確認後自動列印廚房單</label>
+          <label class="inline-check"><input id="onlineConfirmAutoPrintReceipt" type="checkbox"> 線上訂單確認後自動列印顧客單</label>
+          <label class="inline-check"><input id="onlineIncomingSoundEnabled" type="checkbox"> 線上新單播放提醒聲</label>
+          <div class="row gap wrap">
+            <button id="saveRealtimeOrderSettingsBtn" class="primary-btn">儲存即時接單設定</button>
+            <button id="posGoogleLoginBtn" class="secondary-btn">POS Google 登入</button>
+            <button id="posGoogleLogoutBtn" class="secondary-btn">POS Google 登出</button>
+          </div>
+          <div id="posGoogleAccountBox" class="muted"></div>
+          <div id="realtimeOrderStatusBox" class="muted"></div>
+          <div class="muted">外部顧客頁與 POS 都要填相同 Firebase 設定，顧客送單後 POS 會即時收到，店家確認後顧客才完成訂購。</div>
         </section>
         <section class="card settings-list">
           <h2>列印設定</h2>

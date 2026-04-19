@@ -99,6 +99,7 @@ export const state = {
   categoryManageDraft: new Set(),
   moduleManageTarget: null,
   moduleManageDraft: new Set(),
+  onlineIncomingOrders: [],
 };
 
 export function persistAll(){

@@ -43,8 +43,8 @@
           <label>電話
             <input id="onlineCustomerPhone" placeholder="請輸入電話">
           </label>
-          <label>地址 / 取餐備註
-            <textarea id="onlineCustomerAddress" rows="3" placeholder="外送請填地址，外帶可填取餐時間"></textarea>
+          <label>顧客備註
+            <textarea id="onlineCustomerNote" rows="3" placeholder="例如：晚點取餐、餐具需求、桌號"></textarea>
           </label>
         </section>
       </aside>
@@ -101,5 +101,13 @@
   </div>
 
   <script type="module" src="js/pages/online-order-page.js"></script>
+  <div id="onlineOrderStatusOverlay" class="online-status-overlay hidden">
+    <div class="online-status-card">
+      <div class="online-badge">訂單處理中</div>
+      <h2 id="onlineOrderStatusTitle">等待店家確認訂單</h2>
+      <p id="onlineOrderStatusText" class="muted">送出後請稍候，店家確認後才算完成訂購。</p>
+      <button id="closeOnlineStatusBtn" class="secondary-btn hidden">關閉</button>
+    </div>
+  </div>
 </body>
 </html>

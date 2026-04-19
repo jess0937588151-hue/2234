@@ -3,6 +3,7 @@ import { state, persistAll, seedDefaults } from '../core/store.js';
 import { downloadFile } from '../core/utils.js';
 import { buildCartPreviewOrder, printOrderLabels, printOrderReceipt, getPrintSettings } from '../modules/print-service.js';
 import { backupToGoogle, getGoogleBackupConfig, getGoogleDriveSession, initializeGoogleDriveApi, listGoogleBackups, restoreFromGoogle, signInGoogleDrive, signOutGoogleDrive, startGoogleAutoBackup } from '../modules/google-backup-service.js';
+import { getRealtimeAuthUser, getRealtimeConfig, signInPOSWithGoogle, signOutPOSGoogle, startPOSRealtimeListener, verifyPOSAccess, waitForAuthReady } from '../modules/realtime-order-service.js';
 
 export function initSettingsPage(){
   const printConfig = getPrintSettings();
@@ -22,6 +23,66 @@ export function initSettingsPage(){
   document.getElementById('printKitchenCopies').value = Number(printConfig.kitchenCopies || 1);
   document.getElementById('printAutoCheckout').checked = !!printConfig.autoPrintCheckout;
   document.getElementById('printAutoKitchen').checked = !!printConfig.autoPrintKitchen;
+
+  const realtimeCfg = getRealtimeConfig();
+  document.getElementById('realtimeOrderEnabled').checked = !!realtimeCfg.enabled;
+  document.getElementById('firebaseApiKey').value = realtimeCfg.apiKey || '';
+  document.getElementById('firebaseAuthDomain').value = realtimeCfg.authDomain || '';
+  document.getElementById('firebaseDatabaseUrl').value = realtimeCfg.databaseURL || '';
+  document.getElementById('firebaseProjectId').value = realtimeCfg.projectId || '';
+  document.getElementById('firebaseStorageBucket').value = realtimeCfg.storageBucket || '';
+  document.getElementById('firebaseMessagingSenderId').value = realtimeCfg.messagingSenderId || '';
+  document.getElementById('firebaseAppId').value = realtimeCfg.appId || '';
+  document.getElementById('firebaseMeasurementId').value = realtimeCfg.measurementId || '';
+  document.getElementById('onlineStoreTitle').value = realtimeCfg.onlineStoreTitle || '';
+  document.getElementById('onlineStoreSubtitle').value = realtimeCfg.onlineStoreSubtitle || '';
+  document.getElementById('onlineConfirmAutoPrintKitchen').checked = !!realtimeCfg.autoPrintKitchenOnConfirm;
+  document.getElementById('onlineConfirmAutoPrintReceipt').checked = !!realtimeCfg.autoPrintReceiptOnConfirm;
+  document.getElementById('onlineIncomingSoundEnabled').checked = realtimeCfg.incomingSoundEnabled !== false;
+
+
+async function renderPOSGoogleAccountBox(){
+  await waitForAuthReady().catch(()=> null);
+  const user = getRealtimeAuthUser();
+  document.getElementById('posGoogleAccountBox').innerHTML = user
+    ? `POS 登入帳號：${user.email || user.uid}`
+    : 'POS 登入帳號：未登入';
+}
+
+  function renderRealtimeOrderPanel(){
+    const cfg = getRealtimeConfig();
+    const incomingCount = Array.isArray(state.onlineIncomingOrders) ? state.onlineIncomingOrders.filter(x => x.status === 'pending_confirm').length : 0;
+    document.getElementById('realtimeOrderStatusBox').innerHTML =
+      `同步狀態：${cfg.lastSyncStatus || '無'}<br>` +
+      `最近收到訂單：${cfg.lastOrderAt ? cfg.lastOrderAt.replace('T',' ').slice(0,16) : '無'}<br>` +
+      `最近確認訂單：${cfg.lastConfirmedAt ? cfg.lastConfirmedAt.replace('T',' ').slice(0,16) : '無'}<br>` +
+      `線上待確認：${incomingCount} 筆`;
+  }
+  window.refreshRealtimeOrderPanel = renderRealtimeOrderPanel;
+  renderRealtimeOrderPanel();
+  renderPOSGoogleAccountBox();
+
+  document.getElementById('saveRealtimeOrderSettingsBtn').onclick = ()=>{
+    const cfg = getRealtimeConfig();
+    cfg.enabled = document.getElementById('realtimeOrderEnabled').checked;
+    cfg.apiKey = document.getElementById('firebaseApiKey').value.trim();
+    cfg.authDomain = document.getElementById('firebaseAuthDomain').value.trim();
+    cfg.databaseURL = document.getElementById('firebaseDatabaseUrl').value.trim();
+    cfg.projectId = document.getElementById('firebaseProjectId').value.trim();
+    cfg.storageBucket = document.getElementById('firebaseStorageBucket').value.trim();
+    cfg.messagingSenderId = document.getElementById('firebaseMessagingSenderId').value.trim();
+    cfg.appId = document.getElementById('firebaseAppId').value.trim();
+    cfg.measurementId = document.getElementById('firebaseMeasurementId').value.trim();
+    cfg.onlineStoreTitle = document.getElementById('onlineStoreTitle').value.trim();
+    cfg.onlineStoreSubtitle = document.getElementById('onlineStoreSubtitle').value.trim();
+    cfg.autoPrintKitchenOnConfirm = document.getElementById('onlineConfirmAutoPrintKitchen').checked;
+    cfg.autoPrintReceiptOnConfirm = document.getElementById('onlineConfirmAutoPrintReceipt').checked;
+    cfg.incomingSoundEnabled = document.getElementById('onlineIncomingSoundEnabled').checked;
+    persistAll();
+    renderRealtimeOrderPanel();
+    startPOSRealtimeListener(()=> window.refreshAllViews()).catch(err=> console.error(err));
+    alert('即時接單設定已儲存');
+  };
   document.getElementById('showProductImagesToggle').checked = !!state.settings.showProductImages;
 
 
@@ -131,6 +192,30 @@ document.getElementById('manualGoogleRestoreBtn').onclick = async ()=>{
     persistAll();
     await renderGoogleBackupPanel();
     alert(cfg.lastRestoreStatus);
+  }
+};
+
+
+document.getElementById('posGoogleLoginBtn').onclick = async ()=>{
+  try{
+    await signInPOSWithGoogle();
+    const access = await verifyPOSAccess();
+    await renderPOSGoogleAccountBox();
+    await startPOSRealtimeListener(()=> window.refreshAllViews());
+    if(typeof window.refreshRealtimeOrderPanel === 'function') window.refreshRealtimeOrderPanel();
+    alert(`POS Google 登入成功（${access.role}）`);
+  }catch(err){
+    alert(err.message || 'POS Google 登入失敗');
+  }
+};
+
+document.getElementById('posGoogleLogoutBtn').onclick = async ()=>{
+  try{
+    await signOutPOSGoogle();
+    await renderPOSGoogleAccountBox();
+    alert('POS Google 已登出');
+  }catch(err){
+    alert(err.message || 'POS Google 登出失敗');
   }
 };
 
