@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 中文備註：主畫面結構檔。此版只在商品管理頁加入 Excel 匯入功能，其餘頁面不更動。 -->
+<!-- 中文備註：主畫面結構檔。POS 系統主頁面，包含點餐、訂單查詢、報表、商品管理、設定五大頁面。 -->
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
@@ -18,6 +18,7 @@
 </head>
 <body>
 <div id="app">
+  <!-- ===== 側邊導覽列 ===== -->
   <aside class="sidebar">
     <div class="brand">餐廳 POS V2.1.23 接單自動印單通知版</div>
     <button class="nav-btn active" data-view="posView">點餐</button>
@@ -29,6 +30,7 @@
   </aside>
 
   <main class="main">
+    <!-- ===== 點餐頁 ===== -->
     <section id="posView" class="view active">
       <header class="topbar">
         <h1>點餐</h1>
@@ -41,7 +43,6 @@
           <input id="tableNo" placeholder="桌號 / 取餐號 / 訂單號">
         </div>
       </header>
-
       <div class="content-grid">
         <section class="card">
           <div class="toolbar stack">
@@ -50,14 +51,12 @@
           </div>
           <div id="productGrid" class="product-grid"></div>
         </section>
-
         <section class="card cart-panel">
           <div class="row between wrap">
             <h2>購物車</h2>
             <button id="clearCartBtn" class="danger-btn">清空</button>
           </div>
           <div id="cartList" class="cart-list empty">尚未加入商品</div>
-
           <div class="summary">
             <div class="row between"><span>小計</span><strong id="subtotalText">$0</strong></div>
             <div class="stack">
@@ -84,6 +83,7 @@
       </div>
     </section>
 
+    <!-- ===== 訂單查詢頁 ===== -->
     <section id="ordersView" class="view">
       <header class="topbar">
         <h1>訂單查詢</h1>
@@ -120,6 +120,7 @@
       </div>
     </section>
 
+    <!-- ===== 報表頁 ===== -->
     <section id="reportsView" class="view">
       <header class="topbar">
         <h1>報表</h1>
@@ -159,6 +160,7 @@
       </section>
     </section>
 
+    <!-- ===== 商品管理頁 ===== -->
     <section id="productsView" class="view">
       <header class="topbar">
         <h1>商品管理</h1>
@@ -166,7 +168,6 @@
           <button id="saveAllBtn" class="secondary-btn">儲存設定</button>
         </div>
       </header>
-
       <div class="products-layout">
         <section class="card stack">
           <div class="panel-section">
@@ -177,7 +178,6 @@
             </div>
             <div id="categoryList" class="stack" style="margin-top:12px"></div>
           </div>
-
           <div class="panel-section">
             <h2>模組管理</h2>
             <div class="row gap wrap" style="margin-top:12px">
@@ -187,7 +187,6 @@
             <div id="moduleLibraryList" class="stack" style="margin-top:12px"></div>
           </div>
         </section>
-
         <section class="card stack">
           <section class="panel-section">
             <h2>商品編輯</h2>
@@ -251,7 +250,6 @@
               </div>
             </form>
           </section>
-
           <section class="panel-section">
             <div class="row between wrap">
               <h2>待處理菜單</h2>
@@ -259,7 +257,6 @@
             </div>
             <div id="pendingMenuList" class="products-table" style="margin-top:12px"></div>
           </section>
-
           <section class="panel-section">
             <div class="row between wrap">
               <h2>商品列表</h2>
@@ -271,11 +268,13 @@
       </div>
     </section>
 
+    <!-- ===== 設定頁 ===== -->
     <section id="settingsView" class="view">
       <header class="topbar">
         <h1>設定</h1>
       </header>
       <div class="content-grid two">
+        <!-- 本機資料 -->
         <section class="card settings-list">
           <h2>本機資料</h2>
           <button id="exportJsonBtn" class="secondary-btn">匯出本機 JSON</button>
@@ -286,6 +285,7 @@
           <button id="seedDemoBtn" class="secondary-btn">重建預設資料</button>
           <label class="inline-check"><input id="showProductImagesToggle" type="checkbox"> 點餐頁顯示商品圖片</label>
         </section>
+        <!-- Google Drive 備份 / 還原 -->
         <section class="card settings-list">
           <h2>Google Drive 備份 / 還原</h2>
           <label>Google OAuth Client ID
@@ -310,6 +310,7 @@
           <div id="googleBackupStatusBox" class="muted"></div>
           <div class="muted">此功能改為 Google OAuth + Drive API 直連，不使用 Apps Script，也不支援手動輸入 Google 帳號密碼。</div>
         </section>
+        <!-- 即時接單設定 -->
         <section class="card settings-list">
           <h2>即時接單設定</h2>
           <label class="inline-check"><input id="realtimeOrderEnabled" type="checkbox"> 啟用 Firebase 即時接單</label>
@@ -328,6 +329,7 @@
           <label class="inline-check"><input id="onlineIncomingSoundEnabled" type="checkbox"> 線上新單播放提醒聲</label>
           <div class="row gap wrap">
             <button id="saveRealtimeOrderSettingsBtn" class="primary-btn">儲存即時接單設定</button>
+            <button id="syncMenuBtn" class="secondary-btn">同步菜單到雲端</button>
             <button id="posGoogleLoginBtn" class="secondary-btn">POS Google 登入</button>
             <button id="posGoogleLogoutBtn" class="secondary-btn">POS Google 登出</button>
           </div>
@@ -335,6 +337,7 @@
           <div id="realtimeOrderStatusBox" class="muted"></div>
           <div class="muted">外部顧客頁與 POS 都要填相同 Firebase 設定，顧客送單後 POS 會即時收到，店家確認後顧客才完成訂購。</div>
         </section>
+        <!-- 列印設定 -->
         <section class="card settings-list">
           <h2>列印設定</h2>
           <label>店名<input id="printStoreName"></label>
@@ -361,10 +364,12 @@
           <div class="row gap wrap">
             <button id="savePrintSettingsBtn" class="primary-btn">儲存列印設定</button>
             <button id="previewReceiptPrintBtn" class="secondary-btn">預覽顧客單</button>
+            <button id="previewKitchenPrintBtn" class="secondary-btn">預覽廚房單</button>
             <button id="previewLabelPrintBtn" class="secondary-btn">預覽標籤</button>
           </div>
           <div class="muted">此版採用瀏覽器列印方式，可搭配已安裝驅動的出單機與標籤機使用。</div>
         </section>
+        <!-- 這版修正 -->
         <section class="card settings-list">
           <h2>這版修正</h2>
           <ul class="muted">
@@ -376,11 +381,25 @@
             <li>點餐頁可切換是否顯示商品圖片</li>
           </ul>
         </section>
+        <!-- 自訂進單提示音 -->
+        <section class="card settings-list">
+          <h2>自訂進單提示音</h2>
+          <div class="muted">上傳音效檔（500KB 以內，支援 .mp3 .wav .m4a），線上新單進來時將播放此音效取代預設提示音。</div>
+          <div id="customSoundStatusBox" class="muted" style="margin-top:8px">目前音效：預設提示音</div>
+          <input id="customSoundFileInput" type="file" accept="audio/*" hidden>
+          <div class="row gap wrap" style="margin-top:12px">
+            <button id="uploadCustomSoundBtn" class="secondary-btn">上傳自訂音效</button>
+            <button id="previewCustomSoundBtn" class="secondary-btn">試聽目前音效</button>
+            <button id="removeCustomSoundBtn" class="danger-btn">移除自訂音效</button>
+          </div>
+          <div class="muted" style="margin-top:8px">提醒：若未上傳自訂音效，進單時將播放預設的 3 聲電子提示音。音效檔案儲存在瀏覽器本機，更換裝置需重新上傳。</div>
+        </section>
       </div>
     </section>
   </main>
 </div>
 
+<!-- ===== 商品模組設定 Modal ===== -->
 <div id="productConfigModal" class="modal hidden">
   <div class="modal-backdrop" data-close="true"></div>
   <div class="modal-dialog wide">
@@ -409,6 +428,7 @@
   </div>
 </div>
 
+<!-- ===== 分類商品管理 Modal ===== -->
 <div id="categoryManageModal" class="modal hidden">
   <div class="modal-backdrop" data-close="category-manage"></div>
   <div class="modal-dialog wide">
@@ -425,6 +445,7 @@
   </div>
 </div>
 
+<!-- ===== 模組套用商品 Modal ===== -->
 <div id="moduleManageModal" class="modal hidden">
   <div class="modal-backdrop" data-close="module-manage"></div>
   <div class="modal-dialog wide">
@@ -441,6 +462,51 @@
   </div>
 </div>
 
+<!-- ===== 列印欄位選擇 Modal ===== -->
+<div id="printFieldsModal" class="modal hidden">
+  <div class="modal-backdrop" data-close="print-fields"></div>
+  <div class="modal-dialog" style="max-width:420px">
+    <div class="row between wrap">
+      <h2 id="printFieldsTitle">選擇列印欄位</h2>
+      <button id="closePrintFieldsModal" class="ghost-btn">✕</button>
+    </div>
+    <div class="stack" style="margin-top:12px">
+      <label class="inline-check"><input type="checkbox" id="pf_storeName" checked> 店名</label>
+      <label class="inline-check"><input type="checkbox" id="pf_storePhone" checked> 電話</label>
+      <label class="inline-check"><input type="checkbox" id="pf_storeAddress" checked> 地址</label>
+      <label class="inline-check"><input type="checkbox" id="pf_orderNo" checked> 單號</label>
+      <label class="inline-check"><input type="checkbox" id="pf_createdAt" checked> 時間</label>
+      <label class="inline-check"><input type="checkbox" id="pf_orderType" checked> 訂單類型 / 桌號</label>
+      <label class="inline-check"><input type="checkbox" id="pf_paymentMethod" checked> 付款方式</label>
+      <label class="inline-check"><input type="checkbox" id="pf_itemSelections" checked> 品項模組選項</label>
+      <label class="inline-check"><input type="checkbox" id="pf_itemNote" checked> 品項備註</label>
+      <label class="inline-check"><input type="checkbox" id="pf_itemPrice" checked> 品項價格 / 小計</label>
+      <label class="inline-check"><input type="checkbox" id="pf_totalSection" checked> 合計 / 折扣區塊</label>
+      <label class="inline-check"><input type="checkbox" id="pf_footer" checked> 收據備註（頁尾）</label>
+    </div>
+    <div class="row gap wrap" style="margin-top:16px">
+      <button id="printFieldsConfirmBtn" class="primary-btn">確認預覽</button>
+      <button id="printFieldsCancelBtn" class="secondary-btn">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 列印預覽浮動視窗 ===== -->
+<div id="printPreviewModal" class="modal hidden">
+  <div class="modal-backdrop" data-close="print-preview"></div>
+  <div class="modal-dialog wide" style="max-width:480px;padding:0;overflow:hidden;max-height:90vh;display:flex;flex-direction:column;">
+    <div class="row between wrap" style="padding:16px 20px;border-bottom:1px solid var(--line);">
+      <h2 id="printPreviewTitle">列印預覽</h2>
+      <div class="row gap">
+        <button id="printPreviewPrintBtn" class="primary-btn small-btn">列印</button>
+        <button id="closePrintPreviewModal" class="ghost-btn">✕</button>
+      </div>
+    </div>
+    <iframe id="printPreviewFrame" style="flex:1;width:100%;min-height:500px;border:none;background:#fff;"></iframe>
+  </div>
+</div>
+
+<!-- ===== 支付方式 Modal ===== -->
 <input type="hidden" id="paymentTargetMode" value="new">
 <input type="hidden" id="paymentTargetOrderId" value="">
 <div id="paymentModal" class="modal hidden">
@@ -460,6 +526,7 @@
   </div>
 </div>
 
+<!-- ===== 外部腳本 ===== -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://apis.google.com/js/api.js"></script>
