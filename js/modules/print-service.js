@@ -225,3 +225,34 @@ export function buildCartPreviewOrder(){
     items: state.cart
   };
 }
+
+export function previewInModal(html){
+  var modal = document.getElementById('printPreviewModal');
+  var frame = document.getElementById('printPreviewFrame');
+  var title = document.getElementById('printPreviewTitle');
+  if(!modal || !frame) return;
+  modal.classList.remove('hidden');
+  var doc = frame.contentDocument || frame.contentWindow.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  document.getElementById('printPreviewPrintBtn').onclick = function(){
+    frame.contentWindow.print();
+  };
+  document.getElementById('closePrintPreviewModal').onclick = function(){
+    modal.classList.add('hidden');
+  };
+  var backdrop = modal.querySelector('.modal-backdrop');
+  if(backdrop){
+    backdrop.onclick = function(){ modal.classList.add('hidden'); };
+  }
+}
+
+export function getReceiptHtml(order, mode){
+  return buildReceiptHtml(order, mode);
+}
+
+export function getLabelHtml(order){
+  return buildLabelHtml(order);
+}
