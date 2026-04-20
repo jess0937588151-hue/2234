@@ -165,16 +165,15 @@ function showOnlineOrderOverlay(orderId){
 
   overlay.style.display = 'flex';
 
-  // 接受按鈕
+   // 接受按鈕
   const acceptBtn = document.getElementById('overlayAcceptBtn');
-  const newAccept = acceptBtn.cloneNode(true);
-  acceptBtn.parentNode.replaceChild(newAccept, acceptBtn);
-  newAccept.id = 'overlayAcceptBtn';
-  newAccept.onclick = async ()=>{
+  acceptBtn.disabled = false;
+  acceptBtn.textContent = '確認接單';
+  acceptBtn.onclick = async ()=>{
     const prepTime = parseInt(document.getElementById('overlayPrepTime').value) || 20;
     const msg = document.getElementById('overlayMessage').value || `預計 ${prepTime} 分鐘後可取餐`;
-    newAccept.disabled = true;
-    newAccept.textContent = '處理中...';
+    acceptBtn.disabled = true;
+    acceptBtn.textContent = '處理中...';
     try{
       const result = await confirmOnlineOrder(orderId, prepTime, msg);
       stopAlarm();
@@ -194,20 +193,20 @@ function showOnlineOrderOverlay(orderId){
       if(typeof window.refreshRealtimeOrderPanel === 'function') window.refreshRealtimeOrderPanel();
     }catch(err){
       alert('接單失敗：' + err.message);
-      newAccept.disabled = false;
-      newAccept.textContent = '確認接單';
+      acceptBtn.disabled = false;
+      acceptBtn.textContent = '確認接單';
     }
   };
 
+ 
   // 拒絕按鈕
   const rejectBtn = document.getElementById('overlayRejectBtn');
-  const newReject = rejectBtn.cloneNode(true);
-  rejectBtn.parentNode.replaceChild(newReject, rejectBtn);
-  newReject.id = 'overlayRejectBtn';
-  newReject.onclick = async ()=>{
+  rejectBtn.disabled = false;
+  rejectBtn.textContent = '拒絕訂單';
+  rejectBtn.onclick = async ()=>{
     if(!confirm('確定拒絕此訂單？')) return;
-    newReject.disabled = true;
-    newReject.textContent = '處理中...';
+    rejectBtn.disabled = true;
+    rejectBtn.textContent = '處理中...';
     try{
       await rejectOnlineOrder(orderId, '店家拒絕接單');
       stopAlarm();
@@ -215,8 +214,8 @@ function showOnlineOrderOverlay(orderId){
       if(typeof window.refreshRealtimeOrderPanel === 'function') window.refreshRealtimeOrderPanel();
     }catch(err){
       alert('拒絕失敗：' + err.message);
-      newReject.disabled = false;
-      newReject.textContent = '拒絕訂單';
+      rejectBtn.disabled = false;
+      rejectBtn.textContent = '拒絕訂單';
     }
   };
 }
