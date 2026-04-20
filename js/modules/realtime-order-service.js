@@ -136,7 +136,11 @@ function playOnce(){
 
 // 開始重複播放提示音，60秒後自動接單
 function startAlarm(orderId){
-  stopAlarm(); // 先停止之前的警報
+  if(activeAlarmInterval){
+    activeAlarmOrderId = orderId;
+    return;
+  }
+
   activeAlarmOrderId = orderId;
 
   // 立即播放第一次
@@ -147,7 +151,7 @@ function startAlarm(orderId){
     playOnce();
   }, 5000);
 
-    // 60秒後自動接單
+  // 60秒後自動接單
   activeAlarmTimeout = setTimeout(async ()=>{
     const autoOrderId = activeAlarmOrderId;
     stopAlarm();
@@ -160,7 +164,6 @@ function startAlarm(orderId){
       console.error('自動接單失敗：', err);
     }
   }, 60000);
-
 }
 
 // 停止提示音和自動接單計時器
