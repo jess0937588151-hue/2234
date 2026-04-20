@@ -147,17 +147,20 @@ function startAlarm(orderId){
     playOnce();
   }, 5000);
 
-  // 60秒後自動接單
+    // 60秒後自動接單
   activeAlarmTimeout = setTimeout(async ()=>{
+    const autoOrderId = activeAlarmOrderId;
     stopAlarm();
+    if(!autoOrderId) return;
     try{
-      await confirmOnlineOrder(activeAlarmOrderId, 20, '系統自動接單，預計準備時間 20 分鐘');
+      await confirmOnlineOrder(autoOrderId, 20, '系統自動接單，預計準備時間 20 分鐘');
       if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
       if(typeof window.refreshRealtimeOrderPanel === 'function') window.refreshRealtimeOrderPanel();
     }catch(err){
       console.error('自動接單失敗：', err);
     }
   }, 60000);
+
 }
 
 // 停止提示音和自動接單計時器
