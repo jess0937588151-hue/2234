@@ -109,7 +109,7 @@ function playOnce(){
       audio.play().catch(()=>{});
       return;
     }
-    let ctx = keepAliveCtx;
+    let ctx = window.keepAliveCtx || null;
     if(!ctx){
       const AC = window.AudioContext || window.webkitAudioContext;
       if(!AC) return;
@@ -134,49 +134,128 @@ function playOnce(){
   }
 }
 
+function showOnlineOrderOverlay(orderId){
+  const overlay = document.getElementById('onlineOrderOverlay');
+  if(!overlay) return;
+
+  const order = (state.onlineIncomingOrders || []).find(o => o.id === orderId);
+
+  document.getElementById('overlayOrderNo').textContent = order ? (order.orderNo || order.id) : orderId;
+  document.getElementById('overlayTotal').textContent = order ? `$${order.totalAmount || 0}` : '';
+  document.getElementById('overlayMeta').textContent = order
+    ? `${order.createdAt ? new Date(order.createdAt).toLocaleString('zh-TW') : ''} · 線上點餐-${order.orderType === 'dineIn' ? '內用' : '外帶'}`
+    : '';
+  document.getElementById('overlayCustomer').textContent = order
+    ? `${order.customerName || '匿名'} / ${order.customerPhone || ''}`
+    : '';
+
+  const itemsEl = document.getElementById('overlayItems');
+  if(order && order.items){
+    itemsEl.innerHTML = order.items.map(it =>
+      `<div style="padding:3px 0;">${it.name} x ${it.qty}</div>`
+    ).join('');
+  } else {
+    itemsEl.innerHTML = '';
+  }
+
+  document.getElementById('overlayPrepTime').value = 20;
+  document.getElementById('overlayMessage').value = '';
+
+  overlay.style.display = 'flex';
+
+  // 接受按鈕
+  const acceptBtn = document.getElementById('overlayAcceptBtn');
+  const newAccept = acceptBtn.cloneNode(true);
+  acceptBtn.parentNode.replaceChild(newAccept, acceptBtn);
+  newAccept.id = 'overlayAcceptBtn';
+  newAccept.onclick = async ()=>{
+    const prepTime = parseInt(document.getElementById('overlayPrepTime').value) || 20;
+    const msg = document.getElementById('overlayMessage').value || `預計 ${prepTime} 分鐘後可取餐`;
+    newAccept.disabled = true;
+    newAccept.textContent = '處理中...';
+    try{
+      const result = await confirmOnlineOrder(orderId, prepTime, msg);
+      stopAlarm();
+      if(result){
+        const posOrder = buildRealtimeOrderForPOS(result);
+        if(!Array.isArray(state.orders)) state.orders = [];
+        state.orders.unshift(posOrder);
+        persistAll();
+        try{
+          const { printOrderReceipt } = await import('./print-service.js');
+          const cfg2 = ensureRealtimeConfig();
+          if(cfg2.autoPrintOnConfirm) printOrderReceipt(posOrder,'kitchen');
+          printOrderReceipt(posOrder,'customer');
+        }catch(pe){}
+      }
+      if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
+      if(typeof window.refreshRealtimeOrderPanel === 'function') window.refreshRealtimeOrderPanel();
+    }catch(err){
+      alert('接單失敗：' + err.message);
+      newAccept.disabled = false;
+      newAccept.textContent = '確認接單';
+    }
+  };
+
+  // 拒絕按鈕
+  const rejectBtn = document.getElementById('overlayRejectBtn');
+  const newReject = rejectBtn.cloneNode(true);
+  rejectBtn.parentNode.replaceChild(newReject, rejectBtn);
+  newReject.id = 'overlayRejectBtn';
+  newReject.onclick = async ()=>{
+    if(!confirm('確定拒絕此訂單？')) return;
+    newReject.disabled = true;
+    newReject.textContent = '處理中...';
+    try{
+      await rejectOnlineOrder(orderId, '店家拒絕接單');
+      stopAlarm();
+      if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
+      if(typeof window.refreshRealtimeOrderPanel === 'function') window.refreshRealtimeOrderPanel();
+    }catch(err){
+      alert('拒絕失敗：' + err.message);
+      newReject.disabled = false;
+      newReject.textContent = '拒絕訂單';
+    }
+  };
+}
+
+
 // 開始重複播放提示音，60秒後自動接單
 function startAlarm(orderId){
   if(activeAlarmInterval){
     activeAlarmOrderId = orderId;
     return;
   }
-
   activeAlarmOrderId = orderId;
 
-  // 立即播放第一次
+  showOnlineOrderOverlay(orderId);
   playOnce();
 
-  // 每5秒重複播放
   activeAlarmInterval = setInterval(()=>{
     playOnce();
-  }, 5000);
+  }, 3000);
 
-  // 60秒後自動接單
   activeAlarmTimeout = setTimeout(async ()=>{
     const autoOrderId = activeAlarmOrderId;
     stopAlarm();
     if(!autoOrderId) return;
     try{
       const result = await confirmOnlineOrder(autoOrderId, 20, '系統自動接單，預計準備時間 20 分鐘');
-        if(result){
-          const posOrder = buildRealtimeOrderForPOS(result);
-          if(!Array.isArray(state.orders)) state.orders = [];
-          state.orders.unshift(posOrder);
-          persistAll();
-          try{
-            const cfg = ensureRealtimeConfig();
-            const { printOrderReceipt, printOrderLabels } = await import('./print-service.js');
-            if(cfg.autoPrintKitchenOnConfirm) printOrderReceipt(posOrder, 'kitchen');
-            if(cfg.autoPrintReceiptOnConfirm) printOrderReceipt(posOrder, 'customer');
-          }catch(e){ console.error('自動接單列印失敗：', e); }
-        }
-        if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
-        if(typeof window.refreshRealtimeOrderPanel === 'function') window.refreshRealtimeOrderPanel();
-
-
-    }catch(err){
-      console.error('自動接單失敗：', err);
-    }
+      if(result){
+        const posOrder = buildRealtimeOrderForPOS(result);
+        if(!Array.isArray(state.orders)) state.orders = [];
+        state.orders.unshift(posOrder);
+        persistAll();
+        try{
+          const { printOrderReceipt } = await import('./print-service.js');
+          const cfg2 = ensureRealtimeConfig();
+          if(cfg2.autoPrintOnConfirm) printOrderReceipt(posOrder,'kitchen');
+          printOrderReceipt(posOrder,'customer');
+        }catch(pe){ console.error('自動接單列印失敗：',pe); }
+      }
+      if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
+      if(typeof window.refreshRealtimeOrderPanel === 'function') window.refreshRealtimeOrderPanel();
+    }catch(err){ console.error('自動接單失敗：',err); }
   }, 60000);
 }
 
@@ -185,6 +264,8 @@ function stopAlarm(){
   if(activeAlarmInterval){ clearInterval(activeAlarmInterval); activeAlarmInterval = null; }
   if(activeAlarmTimeout){ clearTimeout(activeAlarmTimeout); activeAlarmTimeout = null; }
   activeAlarmOrderId = null;
+  const overlay = document.getElementById('onlineOrderOverlay');
+  if(overlay) overlay.style.display = 'none';
 }
 
 // 保留向下相容的 beep 函式名稱
