@@ -142,9 +142,8 @@ function showOnlineOrderOverlay(orderId){
 
   document.getElementById('overlayOrderNo').textContent = order ? (order.orderNo || order.id) : orderId;
   document.getElementById('overlayTotal').textContent = order
-  ? `$${order.totalAmount || order.total || (order.items || []).reduce((s,it) => s + (Number(it.price || it.basePrice || 0) + Number(it.extraPrice || 0)) * Number(it.qty || 0), 0)}`
+  ? `$${order.total || order.subtotal || order.totalAmount || 0}`
   : '';
-
   document.getElementById('overlayMeta').textContent = order
     ? `${order.createdAt ? new Date(order.createdAt).toLocaleString('zh-TW') : ''} · 線上點餐-${order.orderType === 'dineIn' ? '內用' : '外帶'}`
     : '';
