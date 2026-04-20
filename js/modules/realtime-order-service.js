@@ -339,15 +339,13 @@ export function buildRealtimeOrderForPOS(remote){
 }
 
 export async function syncMenuToFirebase(){
-  const { state } = await import('../core/store.js');
+  await loadFirebaseModules();
+  const user = authInstance.currentUser || await waitForAuthReady();
+  if(!user) throw new Error('請先使用 POS Google 登入');
+  await verifyPOSAccess();
+
   const cfg = ensureRealtimeConfig();
-  const apiKey = cfg.apiKey || '';
-  const dbUrl = cfg.databaseURL || '';
-  if(!apiKey || !dbUrl){
-    throw new Error('請先在設定頁填寫 Firebase API Key 與 Database URL');
-  }
-  await ensureFirebaseAuth(cfg);
-  const storeId = cfg.firebaseStoreId || 'default';
+  const storeId = cfg.projectId || 'default';
   const menuData = {
     categories: state.categories || [],
     products: (state.products || []).map(function(p){
@@ -364,8 +362,10 @@ export async function syncMenuToFirebase(){
     modules: state.modules || [],
     updatedAt: new Date().toISOString()
   };
-  const dbApi = getFirebaseDbApi(cfg);
-  await dbApi.set(dbApi.ref(dbApi.db, 'menu/' + storeId), menuData);
+
+  const menuRef = await getRef('menu/' + storeId);
+  await dbApi.set(menuRef, menuData);
   cfg.lastSyncStatus = '菜單同步成功';
   cfg.lastSyncTime = new Date().toISOString();
+  persistAll();
 }
