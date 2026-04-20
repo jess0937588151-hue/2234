@@ -286,7 +286,7 @@ export async function startPOSRealtimeListener(onRefresh){
   let seen = new Set(JSON.parse(sessionStorage.getItem('pos_seen_online_orders') || '[]'));
 
   posListenerRef = ref;
-  posListenerCallback = snapshot => {
+    posListenerCallback = snapshot => {
     const value = snapshot.val() || {};
     const incoming = Object.entries(value)
       .map(([id, row]) => ({ id, ...row }))
@@ -294,18 +294,25 @@ export async function startPOSRealtimeListener(onRefresh){
 
     state.onlineIncomingOrders = incoming;
 
+    let hasNewOrder = false;
     incoming.forEach(order => {
       if(order.status === 'pending_confirm' && !seen.has(order.id)){
         seen.add(order.id);
         cfg.lastOrderAt = new Date().toISOString();
         cfg.lastSyncStatus = `收到新訂單：${order.customerName || order.orderNo || order.id}`;
         sessionStorage.setItem('pos_seen_online_orders', JSON.stringify([...seen]));
-        startAlarm(order.id);
+        hasNewOrder = true;
       }
     });
 
+    if(hasNewOrder && !activeAlarmInterval){
+      const latestPending = incoming.find(o => o.status === 'pending_confirm');
+      if(latestPending) startAlarm(latestPending.id);
+    }
+
     if(!incoming.some(order => order.status === 'pending_confirm')){
       cfg.lastSyncStatus = '即時接單監聽中';
+      stopAlarm();
     }
 
     persistAll();
