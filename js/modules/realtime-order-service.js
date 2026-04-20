@@ -4,7 +4,7 @@ import { state, persistAll } from '../core/store.js';
 const FIREBASE_BASE = 'https://www.gstatic.com/firebasejs/10.12.2';
 const DEFAULT_FIREBASE_CONFIG = {
   enabled: true,
-  apiKey: 'AIzaSyB0mGn6HQI00eR6UiU2hn44TbFoneblybk',
+  apiKey: 'AIzaSyBOmGn6HQI0O6RU6Iu2hh44TbFoneblbyk',
   authDomain: 'webpos-1f626.firebaseapp.com',
   databaseURL: 'https://webpos-1f626-default-rtdb.asia-southeast1.firebasedatabase.app',
   projectId: 'webpos-1f626',
