@@ -169,7 +169,7 @@ export function initSettingsPage(){
   // 8. Google Drive 備份 - 初始化欄位
   // ============================
   const googleCfg = getGoogleBackupConfig();
-  document.getElementById('googleClientId').value = googleCfg.clientId || '';
+  document.getElementById('googleClientId').value = googleCfg.clientId || '203764995518-sct9k1tpf9fl6nrjh0h7kt8phsr47uas.apps.googleusercontent.com';
   document.getElementById('googleFolderId').value = googleCfg.folderId || '';
   document.getElementById('googleAutoBackupEnabled').checked = !!googleCfg.autoBackupEnabled;
   document.getElementById('googleAutoBackupMinutes').value = Number(googleCfg.autoBackupMinutes || 60);
