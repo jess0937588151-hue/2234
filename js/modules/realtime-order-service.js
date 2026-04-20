@@ -340,9 +340,9 @@ export function buildRealtimeOrderForPOS(remote){
 
 export async function syncMenuToFirebase(){
   const { state } = await import('../core/store.js');
-  const cfg = state.realtimeOrderConfig || {};
-  const apiKey = cfg.firebaseApiKey || '';
-  const dbUrl = cfg.firebaseDatabaseUrl || '';
+  const cfg = ensureRealtimeConfig();
+  const apiKey = cfg.apiKey || '';
+  const dbUrl = cfg.databaseURL || '';
   if(!apiKey || !dbUrl){
     throw new Error('請先在設定頁填寫 Firebase API Key 與 Database URL');
   }
