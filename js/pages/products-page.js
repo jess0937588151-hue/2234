@@ -354,6 +354,28 @@ export function renderProductsTable(){
   state.products.sort((a,b)=>a.sortOrder-b.sortOrder);
   const wrap = document.getElementById('productsTable');
   wrap.innerHTML = '';
+      var syncBar = document.createElement('div');
+    syncBar.className = 'row gap wrap';
+    syncBar.style.marginBottom = '12px';
+    var syncBtn = document.createElement('button');
+    syncBtn.className = 'secondary-btn';
+    syncBtn.textContent = '同步菜單到雲端';
+    syncBtn.onclick = async function(){
+      try{
+        syncBtn.disabled = true;
+        syncBtn.textContent = '同步中...';
+        var mod = await import('../modules/realtime-order-service.js');
+        await mod.syncMenuToFirebase();
+        syncBtn.textContent = '同步完成！';
+        setTimeout(function(){ syncBtn.textContent = '同步菜單到雲端'; syncBtn.disabled = false; }, 2000);
+      }catch(err){
+        alert('同步失敗：' + (err.message || err));
+        syncBtn.textContent = '同步菜單到雲端';
+        syncBtn.disabled = false;
+      }
+    };
+    syncBar.appendChild(syncBtn);
+    wrap.appendChild(syncBar);
   if(!state.products.length) return wrap.innerHTML = '<div class="muted">尚無商品</div>';
   const total = state.products.length;
   const expandedId = wrap.dataset.expandedProductId || '';
