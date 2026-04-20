@@ -437,7 +437,6 @@ export async function startPOSRealtimeListener(onRefresh){
 }
 
 export async function confirmOnlineOrder(orderId, prepTimeMinutes = 0, replyMessage = ''){
-  stopAlarm();
   const ref = await getRef(`onlineOrders/${orderId}`);
   const snapshot = await dbApi.get(ref);
   const order = snapshot.val();
@@ -472,7 +471,6 @@ export async function confirmOnlineOrder(orderId, prepTimeMinutes = 0, replyMess
 }
 
 export async function rejectOnlineOrder(orderId, replyMessage = ''){
-  stopAlarm();
   const ref = await getRef(`onlineOrders/${orderId}`);
   const safeReplyMessage = String(replyMessage || '').trim().slice(0, 120);
   await dbApi.update(ref, {
