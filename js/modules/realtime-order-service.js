@@ -157,15 +157,22 @@ function startAlarm(orderId){
     stopAlarm();
     if(!autoOrderId) return;
     try{
-              const result = await confirmOnlineOrder(autoOrderId, 20, '系統自動接單，預計準備時間 20 分鐘');
+      const result = await confirmOnlineOrder(autoOrderId, 20, '系統自動接單，預計準備時間 20 分鐘');
         if(result){
           const posOrder = buildRealtimeOrderForPOS(result);
           if(!Array.isArray(state.orders)) state.orders = [];
           state.orders.unshift(posOrder);
           persistAll();
+          try{
+            const cfg = ensureRealtimeConfig();
+            const { printOrderReceipt, printOrderLabels } = await import('./print-service.js');
+            if(cfg.autoPrintKitchenOnConfirm) printOrderReceipt(posOrder, 'kitchen');
+            if(cfg.autoPrintReceiptOnConfirm) printOrderReceipt(posOrder, 'customer');
+          }catch(e){ console.error('自動接單列印失敗：', e); }
         }
         if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
         if(typeof window.refreshRealtimeOrderPanel === 'function') window.refreshRealtimeOrderPanel();
+
 
     }catch(err){
       console.error('自動接單失敗：', err);
