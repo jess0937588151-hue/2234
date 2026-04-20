@@ -102,6 +102,8 @@ var activeAlarmOrderId = null;
 
 // 播放一次提示音（優先使用自訂音檔，否則用預設 beep）
 function playOnce(){
+  const cfg = ensureRealtimeConfig();
+  if(!cfg.incomingSoundEnabled) return;
   try{
     const customSound = localStorage.getItem('pos_custom_sound');
     if(customSound){
