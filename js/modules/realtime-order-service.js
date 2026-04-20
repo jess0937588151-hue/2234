@@ -248,15 +248,20 @@ export async function pushOnlineOrder(order){
   cfg.lastOrderAt = new Date().toISOString();
   cfg.lastSyncStatus = '顧客訂單已送出';
   persistAll();
-  return newRef.昂
+  return newRef.key;
 }
 
 export async function watchCustomerOrder(orderId, onChange){
+  await loadFirebaseModules();
   const ref = await getRef(`onlineOrders/${orderId}`);
-  const callback = snapshot => onChange(snapshot.val());
+  const callback = snapshot => {
+    const val = snapshot.val();
+    if(val) onChange(val);
+  };
   dbApi.onValue(ref, callback);
   return ()=> dbApi.off(ref, 'value', callback);
 }
+
 
 export async function startPOSRealtimeListener(onRefresh){
   const cfg = ensureRealtimeConfig();
