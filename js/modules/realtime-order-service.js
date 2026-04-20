@@ -340,29 +340,32 @@ export function buildRealtimeOrderForPOS(remote){
 
 export async function syncMenuToFirebase(){
   const { state } = await import('../core/store.js');
-  const cfg = ensureRealtimeConfig();
-  if(!cfg.firebaseApiKey || !cfg.firebaseDatabaseUrl){
+  const cfg = state.realtimeOrderConfig || {};
+  const apiKey = cfg.firebaseApiKey || '';
+  const dbUrl = cfg.firebaseDatabaseUrl || '';
+  if(!apiKey || !dbUrl){
     throw new Error('請先在設定頁填寫 Firebase API Key 與 Database URL');
   }
   await ensureFirebaseAuth(cfg);
   const storeId = cfg.firebaseStoreId || 'default';
   const menuData = {
     categories: state.categories || [],
-    products: (state.products || []).map(p=>({
-      id: p.id,
-      name: p.name,
-      price: p.price,
-      category: p.category,
-      image: p.image || '',
-      modules: p.modules || [],
-      sortOrder: p.sortOrder || 0
-    })),
+    products: (state.products || []).map(function(p){
+      return {
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        category: p.category,
+        image: p.image || '',
+        modules: p.modules || [],
+        sortOrder: p.sortOrder || 0
+      };
+    }),
     modules: state.modules || [],
     updatedAt: new Date().toISOString()
   };
   const dbApi = getFirebaseDbApi(cfg);
-  await dbApi.set(dbApi.ref(dbApi.db, `menu/${storeId}`), menuData);
+  await dbApi.set(dbApi.ref(dbApi.db, 'menu/' + storeId), menuData);
   cfg.lastSyncStatus = '菜單同步成功';
   cfg.lastSyncTime = new Date().toISOString();
 }
-
