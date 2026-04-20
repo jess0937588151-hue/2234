@@ -132,6 +132,18 @@ export function initSettingsPage(){
   // ============================
   document.getElementById('posGoogleLoginBtn').onclick = async function(){
     try{
+               try{
+          const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
+          const osc = tempCtx.createOscillator();
+          const gain = tempCtx.createGain();
+          gain.gain.value = 0;
+          osc.connect(gain);
+          gain.connect(tempCtx.destination);
+          osc.start();
+          osc.stop(tempCtx.currentTime + 0.01);
+          setTimeout(()=> tempCtx.close(), 100);
+        }catch(e){}
+
       await signInPOSWithGoogle();
       const access = await verifyPOSAccess();
       await renderPOSGoogleAccountBox();
