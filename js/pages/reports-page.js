@@ -198,23 +198,19 @@ function buildReportPrintHtml(flags){
 
 function openReportPrintPreview(html){
   var modal = document.getElementById('printPreviewModal');
-  var body = document.getElementById('printPreviewBody');
-  if(!modal || !body) return;
-  body.innerHTML = html;
+  var frame = document.getElementById('printPreviewFrame');
+  if(!modal || !frame) return;
   modal.classList.remove('hidden');
+  var doc = frame.contentDocument || frame.contentWindow.document;
+  doc.open();
+  doc.write('<html><head><title>列印報表</title></head><body>' + html + '</body></html>');
+  doc.close();
 
-  document.getElementById('printPreviewPrintBtn').onclick = function(){
-    var w = window.open('', '_blank');
-    w.document.write('<html><head><title>列印報表</title></head><body>' + html + '</body></html>');
-    w.document.close();
-    w.print();
+  document.getElementById('printPreviewBtn').onclick = function(){
+    frame.contentWindow.print();
   };
 
-  document.getElementById('printPreviewCloseBtn').onclick = function(){
-    modal.classList.add('hidden');
-  };
-
-  document.getElementById('closePrintPreview').onclick = function(){
+  document.getElementById('closePrintPreviewModal').onclick = function(){
     modal.classList.add('hidden');
   };
 
