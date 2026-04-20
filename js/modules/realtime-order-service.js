@@ -109,25 +109,28 @@ function playOnce(){
       audio.play().catch(()=>{});
       return;
     }
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if(!AudioCtx) return;
-    const ctx = new AudioCtx();
-    const notes = [880, 988, 880];
-    notes.forEach((freq, index)=>{
+    let ctx = keepAliveCtx;
+    if(!ctx){
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(!AC) return;
+      ctx = new AC();
+    }
+    if(ctx.state === 'suspended') ctx.resume();
+    const now = ctx.currentTime;
+    [880, 1046.5, 1318.5].forEach((freq, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      gain.gain.value = 0.05;
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.3, now + i * 0.18);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.18 + 0.15);
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.type = 'sine';
-      osc.frequency.value = freq;
-      const startAt = ctx.currentTime + index * 0.22;
-      osc.start(startAt);
-      osc.stop(startAt + 0.16);
+      osc.start(now + i * 0.18);
+      osc.stop(now + i * 0.18 + 0.15);
     });
-    setTimeout(()=> ctx.close(), 900);
   }catch(err){
-    console.error(err);
+    console.error('playOnce 播放失敗：', err);
   }
 }
 
