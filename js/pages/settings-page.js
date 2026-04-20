@@ -324,13 +324,12 @@ document.getElementById('posGoogleLogoutBtn').onclick = async ()=>{
     alert('列印設定已儲存');
   };
     function initCustomSoundSection(){
-    var fileInput = document.getElementById('customSoundFileInput');
-    var uploadBtn = document.getElementById('uploadCustomSoundBtn');
-    var previewBtn = document.getElementById('previewCustomSoundBtn');
-    var removeBtn = document.getElementById('removeCustomSoundBtn');
-    var statusEl = document.getElementById('customSoundStatusBox');
-
-    if(!uploadBtn) return;
+      var fileInput = document.getElementById('customSoundFileInput');
+      var uploadBtn = document.getElementById('uploadCustomSoundBtn');
+      var previewBtn = document.getElementById('previewCustomSoundBtn');
+      var removeBtn = document.getElementById('removeCustomSoundBtn');
+      var statusEl = document.getElementById('customSoundStatusBox');
+      if(!uploadBtn) return;
 
     function renderStatus(){
       var saved = localStorage.getItem('pos_custom_sound');
