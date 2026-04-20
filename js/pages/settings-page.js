@@ -83,6 +83,23 @@ async function renderPOSGoogleAccountBox(){
     startPOSRealtimeListener(()=> window.refreshAllViews()).catch(err=> console.error(err));
     alert('即時接單設定已儲存');
   };
+    document.getElementById('syncMenuBtn').onclick = async ()=>{
+    const btn = document.getElementById('syncMenuBtn');
+    try{
+      btn.disabled = true;
+      btn.textContent = '同步中...';
+      const mod = await import('../modules/realtime-order-service.js');
+      await mod.syncMenuToFirebase();
+      btn.textContent = '同步完成！';
+      alert('菜單已同步到雲端');
+      setTimeout(()=>{ btn.textContent = '同步菜單到雲端'; btn.disabled = false; }, 2000);
+    }catch(err){
+      alert('同步失敗：' + (err.message || err));
+      btn.textContent = '同步菜單到雲端';
+      btn.disabled = false;
+    }
+  };
+
   document.getElementById('showProductImagesToggle').checked = !!state.settings.showProductImages;
 
 
