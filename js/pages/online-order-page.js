@@ -314,6 +314,8 @@ async function submitOnlineOrder(){
   try{
     openStatusOverlay('等待店家確認訂單', '送出後請稍候，店家確認後才算完成訂購。');
     const orderId = await pushOnlineOrder(payload);
+    const { signInCustomerAnonymously } = await import('../modules/realtime-order-service.js');
+    await signInCustomerAnonymously();
     const stopWatch = await watchCustomerOrder(orderId, (remote)=>{
       if(!remote) return;
       if(remote.status === 'confirmed'){
