@@ -323,4 +323,60 @@ document.getElementById('posGoogleLogoutBtn').onclick = async ()=>{
     persistAll();
     alert('列印設定已儲存');
   };
+    function initCustomSoundSection(){
+    var fileInput = document.getElementById('customSoundFile');
+    var uploadBtn = document.getElementById('uploadSoundBtn');
+    var previewBtn = document.getElementById('previewSoundBtn');
+    var removeBtn = document.getElementById('removeSoundBtn');
+    var statusEl = document.getElementById('customSoundStatus');
+    if(!uploadBtn) return;
+
+    function renderStatus(){
+      var saved = localStorage.getItem('pos_custom_sound');
+      var name = localStorage.getItem('pos_custom_sound_name');
+      if(saved && statusEl){
+        statusEl.textContent = '已上傳：' + (name || '自訂音檔');
+      } else if(statusEl){
+        statusEl.textContent = '尚未上傳自訂音檔';
+      }
+    }
+    renderStatus();
+
+    uploadBtn.onclick = function(){ fileInput.click(); };
+
+    fileInput.onchange = function(e){
+      var f = e.target.files[0];
+      if(!f) return;
+      if(f.size > 500 * 1024){
+        alert('音檔超過 500KB，請選擇較小的檔案');
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function(ev){
+        localStorage.setItem('pos_custom_sound', ev.target.result);
+        localStorage.setItem('pos_custom_sound_name', f.name);
+        renderStatus();
+        alert('已上傳：' + f.name);
+      };
+      reader.readAsDataURL(f);
+    };
+
+    previewBtn.onclick = function(){
+      var saved = localStorage.getItem('pos_custom_sound');
+      if(!saved){
+        alert('尚未上傳自訂音檔');
+        return;
+      }
+      var audio = new Audio(saved);
+      audio.play();
+    };
+
+    removeBtn.onclick = function(){
+      localStorage.removeItem('pos_custom_sound');
+      localStorage.removeItem('pos_custom_sound_name');
+      renderStatus();
+      alert('已移除自訂音檔');
+    };
+  }
+  initCustomSoundSection();
 }
