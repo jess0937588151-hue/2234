@@ -92,10 +92,23 @@ async function getRef(path){
   return dbApi.ref(dbInstance, path);
 }
 
-function beep(){
+// ========== 進單提示音 & 自動接單 ==========
+// activeAlarmInterval: 重複播放計時器
+// activeAlarmTimeout: 60秒自動接單計時器
+// activeAlarmOrderId: 當前響鈴的訂單ID
+var activeAlarmInterval = null;
+var activeAlarmTimeout = null;
+var activeAlarmOrderId = null;
+
+// 播放一次提示音（優先使用自訂音檔，否則用預設 beep）
+function playOnce(){
   try{
-    const cfg = ensureRealtimeConfig();
-    if(!cfg.incomingSoundEnabled) return;
+    const customSound = localStorage.getItem('pos_custom_sound');
+    if(customSound){
+      const audio = new Audio(customSound);
+      audio.play().catch(()=>{});
+      return;
+    }
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if(!AudioCtx) return;
     const ctx = new AudioCtx();
@@ -103,11 +116,11 @@ function beep(){
     notes.forEach((freq, index)=>{
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = freq;
       gain.gain.value = 0.05;
       osc.connect(gain);
       gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
       const startAt = ctx.currentTime + index * 0.22;
       osc.start(startAt);
       osc.stop(startAt + 0.16);
@@ -117,6 +130,47 @@ function beep(){
     console.error(err);
   }
 }
+
+// 開始重複播放提示音，60秒後自動接單
+function startAlarm(orderId){
+  stopAlarm(); // 先停止之前的警報
+  activeAlarmOrderId = orderId;
+
+  // 立即播放第一次
+  playOnce();
+
+  // 每5秒重複播放
+  activeAlarmInterval = setInterval(()=>{
+    playOnce();
+  }, 5000);
+
+  // 60秒後自動接單
+  activeAlarmTimeout = setTimeout(async ()=>{
+    stopAlarm();
+    try{
+      await confirmOnlineOrder(activeAlarmOrderId, 20, '系統自動接單，預計準備時間 20 分鐘');
+      if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
+      if(typeof window.refreshRealtimeOrderPanel === 'function') window.refreshRealtimeOrderPanel();
+    }catch(err){
+      console.error('自動接單失敗：', err);
+    }
+  }, 60000);
+}
+
+// 停止提示音和自動接單計時器
+function stopAlarm(){
+  if(activeAlarmInterval){ clearInterval(activeAlarmInterval); activeAlarmInterval = null; }
+  if(activeAlarmTimeout){ clearTimeout(activeAlarmTimeout); activeAlarmTimeout = null; }
+  activeAlarmOrderId = null;
+}
+
+// 保留向下相容的 beep 函式名稱
+function beep(){
+  const cfg = ensureRealtimeConfig();
+  if(!cfg.incomingSoundEnabled) return;
+  playOnce();
+}
+
 
 export async function signInPOSWithGoogle(){
   await loadFirebaseModules();
@@ -191,7 +245,7 @@ export async function pushOnlineOrder(order){
   cfg.lastOrderAt = new Date().toISOString();
   cfg.lastSyncStatus = '顧客訂單已送出';
   persistAll();
-  return newRef.key;
+  return newRef.昂
 }
 
 export async function watchCustomerOrder(orderId, onChange){
@@ -235,7 +289,7 @@ export async function startPOSRealtimeListener(onRefresh){
         cfg.lastOrderAt = new Date().toISOString();
         cfg.lastSyncStatus = `收到新訂單：${order.customerName || order.orderNo || order.id}`;
         sessionStorage.setItem('pos_seen_online_orders', JSON.stringify([...seen]));
-        beep();
+        startAlarm(order.id);
       }
     });
 
@@ -265,6 +319,7 @@ export async function startPOSRealtimeListener(onRefresh){
 }
 
 export async function confirmOnlineOrder(orderId, prepTimeMinutes = 0, replyMessage = ''){
+  stopAlarm();
   const ref = await getRef(`onlineOrders/${orderId}`);
   const snapshot = await dbApi.get(ref);
   const order = snapshot.val();
@@ -299,6 +354,7 @@ export async function confirmOnlineOrder(orderId, prepTimeMinutes = 0, replyMess
 }
 
 export async function rejectOnlineOrder(orderId, replyMessage = ''){
+  stopAlarm();
   const ref = await getRef(`onlineOrders/${orderId}`);
   const safeReplyMessage = String(replyMessage || '').trim().slice(0, 120);
   await dbApi.update(ref, {
