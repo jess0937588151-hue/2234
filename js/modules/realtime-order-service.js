@@ -286,7 +286,7 @@ export async function startPOSRealtimeListener(onRefresh){
   let seen = new Set(JSON.parse(sessionStorage.getItem('pos_seen_online_orders') || '[]'));
 
   posListenerRef = ref;
-      posListenerCallback = snapshot => {
+    posListenerCallback = snapshot => {
     const value = snapshot.val() || {};
     const incoming = Object.entries(value)
       .map(([id, row]) => ({ id, ...row }))
@@ -294,30 +294,16 @@ export async function startPOSRealtimeListener(onRefresh){
 
     state.onlineIncomingOrders = incoming;
 
-    const hasPending = incoming.some(order => order.status === 'pending_confirm');
-
+    let hasNewOrder = false;
     incoming.forEach(order => {
       if(order.status === 'pending_confirm' && !seen.has(order.id)){
         seen.add(order.id);
         cfg.lastOrderAt = new Date().toISOString();
         cfg.lastSyncStatus = `收到新訂單：${order.customerName || order.orderNo || order.id}`;
         sessionStorage.setItem('pos_seen_online_orders', JSON.stringify([...seen]));
-        if(!activeAlarmInterval){
-          startAlarm(order.id);
-        }
+        hasNewOrder = true;
       }
     });
-
-    if(!hasPending){
-      cfg.lastSyncStatus = '即時接單監聯中';
-      if(activeAlarmInterval) stopAlarm();
-    }
-
-    persistAll();
-    if(typeof onRefresh === 'function') onRefresh();
-    if(typeof window.refreshRealtimeOrderPanel === 'function') window.refreshRealtimeOrderPanel();
-  };
-
 
     if(hasNewOrder && !activeAlarmInterval){
       const latestPending = incoming.find(o => o.status === 'pending_confirm');
@@ -351,6 +337,7 @@ export async function startPOSRealtimeListener(onRefresh){
 }
 
 export async function confirmOnlineOrder(orderId, prepTimeMinutes = 0, replyMessage = ''){
+  stopAlarm();
   const ref = await getRef(`onlineOrders/${orderId}`);
   const snapshot = await dbApi.get(ref);
   const order = snapshot.val();
@@ -385,6 +372,7 @@ export async function confirmOnlineOrder(orderId, prepTimeMinutes = 0, replyMess
 }
 
 export async function rejectOnlineOrder(orderId, replyMessage = ''){
+  stopAlarm();
   const ref = await getRef(`onlineOrders/${orderId}`);
   const safeReplyMessage = String(replyMessage || '').trim().slice(0, 120);
   await dbApi.update(ref, {
