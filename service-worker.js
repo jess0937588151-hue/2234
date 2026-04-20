@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pos-v2111-cache';
+const CACHE_NAME = 'pos-v2112-cache';
 const ASSETS = [
   './',
   './index.html',
@@ -28,6 +28,9 @@ const ASSETS = [
   './js/modules/drag-sort.js',
   './js/modules/product-category-manager.js',
   './js/modules/product-module-manager.js',
+  './js/modules/print-service.js',
+  './js/modules/realtime-order-service.js',
+  './js/modules/google-backup-service.js',
   './assets/icon-192.png',
   './assets/icon-512.png'
 ];
@@ -46,14 +49,18 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+
+  // Firebase CDN 和外部 API 不做快取
+  const url = new URL(event.request.url);
+  if (url.origin !== location.origin) return;
+
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).then((response) => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-        return response;
-      }).catch(() => caches.match('./index.html'));
+    fetch(event.request).then((response) => {
+      const clone = response.clone();
+      caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+      return response;
+    }).catch(() => {
+      return caches.match(event.request).then(cached => cached || caches.match('./index.html'));
     })
   );
 });
