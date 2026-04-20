@@ -206,8 +206,8 @@ function openReportPrintPreview(html){
   doc.write('<html><head><title>列印報表</title></head><body>' + html + '</body></html>');
   doc.close();
 
-  document.getElementById('printPreviewBtn').onclick = function(){
-    frame.contentWindow.print();
+  document.getElementById('printPreviewPrintBtn').onclick = function(){
+  frame.contentWindow.print();
   };
 
   document.getElementById('closePrintPreviewModal').onclick = function(){
