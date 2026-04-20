@@ -234,7 +234,7 @@ export function previewInModal(html){
   modal.classList.remove('hidden');
   var doc = frame.contentDocument || frame.contentWindow.document;
   doc.open();
-  doc.write(html);
+  doc.write(html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ''));
   doc.close();
 
   document.getElementById('printPreviewPrintBtn').onclick = function(){
