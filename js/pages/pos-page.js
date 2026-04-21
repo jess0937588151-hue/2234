@@ -449,5 +449,42 @@ export function initPOSPage(){
       renderCart();
     };
   }
+  document.getElementById('discountAmountBtn').onclick = ()=>{
+    const val = prompt('請輸入折扣金額（正數）');
+    if(!val) return;
+    const amount = Math.abs(Number(val));
+    if(!amount || amount <= 0) return alert('請輸入正確金額');
+    mergeOrPushCartItem({
+      rowId: id(),
+      productId: '_discount_',
+      name: '折扣 -$' + amount,
+      basePrice: -amount,
+      qty: 1,
+      note: '',
+      selections: [],
+      extraPrice: 0
+    });
+    renderCart();
+  };
+  document.getElementById('discountPercentBtn').onclick = ()=>{
+    const val = prompt('請輸入折扣百分比（例如：10 表示打9折）');
+    if(!val) return;
+    const percent = Math.abs(Number(val));
+    if(!percent || percent <= 0 || percent >= 100) return alert('請輸入 1～99 之間的數字');
+    const subtotal = state.cart.reduce((s,x)=> s + (x.basePrice + x.extraPrice) * x.qty, 0);
+    const discountAmount = Math.round(subtotal * percent / 100);
+    if(discountAmount <= 0) return alert('目前購物車金額為 0，無法計算折扣');
+    mergeOrPushCartItem({
+      rowId: id(),
+      productId: '_discount_',
+      name: '折扣 ' + percent + '% (-$' + discountAmount + ')',
+      basePrice: -discountAmount,
+      qty: 1,
+      note: '',
+      selections: [],
+      extraPrice: 0
+    });
+    renderCart();
+  };
 
 }
