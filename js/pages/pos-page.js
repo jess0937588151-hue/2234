@@ -394,5 +394,18 @@ export function initPOSPage(){
     };
   }
 
+  if(document.getElementById('checkoutBtnModal')){
+    document.getElementById('checkoutBtnModal').onclick = ()=>{
+      document.getElementById('cartModal').style.display = 'none';
+      document.getElementById('checkoutBtn').click();
+    };
+  }
+  if(document.getElementById('clearCartBtnModal')){
+    document.getElementById('clearCartBtnModal').onclick = ()=>{
+      state.cart = [];
+      state.editingOrderId = null;
+      renderCart();
+    };
+  }
 
 }
