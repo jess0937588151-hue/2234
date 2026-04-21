@@ -1,7 +1,7 @@
 /* 中文備註：訂單服務。建立訂單後會回傳訂單資料，供列印功能使用。 */
 import { state } from '../core/store.js';
 import { deepCopy, id } from '../core/utils.js';
-import { getDiscountResult, getDiscountType } from './cart-service.js';
+//import { getDiscountResult, getDiscountType } from './cart-service.js';
 
 export function createOrUpdateOrder(paymentMethod){
   const subtotal = state.cart.reduce((s,x)=>s + (x.basePrice + x.extraPrice) * x.qty, 0);
