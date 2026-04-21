@@ -5,8 +5,9 @@ import { getDiscountResult, getDiscountType } from './cart-service.js';
 
 export function createOrUpdateOrder(paymentMethod){
   const subtotal = state.cart.reduce((s,x)=>s + (x.basePrice + x.extraPrice) * x.qty, 0);
-  const { discountAmount, total } = getDiscountResult(subtotal);
-  const existing = state.editingOrderId ? state.orders.find(o=>o.id===state.editingOrderId) : null;
+  const discountAmount = 0;
+const total = subtotal;
+ const existing = state.editingOrderId ? state.orders.find(o=>o.id===state.editingOrderId) : null;
   const order = {
     id: existing?.id || id(),
     orderNo: existing?.orderNo || ('OD' + Date.now()),
@@ -16,9 +17,10 @@ export function createOrUpdateOrder(paymentMethod){
     paymentMethod,
     orderType: document.getElementById('orderType').value,
     tableNo: document.getElementById('tableNo').value.trim(),
-    discountType: getDiscountType(),
-    discountValue: Number(document.getElementById('discountValue').value || 0),
-    discountAmount,
+        discountType: 'amount',
+    discountValue: 0,
+    discountAmount: 0,
+
     subtotal,
     total,
     items: deepCopy(state.cart),
