@@ -232,12 +232,22 @@ function startAlarm(orderId){
   activeAlarmOrderId = orderId;
 
   showOnlineOrderOverlay(orderId);
-  playOnce();
 
-  activeAlarmInterval = setInterval(()=>{
+  // 延遲1秒後開始播放，確保 overlay 已顯示
+  setTimeout(()=>{
+    if(!activeAlarmOrderId) return;
     playOnce();
-  }, 3000);
+    activeAlarmInterval = setInterval(()=>{
+      // 只在 overlay 可見時播放
+      const overlay = document.getElementById('onlineOrderOverlay');
+      if(!overlay || overlay.style.display === 'none'){
+        return;
+      }
+      playOnce();
+    }, 3000);
+  }, 1000);
 
+  // 60秒後自動接單
   activeAlarmTimeout = setTimeout(async ()=>{
     const autoOrderId = activeAlarmOrderId;
     stopAlarm();
@@ -261,6 +271,7 @@ function startAlarm(orderId){
     }catch(err){ console.error('自動接單失敗：',err); }
   }, 60000);
 }
+
 
 // 停止提示音和自動接單計時器
 function stopAlarm(){
