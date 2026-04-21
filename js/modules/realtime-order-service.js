@@ -23,50 +23,6 @@ let initialized = false;
 let posListenerRef = null;
 let posListenerCallback = null;
 
-// 預載提示音 audio 元素
-let alarmAudio = null;
-function getAlarmAudio(){
-  if(alarmAudio) return alarmAudio;
-  const customSound = localStorage.getItem('pos_custom_sound');
-  if(customSound){
-    alarmAudio = new Audio(customSound);
-  } else {
-    // 產生內建 beep 音效的 data URI
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const sr = ctx.sampleRate;
-    const duration = 0.6;
-    const len = sr * duration;
-    const buf = ctx.createBuffer(1, len, sr);
-    const data = buf.getChannelData(0);
-    const freqs = [880, 1046.5, 1318.5];
-    freqs.forEach((freq, i) => {
-      const start = Math.floor(i * 0.18 * sr);
-      const end = Math.floor((i * 0.18 + 0.15) * sr);
-      for(let n = start; n < end && n < len; n++){
-        const t = (n - start) / sr;
-        const envelope = 0.3 * Math.exp(-t * 20);
-        data[n] += envelope * Math.sin(2 * Math.PI * freq * t);
-      }
-    });
-    const offCtx = new OfflineAudioContext(1, len, sr);
-    const source = offCtx.createBufferSource();
-    source.buffer = buf;
-    source.connect(offCtx.destination);
-    source.start();
-    offCtx.startRendering().then(rendered => {
-      const wav = audioBufferToWav(rendered);
-      const blob = new Blob([wav], {type:'audio/wav'});
-      const url = URL.createObjectURL(blob);
-      alarmAudio = new Audio(url);
-      alarmAudio.load();
-    });
-    ctx.close();
-    // 暫時先用簡易方式
-    alarmAudio = null;
-    return null;
-  }
-  if(alarmAudio) alarmAudio.load();
-  return alarmAudio;
 
 function ensureRealtimeConfig(){
   if(!state.settings) state.settings = {};
