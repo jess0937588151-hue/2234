@@ -161,111 +161,103 @@
       </section>
     </section>
 
-    <!-- ===== 商品管理頁 ===== -->
+       <!-- ===== 商品管理頁 ===== -->
     <section id="productsView" class="view">
       <header class="topbar">
         <h1>商品管理</h1>
         <div class="topbar-actions">
+          <button id="addProductBtn" class="primary-btn">新增商品</button>
           <button id="saveAllBtn" class="secondary-btn">儲存設定</button>
         </div>
       </header>
       <div class="products-layout">
-        <section class="card stack">
-          <div class="panel-section">
-            <h2>分類管理</h2>
-            <div class="row gap wrap" style="margin-top:12px">
-              <input id="newCategoryInput" placeholder="新增分類">
-              <button id="addCategoryBtn" class="secondary-btn">新增分類</button>
-            </div>
-            <div id="categoryList" class="stack" style="margin-top:12px"></div>
+        <section class="panel-section">
+          <h2>分類管理</h2>
+          <div class="row gap wrap" style="margin-top:10px">
+            <input id="newCategoryInput" placeholder="新增分類" style="flex:1">
+            <button id="addCategoryBtn" class="secondary-btn">新增</button>
           </div>
-          <div class="panel-section">
-            <h2>模組管理</h2>
-            <div class="row gap wrap" style="margin-top:12px">
-              <input id="newModuleInput" placeholder="新增模組名稱">
-              <button id="addModuleBtn" class="secondary-btn">新增模組</button>
-            </div>
-            <div id="moduleLibraryList" class="stack" style="margin-top:12px"></div>
+          <div id="categoryList" class="entity-grid" style="margin-top:10px"></div>
+        </section>
+        <section class="panel-section">
+          <h2>模組管理</h2>
+          <div class="row gap wrap" style="margin-top:10px">
+            <input id="newModuleInput" placeholder="新增模組名稱" style="flex:1">
+            <button id="addModuleBtn" class="secondary-btn">新增</button>
           </div>
+          <div id="moduleLibraryList" class="entity-grid" style="margin-top:10px"></div>
         </section>
-        <section class="card stack">
-          <section class="panel-section">
-            <h2>商品編輯</h2>
-            <form id="productForm" class="stack" style="margin-top:12px">
-              <input type="hidden" id="productId">
-              <div class="grid2">
-                <div>
-                  <label>商品名稱</label>
-                  <input id="productName" required>
-                  <div id="productNameError" class="field-error hidden">請輸入商品名稱</div>
-                </div>
-                <div>
-                  <label>價格</label>
-                  <input id="productPrice" type="number" min="0" required>
-                  <div id="productPriceError" class="field-error hidden">請輸入正確商品價格</div>
-                </div>
-              </div>
-              <div class="grid2">
-                <div>
-                  <label>分類</label>
-                  <select id="productCategory"></select>
-                </div>
-                <div>
-                  <label>狀態</label>
-                  <select id="productEnabled">
-                    <option value="true">啟用</option>
-                    <option value="false">停用</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label>商品別名（逗號分隔）</label>
-                <input id="productAliases" placeholder="香雞排, 大雞排">
-              </div>
-              <div class="stack">
-                <label>商品圖片</label>
-                <input id="productImageInput" type="file" accept="image/*">
-                <input id="productImageData" type="hidden">
-                <div id="productImagePreview" class="product-image-preview muted">尚未上傳圖片</div>
-                <div class="row gap wrap">
-                  <button type="button" id="removeProductImageBtn" class="secondary-btn">移除圖片</button>
-                </div>
-              </div>
-              <div class="stack">
-                <div class="row between wrap">
-                  <label>已套用模組</label>
-                  <div class="row gap wrap">
-                    <select id="moduleSelect"></select>
-                    <button type="button" id="attachModuleBtn" class="secondary-btn">加入模組</button>
-                  </div>
-                </div>
-                <div id="productModulesEditor" class="stack"></div>
-              </div>
-              <div class="row gap wrap">
-                <button type="button" id="excelTemplateBtn" class="secondary-btn">新增範本</button>
-                <button type="button" id="excelImportBtn" class="secondary-btn">Excel匯入菜單</button>
-                <input id="excelImportInput" type="file" accept=".xlsx,.xls,.csv" hidden>
-                <button type="submit" class="primary-btn">保存商品</button>
-                <button type="button" id="deleteProductBtn" class="danger-btn">刪除商品</button>
-                <button type="button" id="resetProductBtn" class="secondary-btn">清空表單</button>
-              </div>
-            </form>
-          </section>
-          <section class="panel-section">
-            <div class="row between wrap">
-              <h2>待處理菜單</h2>
-              <div class="muted">Excel匯入結果先放這裡，確認後才正式納入菜單</div>
+        <section class="panel-section">
+          <div class="row between wrap">
+            <h2>待處理菜單</h2>
+            <div class="row gap wrap">
+              <button id="excelTemplateBtn" class="secondary-btn small-btn">新增範本</button>
+              <button id="excelImportBtn" class="secondary-btn small-btn">Excel匯入</button>
+              <input id="excelImportInput" type="file" accept=".xlsx,.xls,.csv" hidden>
             </div>
-            <div id="pendingMenuList" class="products-table" style="margin-top:12px"></div>
-          </section>
-          <section class="panel-section">
-            <div class="row between wrap">
-              <h2>商品列表</h2>
-              <div class="muted">正式菜單</div>
-            </div>
-            <div id="productsTable" class="products-table" style="margin-top:12px"></div>
-          </section>
+          </div>
+          <div id="pendingMenuList" style="margin-top:10px"></div>
         </section>
+        <section class="panel-section">
+          <h2>商品列表</h2>
+          <div id="productsTable" class="product-grid" style="margin-top:10px"></div>
+        </section>
+      </div>
+      <!-- 商品編輯浮動視窗 -->
+      <div id="productEditModal" class="product-modal-backdrop" style="display:none">
+        <div class="product-modal">
+          <h3 id="productEditModalTitle">新增商品</h3>
+          <form id="productForm" class="form-grid">
+            <input type="hidden" id="productId">
+            <div class="form-row">
+              <label>商品名稱</label>
+              <input id="productName" required>
+              <div id="productNameError" class="field-error hidden">請輸入商品名稱</div>
+            </div>
+            <div class="form-row">
+              <label>價格</label>
+              <input id="productPrice" type="number" min="0" required>
+              <div id="productPriceError" class="field-error hidden">請輸入正確商品價格</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div class="form-row">
+                <label>分類</label>
+                <select id="productCategory"></select>
+              </div>
+              <div class="form-row">
+                <label>狀態</label>
+                <select id="productEnabled">
+                  <option value="true">啟用</option>
+                  <option value="false">停用</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <label>商品別名（逗號分隔）</label>
+              <input id="productAliases" placeholder="香雞排, 大雞排">
+            </div>
+            <div class="form-row">
+              <label>商品圖片</label>
+              <input id="productImageInput" type="file" accept="image/*">
+              <input id="productImageData" type="hidden">
+              <div id="productImagePreview" class="product-image-preview muted">尚未上傳圖片</div>
+              <button type="button" id="removeProductImageBtn" class="secondary-btn small-btn" style="margin-top:6px">移除圖片</button>
+            </div>
+            <div class="form-row">
+              <label>已套用模組</label>
+              <div class="row gap wrap" style="margin-bottom:6px">
+                <select id="moduleSelect" style="flex:1"></select>
+                <button type="button" id="attachModuleBtn" class="secondary-btn small-btn">加入</button>
+              </div>
+              <div id="productModulesEditor"></div>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="primary-btn" style="background:#2563eb;color:#fff">保存商品</button>
+              <button type="button" id="deleteProductBtn" class="danger-btn" style="background:#fecaca;color:#b91c1c">刪除</button>
+              <button type="button" id="closeProductEditModal" style="background:#e5e7eb;color:#374151">取消</button>
+            </div>
+          </form>
+        </div>
       </div>
     </section>
 
