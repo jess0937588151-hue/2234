@@ -190,10 +190,8 @@ export function renderProducts(){
       // 加入折扣商品卡片
   const discountCard = document.createElement('div');
   discountCard.className = 'product-card';
-  discountCard.innerHTML = `
-    <div class="card-thumb-placeholder" style="background:#fef2f2">🏷️</div>
-    <div class="card-name">折扣</div>
-    <div class="price" style="color:#ef4444">輸入金額</div>
+    discountCard.innerHTML = `
+    <div class="card-name" style="color:#ef4444">🏷️ 折扣</div>
     <div class="meta">點擊輸入折扣金額</div>
     <button class="primary-btn full" style="background:#ef4444">加入折扣</button>
   `;
