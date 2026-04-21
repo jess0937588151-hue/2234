@@ -23,6 +23,51 @@ let initialized = false;
 let posListenerRef = null;
 let posListenerCallback = null;
 
+// 預載提示音 audio 元素
+let alarmAudio = null;
+function getAlarmAudio(){
+  if(alarmAudio) return alarmAudio;
+  const customSound = localStorage.getItem('pos_custom_sound');
+  if(customSound){
+    alarmAudio = new Audio(customSound);
+  } else {
+    // 產生內建 beep 音效的 data URI
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const sr = ctx.sampleRate;
+    const duration = 0.6;
+    const len = sr * duration;
+    const buf = ctx.createBuffer(1, len, sr);
+    const data = buf.getChannelData(0);
+    const freqs = [880, 1046.5, 1318.5];
+    freqs.forEach((freq, i) => {
+      const start = Math.floor(i * 0.18 * sr);
+      const end = Math.floor((i * 0.18 + 0.15) * sr);
+      for(let n = start; n < end && n < len; n++){
+        const t = (n - start) / sr;
+        const envelope = 0.3 * Math.exp(-t * 20);
+        data[n] += envelope * Math.sin(2 * Math.PI * freq * t);
+      }
+    });
+    const offCtx = new OfflineAudioContext(1, len, sr);
+    const source = offCtx.createBufferSource();
+    source.buffer = buf;
+    source.connect(offCtx.destination);
+    source.start();
+    offCtx.startRendering().then(rendered => {
+      const wav = audioBufferToWav(rendered);
+      const blob = new Blob([wav], {type:'audio/wav'});
+      const url = URL.createObjectURL(blob);
+      alarmAudio = new Audio(url);
+      alarmAudio.load();
+    });
+    ctx.close();
+    // 暫時先用簡易方式
+    alarmAudio = null;
+    return null;
+  }
+  if(alarmAudio) alarmAudio.load();
+  return alarmAudio;
+
 function ensureRealtimeConfig(){
   if(!state.settings) state.settings = {};
   const current = state.settings.realtimeOrder || {};
@@ -101,40 +146,66 @@ var activeAlarmTimeout = null;
 var activeAlarmOrderId = null;
 
 // 播放一次提示音（優先使用自訂音檔，否則用預設 beep）
+let beepAudio = null;
+let beepUnlocked = false;
+
+function ensureBeepAudio(){
+  const customSound = localStorage.getItem('pos_custom_sound');
+  if(customSound){
+    if(!beepAudio || beepAudio._custom !== customSound){
+      beepAudio = new Audio(customSound);
+      beepAudio._custom = customSound;
+    }
+    return beepAudio;
+  }
+  if(!beepAudio){
+    // 用 oscillator 產生一次性 blob URL
+    try{
+      const sr = 8000;
+      const duration = 0.6;
+      const numSamples = sr * duration;
+      const header = new ArrayBuffer(44 + numSamples);
+      const view = new DataView(header);
+      // WAV header
+      const writeStr = (o,s)=>{for(let i=0;i<s.length;i++)view.setUint8(o+i,s.charCodeAt(i));};
+      writeStr(0,'RIFF'); view.setUint32(4,36+numSamples,true); writeStr(8,'WAVE');
+      writeStr(12,'fmt '); view.setUint32(16,16,true); view.setUint16(20,1,true);
+      view.setUint16(22,1,true); view.setUint32(24,sr,true); view.setUint32(28,sr,true);
+      view.setUint16(32,1,true); view.setUint16(34,8,true);
+      writeStr(36,'data'); view.setUint32(40,numSamples,true);
+      const bytes = new Uint8Array(header, 44);
+      for(let i=0;i<numSamples;i++){
+        const t = i/sr;
+        let v = 0;
+        if(t<0.15) v = Math.sin(2*Math.PI*880*t)*0.3*Math.exp(-t*15);
+        else if(t>=0.18&&t<0.33) v = Math.sin(2*Math.PI*1047*(t-0.18))*0.3*Math.exp(-(t-0.18)*15);
+        else if(t>=0.36&&t<0.51) v = Math.sin(2*Math.PI*1319*(t-0.36))*0.3*Math.exp(-(t-0.36)*15);
+        bytes[i] = 128 + Math.round(v*127);
+      }
+      const blob = new Blob([header],{type:'audio/wav'});
+      beepAudio = new Audio(URL.createObjectURL(blob));
+      beepAudio.load();
+    }catch(e){
+      console.error('建立 beep 音效失敗：',e);
+    }
+  }
+  return beepAudio;
+}
+
 function playOnce(){
   const cfg = ensureRealtimeConfig();
   if(!cfg.incomingSoundEnabled) return;
   try{
-    const customSound = localStorage.getItem('pos_custom_sound');
-    if(customSound){
-      const audio = new Audio(customSound);
-      audio.play().catch(()=>{});
-      return;
-    }
-    let ctx = window.keepAliveCtx || null;
-    if(!ctx){
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if(!AC) return;
-      ctx = new AC();
-    }
-    if(ctx.state === 'suspended') ctx.resume();
-    const now = ctx.currentTime;
-    [880, 1046.5, 1318.5].forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.frequency.value = freq;
-      osc.type = 'sine';
-      gain.gain.setValueAtTime(0.3, now + i * 0.18);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.18 + 0.15);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now + i * 0.18);
-      osc.stop(now + i * 0.18 + 0.15);
-    });
+    const audio = ensureBeepAudio();
+    if(!audio) return;
+    audio.currentTime = 0;
+    audio.play().catch(()=>{});
   }catch(err){
-    console.error('playOnce 播放失敗：', err);
+    console.error('playOnce 播放失敗：',err);
   }
 }
+
+
 
 function showOnlineOrderOverlay(orderId){
   const overlay = document.getElementById('onlineOrderOverlay');
