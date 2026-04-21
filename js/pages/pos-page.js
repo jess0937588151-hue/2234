@@ -228,9 +228,10 @@ export function renderCart(){
     });
   }
   const subtotal = state.cart.reduce((s,x)=>s + (x.basePrice + x.extraPrice) * x.qty, 0);
-  const {discountAmount, total} = getDiscountResult(subtotal);
+  const discountAmount = 0;
+  const total = subtotal;
   document.getElementById('subtotalText').textContent = money(subtotal);
-  document.getElementById('totalText').textContent = money(total) + (discountAmount ? `（已折 ${money(discountAmount)}）` : '');
+  document.getElementById('totalText').textContent = money(total);
 }
 
 function finalizeOrder(paymentMethod){
@@ -318,18 +319,8 @@ export function initPOSPage(){
   document.getElementById('cancelProductConfigBtn').onclick = closeProductConfig;
   document.querySelector('#productConfigModal .modal-backdrop').onclick = closeProductConfig;
 
-  document.getElementById('discountAmountBtn').onclick = ()=> { setDiscountType('amount'); persistAll(); document.getElementById('discountAmountBtn').classList.add('active'); document.getElementById('discountPercentBtn').classList.remove('active'); renderCart(); };
-  document.getElementById('discountPercentBtn').onclick = ()=> { setDiscountType('percent'); persistAll(); document.getElementById('discountPercentBtn').classList.add('active'); document.getElementById('discountAmountBtn').classList.remove('active'); renderCart(); };
-  document.getElementById('discountValue').addEventListener('input', ()=>{ handleDiscountInput(); renderCart(); });
   document.getElementById('clearCartBtn').onclick = ()=>{ state.cart=[]; state.editingOrderId=null; renderCart(); };
-  document.getElementById('printCartReceiptBtn').onclick = ()=>{
-    if(!state.cart.length) return alert('請先加入商品');
-    printOrderReceipt(buildCartPreviewOrder(), 'customer');
-  };
-  document.getElementById('printCartLabelBtn').onclick = ()=>{
-    if(!state.cart.length) return alert('請先加入商品');
-    printOrderLabels(buildCartPreviewOrder());
-  };
+  
   document.getElementById('checkoutBtn').onclick = ()=>{
     if(!state.cart.length) return alert('請先加入商品');
     document.getElementById('paymentTargetMode').value = 'new';
@@ -340,8 +331,5 @@ export function initPOSPage(){
   document.querySelector('#paymentModal .modal-backdrop').onclick = ()=> document.getElementById('paymentModal').classList.add('hidden');
   document.querySelectorAll('.pay-btn').forEach(btn=> btn.onclick = ()=> finalizeOrder(btn.dataset.payment));
 
-  if(getDiscountType() === 'percent'){
-    document.getElementById('discountPercentBtn').classList.add('active');
-    document.getElementById('discountAmountBtn').classList.remove('active');
-  }
+
 }
