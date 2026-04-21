@@ -44,4 +44,7 @@
 .cart-summary{border-top:1px solid var(--line);padding-top:10px;margin-top:10px}
 .pos-topbar-row select{padding:6px 8px;border:1px solid var(--line);border-radius:8px;font-size:13px;width:80px}
 .pos-topbar-row input{padding:6px 8px;border:1px solid var(--line);border-radius:8px;font-size:13px;width:130px}
+.cart-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:7000;display:flex;align-items:center;justify-content:center}
+.cart-modal{background:#fff;border-radius:18px;padding:20px;max-width:420px;width:92%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.2)}
+
 
