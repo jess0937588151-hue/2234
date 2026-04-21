@@ -213,8 +213,35 @@ export function renderProducts(){
     renderCart();
   };
   grid.appendChild(discountCard);
-
+  // 百分比折扣卡片
+  const percentCard = document.createElement('div');
+  percentCard.className = 'product-card';
+  percentCard.innerHTML = `
+    <div class="card-name" style="color:#ef4444">％ 折扣</div>
+    <div class="meta">點擊輸入折扣百分比</div>
+    <button class="primary-btn full" style="background:#ef4444">加入%折扣</button>
+  `;
+  percentCard.querySelector('button').onclick = ()=>{
+    const val = prompt('請輸入折扣百分比（例如：10 表示打9折）');
+    if(!val) return;
+    const percent = Math.abs(Number(val));
+    if(!percent || percent <= 0 || percent >= 100) return alert('請輸入 1～99 之間的數字');
+    const subtotal = state.cart.reduce((s,x)=> s + (x.basePrice + x.extraPrice) * x.qty, 0);
+    const discountAmount = Math.round(subtotal * percent / 100);
+    if(discountAmount <= 0) return alert('目前購物車金額為 0，無法計算折扣');
+    mergeOrPushCartItem({
+      rowId: id(),
+      productId: '_discount_',
+      name: '折扣 ' + percent + '% (-$' + discountAmount + ')',
+      basePrice: -discountAmount,
+      qty: 1,
+      note: '',
+      selections: [],
+      extraPrice: 0
+    });
+    renderCart();
   };
+  grid.appendChild(percentCard);
 
 }
 
