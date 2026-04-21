@@ -330,6 +330,21 @@ export function initPOSPage(){
   document.getElementById('closePaymentModal').onclick = ()=> document.getElementById('paymentModal').classList.add('hidden');
   document.querySelector('#paymentModal .modal-backdrop').onclick = ()=> document.getElementById('paymentModal').classList.add('hidden');
   document.querySelectorAll('.pay-btn').forEach(btn=> btn.onclick = ()=> finalizeOrder(btn.dataset.payment));
+  if(document.getElementById('cartModalBtn')){
+    document.getElementById('cartModalBtn').onclick = ()=>{
+      document.getElementById('cartModal').style.display = 'flex';
+    };
+  }
+  if(document.getElementById('closeCartModal')){
+    document.getElementById('closeCartModal').onclick = ()=>{
+      document.getElementById('cartModal').style.display = 'none';
+    };
+  }
+  if(document.getElementById('cartModal')){
+    document.getElementById('cartModal').onclick = (e)=>{
+      if(e.target.id === 'cartModal') document.getElementById('cartModal').style.display = 'none';
+    };
+  }
 
 
 }
