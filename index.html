@@ -31,8 +31,7 @@
 
   <main class="main">
     <!-- ===== 點餐頁 ===== -->
-        <!-- ===== 點餐頁 ===== -->
-    <section id="posView" class="view active">
+      <section id="posView" class="view active">
       <header class="topbar pos-topbar">
         <div class="pos-topbar-row">
           <h1>點餐</h1>
@@ -41,33 +40,31 @@
             <option value="外帶">外帶</option>
             <option value="線上點餐">線上點餐</option>
           </select>
-          <input id="tableNo" placeholder="桌號 / 取餐號 / 訂單號">
-          <button id="cartModalBtn" class="secondary-btn pos-cart-btn">🛒 購物車 <span id="cartBadge">0</span></button>
+          <input id="tableNo" placeholder="桌號 / 取餐號 / 訂單號" style="width:160px">
           <button id="checkoutBtn" class="primary-btn">結帳</button>
         </div>
       </header>
       <div class="pos-layout">
-        <section class="pos-products-area">
+        <section>
           <div class="toolbar stack">
             <input id="productSearch" placeholder="搜尋商品">
             <div id="categoryTabs" class="category-tabs"></div>
           </div>
           <div id="productGrid" class="product-grid"></div>
         </section>
-        <section class="pos-cart-sidebar" id="cartSidebar">
+        <section class="pos-cart-panel">
           <div class="row between wrap">
-            <h2>購物車</h2>
+            <h2 style="margin:0">購物車</h2>
             <button id="clearCartBtn" class="danger-btn small-btn">清空</button>
           </div>
           <div id="cartList" class="cart-list empty">尚未加入商品</div>
           <div class="cart-summary">
             <div class="row between"><span>小計</span><strong id="subtotalText">$0</strong></div>
-            <div class="row between"><span>折扣</span><strong id="discountText">-$0</strong></div>
-            <div class="row between" style="font-size:18px"><span>合計</span><strong id="totalText">$0</strong></div>
+            <div class="row between" style="font-size:18px;margin-top:6px"><span>合計</span><strong id="totalText">$0</strong></div>
           </div>
-          <input type="hidden" id="discountValue" value="0">
         </section>
       </div>
+  
       <!-- 購物車浮動視窗（手機用） -->
       <div id="cartModal" class="cart-modal-backdrop" style="display:none">
         <div class="cart-modal">
@@ -78,8 +75,7 @@
           <div id="cartListModal" class="cart-list empty">尚未加入商品</div>
           <div class="cart-summary">
             <div class="row between"><span>小計</span><strong id="subtotalTextModal">$0</strong></div>
-            <div class="row between"><span>折扣</span><strong id="discountTextModal">-$0</strong></div>
-            <div class="row between" style="font-size:18px"><span>合計</span><strong id="totalTextModal">$0</strong></div>
+           <div class="row between" style="font-size:18px"><span>合計</span><strong id="totalTextModal">$0</strong></div>
           </div>
           <button id="checkoutBtnModal" class="primary-btn full" style="margin-top:12px">結帳</button>
         </div>
