@@ -190,7 +190,7 @@ export function renderProducts(){
       // 加入折扣商品卡片
   const discountCard = document.createElement('div');
   discountCard.className = 'product-card';
-    discountCard.innerHTML = `
+      discountCard.innerHTML = `
     <div class="card-name" style="color:#ef4444">🏷️ 折扣</div>
     <div class="meta">點擊輸入折扣金額</div>
     <button class="primary-btn full" style="background:#ef4444">加入折扣</button>
