@@ -185,6 +185,8 @@ export function renderProducts(){
     if(p.enabled===false) btn.disabled = true;
     else btn.onclick = ()=> openProductConfigForNew(p.id);
     grid.appendChild(card);
+  
+  });
       // 加入折扣商品卡片
   const discountCard = document.createElement('div');
   discountCard.className = 'product-card';
@@ -214,8 +216,8 @@ export function renderProducts(){
   };
   grid.appendChild(discountCard);
 
-  });
 }
+
 
 window.refreshPublicProducts = renderProducts;
 
