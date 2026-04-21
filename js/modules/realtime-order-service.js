@@ -165,31 +165,6 @@ function playOnce(){
   }
 }
 
-      const blob = new Blob([header],{type:'audio/wav'});
-      beepAudio = new Audio(URL.createObjectURL(blob));
-      beepAudio.load();
-    }catch(e){
-      console.error('建立 beep 音效失敗：',e);
-    }
-  }
-  return beepAudio;
-}
-
-function playOnce(){
-  const cfg = ensureRealtimeConfig();
-  if(!cfg.incomingSoundEnabled) return;
-  try{
-    const audio = ensureBeepAudio();
-    if(!audio) return;
-    audio.currentTime = 0;
-    audio.play().catch(()=>{});
-  }catch(err){
-    console.error('playOnce 播放失敗：',err);
-  }
-}
-
-
-
 function showOnlineOrderOverlay(orderId){
   const overlay = document.getElementById('onlineOrderOverlay');
   if(!overlay) return;
