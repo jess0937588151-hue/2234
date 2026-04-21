@@ -222,16 +222,29 @@ window.refreshPublicProducts = renderProducts;
 export function renderCart(){
   const list = document.getElementById('cartList');
   const listModal = document.getElementById('cartListModal');
-  list.innerHTML = '';
-  if(listModal) listModal.innerHTML = '';
+   list.innerHTML = '';
 
+  // 右側面板：只顯示品項、數量、金額
   if(!state.cart.length){
     list.className = 'cart-list empty';
     list.textContent = '尚未加入商品';
-    if(listModal){ listModal.className = 'cart-list empty'; listModal.textContent = '尚未加入商品'; }
   } else {
     list.className = 'cart-list';
-    if(listModal) listModal.className = 'cart-list';
+    state.cart.forEach(item=>{
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid #f1f5f9';
+      row.innerHTML = `<span>${escapeHtml(item.name)} x${item.qty}</span><strong>${money((item.basePrice + item.extraPrice) * item.qty)}</strong>`;
+      list.appendChild(row);
+    });
+  }
+
+  // 浮動視窗：完整功能
+  if(listModal) listModal.innerHTML = '';
+  if(listModal && !state.cart.length){
+    listModal.className = 'cart-list empty';
+    listModal.textContent = '尚未加入商品';
+  } else if(listModal){
+    listModal.className = 'cart-list';
     state.cart.forEach(item=>{
       const desc = (item.selections||[]).map(s=> `${s.moduleName}:${s.optionName}`).join(' / ');
       const row = document.createElement('div');
@@ -261,10 +274,10 @@ export function renderCart(){
         buttons[btnIdx++].onclick = ()=> openProductConfigForEdit(item.rowId);
       }
       buttons[btnIdx].onclick = ()=>{ state.cart = state.cart.filter(x=>x.rowId!==item.rowId); renderCart(); };
-      list.appendChild(row);
-      if(listModal) listModal.appendChild(row.cloneNode(true));
+      listModal.appendChild(row);
     });
   }
+
 
   const subtotal = state.cart.reduce((s,x)=>s + (x.basePrice + x.extraPrice) * x.qty, 0);
   const total = Math.max(0, subtotal);
