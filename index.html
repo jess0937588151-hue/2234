@@ -554,7 +554,8 @@
 <script type="module" src="js/app.js"></script>
 
 <!-- 線上訂單全螢幕通知 -->
-<div id="onlineOrderOverlay" onclick="if(event.target===this)this.style.display='none'" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.85); align-items:center; justify-content:center; flex-direction:column;">
+<div id="onlineOrderOverlay" onclick="if(event.target===this){this.style.display='none';}"
+ style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.85); align-items:center; justify-content:center; flex-direction:column;">
   <!-- 頂部提示 -->
     <div style="text-align:center; margin-bottom:16px;">
       <div id="overlayPulse" style="width:60px; height:60px; margin:0 auto 12px; border-radius:50%; background:#f59e0b; animation:pulse-ring 1.5s infinite; display:flex; align-items:center; justify-content:center;">
