@@ -198,19 +198,18 @@ export function renderCategoryList(){
   const wrap = document.getElementById('categoryList');
   const uncategorized = state.products.filter(p => !p.category || p.category === '未分類');
   wrap.innerHTML = '';
-  const uncategorizedRow = document.createElement('div');
-  uncategorizedRow.className = 'entity-row warning';
-  uncategorizedRow.innerHTML = `<div><strong>未分類</strong><div class="meta">${uncategorized.length ? uncategorized.map(p => escapeHtml(p.name)).join('、') : '目前沒有未分類商品'}</div></div><div><span class="badge pending">${uncategorized.length} 筆</span></div>`;
-  wrap.appendChild(uncategorizedRow);
+  const uncatCard = document.createElement('div');
+  uncatCard.className = 'entity-card warning';
+  uncatCard.innerHTML = `<strong>未分類</strong><div class="meta">${uncategorized.length} 筆商品</div>`;
+  wrap.appendChild(uncatCard);
 
   state.categories.filter(cat => cat !== '未分類').forEach(cat=>{
     const count = state.products.filter(p=>p.category===cat).length;
-    const row = document.createElement('div');
-    row.className = 'entity-row';
-    row.innerHTML = `<div><strong>${escapeHtml(cat)}</strong><div class="meta">商品數：${count}</div></div><div class="action-stack"><button class="secondary-btn small-btn">管理商品</button><button class="secondary-btn small-btn">改名</button><button class="danger-btn small-btn">刪除</button></div>`;
-    const [manageBtn, renameBtn, deleteBtn] = row.querySelectorAll('button');
-    manageBtn.onclick = ()=> openCategoryManage(cat);
-    renameBtn.onclick = ()=>{
+    const card = document.createElement('div');
+    card.className = 'entity-card';
+    card.innerHTML = `<strong>${escapeHtml(cat)}</strong><div class="meta">${count} 筆商品</div><div class="card-actions"><button class="manage">管理</button><button class="rename">改名</button><button class="delete">刪除</button></div>`;
+    card.querySelector('.manage').onclick = ()=> openCategoryManage(cat);
+    card.querySelector('.rename').onclick = ()=>{
       const nv = prompt('輸入新分類名稱', cat);
       if(!nv || nv.trim()===cat) return;
       if(state.categories.includes(nv.trim())) return alert('分類已存在');
@@ -218,15 +217,16 @@ export function renderCategoryList(){
       state.products.forEach(p=>{ if(p.category===cat) p.category = nv.trim(); });
       persistAll(); window.refreshAllViews();
     };
-    deleteBtn.onclick = ()=>{
+    card.querySelector('.delete').onclick = ()=>{
       if(!confirm(`確定刪除分類「${cat}」？`)) return;
       state.categories = state.categories.filter(c=>c!==cat);
-      state.products.forEach(p=>{ if(p.category===cat) p.category = '未分類'; });
+      state.products.forEach(p=>{ if(p.category===catㄓ) p.category = '未分類'; });
       if(state.settings.selectedCategory===cat) state.settings.selectedCategory='全部';
       persistAll(); window.refreshAllViews();
     };
-    wrap.appendChild(row);
+    wrap.appendChild(card);
   });
+
 }
 export function renderModuleSelect(){
   const sel = document.getElementById('moduleSelect');
@@ -252,33 +252,32 @@ export function renderModuleLibrary(expandModuleId=''){
   state.modules.forEach(mod=>{
     const usedCount = state.products.filter(p=> (p.modules||[]).some(a=>a.moduleId===mod.id)).length;
     const isOpen = expandModuleId === mod.id;
-    const block = document.createElement('div');
-    block.className = 'module-editor';
-    block.innerHTML = `<div class="row between wrap"><div><strong>${escapeHtml(mod.name)}</strong><div class="meta module-summary">${escapeHtml(getModuleSummary(mod, usedCount))}</div></div><div class="action-stack"><button type="button" class="secondary-btn small-btn">套用商品</button><button type="button" class="secondary-btn small-btn">${isOpen ? '收合' : '編輯模組'}</button><button type="button" class="danger-btn small-btn">刪除模組</button></div></div><div class="module-options ${isOpen ? '' : 'hidden'}"></div><div class="row gap wrap ${isOpen ? '' : 'hidden'} footer-tools" style="margin-top:10px"><button type="button" class="secondary-btn small-btn add-option-btn">新增子選項</button></div>`;
-    const buttons = block.querySelectorAll('button');
-    const optionsWrap = block.querySelector('.module-options');
-    const footerRow = block.querySelector('.footer-tools');
-    buttons[0].onclick = ()=> openModuleManage(mod.id);
-    buttons[1].onclick = ()=> renderModuleLibrary(isOpen ? '' : mod.id);
-    buttons[2].onclick = ()=>{
+    const card = document.createElement('div');
+    card.className = 'module-card';
+    card.innerHTML = `<strong>${escapeHtml(mod.name)}</strong><div class="meta">${mod.selection==='multi'?'多選':'單選'} ・ ${mod.required?'必選':'非必選'} ・ ${usedCount} 商品</div><div class="card-actions"><button class="apply">套用</button><button class="edit">${isOpen?'收合':'編輯'}</button><button class="delete">刪除</button></div>${isOpen ? '<div class="module-expand"></div>' : ''}`;
+    card.querySelector('.apply').onclick = ()=> openModuleManage(mod.id);
+    card.querySelector('.edit').onclick = ()=> renderModuleLibrary(isOpen ? '' : mod.id);
+    card.querySelector('.delete').onclick = ()=>{
       if(!confirm(`確定刪除模組「${mod.name}」？`)) return;
       state.modules = state.modules.filter(m=>m.id!==mod.id);
       state.products.forEach(p=> p.modules = (p.modules||[]).filter(a=>a.moduleId!==mod.id));
       persistAll(); window.refreshAllViews();
     };
     if(isOpen){
-      optionsWrap.innerHTML = `<div class="grid2"><div><label>模組名稱</label><input class="module-name" value="${escapeAttr(mod.name)}"></div><div><label>規則</label><select class="module-selection"><option value="single" ${mod.selection==='single'?'selected':''}>單選</option><option value="multi" ${mod.selection==='multi'?'selected':''}>多選</option></select></div></div><div class="switch-row"><span>必選</span><button type="button" class="switch ${mod.required ? 'on' : ''}">${mod.required ? '開' : '關'}</button></div><div class="module-options-list"></div>`;
-      const nameInput = optionsWrap.querySelector('.module-name');
-      const selectionSel = optionsWrap.querySelector('.module-selection');
-      const switchBtn = optionsWrap.querySelector('.switch');
-      nameInput.oninput = ()=>{ mod.name = nameInput.value; renderModuleSelect(); const summary = block.querySelector('.module-summary'); if(summary) summary.textContent = getModuleSummary(mod, usedCount); };
+      const expandDiv = card.querySelector('.module-expand');
+      expandDiv.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label style="font-size:12px">模組名稱</label><input class="module-name" value="${escapeAttr(mod.name)}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:8px"></div><div><label style="font-size:12px">規則</label><select class="module-selection" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:8px"><option value="single" ${mod.selection==='single'?'selected':''}>單選</option><option value="multi" ${mod.selection==='multi'?'selected':''}>多選</option></select></div></div><div class="switch-row"><span style="font-size:12px">必選</span><button type="button" class="switch ${mod.required?'on':''}">${mod.required?'開':'關'}</button></div><div class="module-options-list"></div><button type="button" class="secondary-btn small-btn" style="margin-top:6px;font-size:11px">新增子選項</button>`;
+      const nameInput = expandDiv.querySelector('.module-name');
+      const selectionSel = expandDiv.querySelector('.module-selection');
+      const switchBtn = expandDiv.querySelector('.switch');
+      nameInput.oninput = ()=>{ mod.name = nameInput.value; renderModuleSelect(); };
       selectionSel.onchange = ()=>{ mod.selection = selectionSel.value; renderModuleLibrary(mod.id); };
       switchBtn.onclick = ()=>{ mod.required = !mod.required; renderModuleLibrary(mod.id); };
-      renderModuleEditorOptions(optionsWrap.querySelector('.module-options-list'), mod, mod.id);
-      footerRow.querySelector('.add-option-btn').onclick = ()=>{ mod.options.push({id:id(), name:'', price:0, enabled:true}); renderModuleLibrary(mod.id); };
+      renderModuleEditorOptions(expandDiv.querySelector('.module-options-list'), mod, mod.id);
+      expandDiv.querySelector('button:last-child').onclick = ()=>{ mod.options.push({id:id(), name:'', price:0, enabled:true}); renderModuleLibrary(mod.id); };
     }
-    wrap.appendChild(block);
+    wrap.appendChild(card);
   });
+
 }
 export function renderProductModulesEditor(){
   const wrap = document.getElementById('productModulesEditor');
@@ -354,49 +353,38 @@ export function renderProductsTable(){
   state.products.sort((a,b)=>a.sortOrder-b.sortOrder);
   const wrap = document.getElementById('productsTable');
   wrap.innerHTML = '';
-      var syncBar = document.createElement('div');
-    syncBar.className = 'row gap wrap';
-    syncBar.style.marginBottom = '12px';
-    var syncBtn = document.createElement('button');
-    syncBtn.className = 'secondary-btn';
-    syncBtn.textContent = '同步菜單到雲端';
-    syncBtn.onclick = async function(){
-      try{
-        syncBtn.disabled = true;
-        syncBtn.textContent = '同步中...';
-        var mod = await import('../modules/realtime-order-service.js');
-        await mod.syncMenuToFirebase();
-        syncBtn.textContent = '同步完成！';
-        setTimeout(function(){ syncBtn.textContent = '同步菜單到雲端'; syncBtn.disabled = false; }, 2000);
-      }catch(err){
-        alert('同步失敗：' + (err.message || err));
-        syncBtn.textContent = '同步菜單到雲端';
-        syncBtn.disabled = false;
-      }
-    };
-    syncBar.appendChild(syncBtn);
-    wrap.appendChild(syncBar);
-  if(!state.products.length) return wrap.innerHTML = '<div class="muted">尚無商品</div>';
-  const total = state.products.length;
-  const expandedId = wrap.dataset.expandedProductId || '';
-  state.products.forEach((p, index)=>{
-    const row = document.createElement('div');
-    row.className = 'product-list-item';
-    const expanded = expandedId === p.id;
-    row.innerHTML = productRowHtml(p, index, total, expanded);
-    row.querySelector('.move-up').onclick = ()=> moveProduct(p.id, 'up');
-    row.querySelector('.move-down').onclick = ()=> moveProduct(p.id, 'down');
-    row.querySelector('.toggle').onclick = ()=>{ p.enabled = !(p.enabled!==false); persistAll(); window.refreshAllViews(); };
-    row.querySelector('.edit').onclick = ()=> openProductForm(p);
-    row.querySelector('.delete').onclick = ()=>{ if(!confirm(`確定刪除商品「${p.name}」？`)) return; state.products = state.products.filter(x=>x.id!==p.id); state.products.forEach((item, i)=> item.sortOrder = i); persistAll(); window.refreshAllViews(); if(document.getElementById('productId').value===p.id) resetProductForm(); };
-    const priceInput = row.querySelector('.inline-price');
-    priceInput.addEventListener('change', ()=> saveInlinePrice(p, priceInput.value));
-    priceInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter'){ e.preventDefault(); saveInlinePrice(p, priceInput.value); priceInput.blur(); }});
-    row.querySelector('.inline-module-toggle').onclick = ()=>{ wrap.dataset.expandedProductId = expanded ? '' : p.id; renderProductsTable(); };
-    row.querySelectorAll('.inline-module-item input').forEach(chk=> chk.addEventListener('change', ()=>{ toggleInlineModule(p, chk.dataset.moduleId, chk.checked); wrap.dataset.expandedProductId = p.id; renderProductsTable(); }));
-    wrap.appendChild(row);
+  var syncBar = document.createElement('div');
+  syncBar.style.cssText = 'grid-column:1/-1;margin-bottom:4px';
+  var syncBtn = document.createElement('button');
+  syncBtn.className = 'secondary-btn small-btn';
+  syncBtn.textContent = '同步菜單到雲端';
+  syncBtn.onclick = async function(){
+    try{
+      syncBtn.disabled = true; syncBtn.textContent = '同步中...';
+      var mod = await import('../modules/realtime-order-service.js');
+      await mod.syncMenuToFirebase();
+      syncBtn.textContent = '同步完成！';
+      setTimeout(function(){ syncBtn.textContent = '同步菜單到雲端'; syncBtn.disabled = false; }, 2000);
+    }catch(err){
+      alert('同步失敗：' + (err.message || err));
+      syncBtn.textContent = '同步菜單到雲端'; syncBtn.disabled = false;
+    }
+  };
+  syncBar.appendChild(syncBtn);
+  wrap.appendChild(syncBar);
+  if(!state.products.length) return wrap.innerHTML = '<div class="muted" style="grid-column:1/-1">尚無商品</div>';
+  state.products.forEach((p)=>{
+    const card = document.createElement('div');
+    card.className = 'product-card' + (p.enabled===false ? ' disabled' : '');
+    const modNames = getProductModuleNames(p);
+    card.innerHTML = `${p.image ? `<img class="card-thumb" src="${escapeAttr(p.image)}" alt="${escapeAttr(p.name)}">` : `<div class="card-thumb-placeholder">📦</div>`}<span class="status ${p.enabled!==false?'on':'off'}">${p.enabled!==false?'啟用':'停用'}</span><div class="card-name">${escapeHtml(p.name)}</div><div class="card-price">$${money(p.price)}</div><div class="card-meta">${escapeHtml(p.category||'未分類')}${modNames.length ? ' ・ ' + modNames.join('、') : ''}</div><div class="card-actions"><button class="edit">編輯</button><button class="toggle">${p.enabled!==false?'停用':'啟用'}</button><button class="delete">刪除</button></div>`;
+    card.querySelector('.edit').onclick = ()=> openProductEditModal(p);
+    card.querySelector('.toggle').onclick = ()=>{ p.enabled = !(p.enabled!==false); persistAll(); window.refreshAllViews(); };
+    card.querySelector('.delete').onclick = ()=>{ if(!confirm(`確定刪除「${p.name}」？`)) return; state.products = state.products.filter(x=>x.id!==p.id); state.products.forEach((item, i)=> item.sortOrder = i); persistAll(); window.refreshAllViews(); };
+    wrap.appendChild(card);
   });
 }
+
 export function resetProductForm(){
   document.getElementById('productId').value = '';
   document.getElementById('productName').value = '';
@@ -436,9 +424,32 @@ function openProductForm(product){
   validateProductForm(false);
   bindFormButtonsState();
 }
+function openProductEditModal(product){
+  const modal = document.getElementById('productEditModal');
+  const title = document.getElementById('productEditModalTitle');
+  if(product){
+    title.textContent = '編輯商品';
+    openProductForm(product);
+  } else {
+    title.textContent = '新增商品';
+    resetProductForm();
+  }
+  modal.style.display = 'flex';
+}
+
+function closeProductEditModal(){
+  document.getElementById('productEditModal').style.display = 'none';
+  resetProductForm();
+}
 
 export function initProductsPage(){
   /* 中文備註：商品管理頁新增三個 Excel 按鈕。這些功能只影響商品管理，不會影響其他頁面。 */
+  document.getElementById('addProductBtn').onclick = ()=> openProductEditModal(null);
+  document.getElementById('closeProductEditModal').onclick = closeProductEditModal;
+  document.getElementById('productEditModal').onclick = (e)=>{
+    if(e.target.id === 'productEditModal') closeProductEditModal();
+  };
+
   document.getElementById('excelTemplateBtn').onclick = ()=>{
     const workbook = buildWorkbookFromRows(createExcelTemplateRows());
     const blob = workbookToBlob(workbook);
@@ -455,7 +466,6 @@ export function initProductsPage(){
   document.getElementById('addCategoryBtn').onclick = ()=>{ const input = document.getElementById('newCategoryInput'); const name = input.value.trim(); if(!name) return; if(state.categories.includes(name)) return alert('分類已存在'); state.categories.push(name); input.value = ''; persistAll(); window.refreshAllViews(); };
   document.getElementById('addModuleBtn').onclick = ()=>{ const input = document.getElementById('newModuleInput'); const name = input.value.trim(); if(!name) return; state.modules.push({id:id(), name, selection:'single', required:true, options:[]}); input.value = ''; persistAll(); window.refreshAllViews(); };
   document.getElementById('attachModuleBtn').onclick = ()=>{ const moduleId = document.getElementById('moduleSelect').value; if(!moduleId) return; if(state.editModules.some(m=>m.moduleId===moduleId)) return alert('此模組已加入'); state.editModules.push({moduleId, requiredOverride:null}); renderProductModulesEditor(); };
-  document.getElementById('resetProductBtn').onclick = resetProductForm;
   document.getElementById('removeProductImageBtn').onclick = ()=>{
     document.getElementById('productImageData').value = '';
     if(document.getElementById('productImageInput')) document.getElementById('productImageInput').value = '';
@@ -495,7 +505,7 @@ export function initProductsPage(){
     if(idx>=0) state.products[idx] = product;
     else state.products.push(product);
     state.products.sort((a,b)=>a.sortOrder-b.sortOrder).forEach((item, i)=> item.sortOrder = i);
-    persistAll(); window.refreshAllViews(); resetProductForm(); alert('商品已保存');
+    persistAll(); window.refreshAllViews(); resetProductForm(); alert('商品已保存');closeProductEditModal();
   };
   document.getElementById('saveAllBtn').onclick = ()=>{ persistAll(); alert('已保存'); };
   document.getElementById('closeCategoryManageModal').onclick = closeCategoryManage;
