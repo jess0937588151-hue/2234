@@ -185,6 +185,35 @@ export function renderProducts(){
     if(p.enabled===false) btn.disabled = true;
     else btn.onclick = ()=> openProductConfigForNew(p.id);
     grid.appendChild(card);
+      // 加入折扣商品卡片
+  const discountCard = document.createElement('div');
+  discountCard.className = 'product-card';
+  discountCard.innerHTML = `
+    <div class="card-thumb-placeholder" style="background:#fef2f2">🏷️</div>
+    <div class="card-name">折扣</div>
+    <div class="price" style="color:#ef4444">輸入金額</div>
+    <div class="meta">點擊輸入折扣金額</div>
+    <button class="primary-btn full" style="background:#ef4444">加入折扣</button>
+  `;
+  discountCard.querySelector('button').onclick = ()=>{
+    const val = prompt('請輸入折扣金額（正數）');
+    if(!val) return;
+    const amount = Math.abs(Number(val));
+    if(!amount || amount <= 0) return alert('請輸入正確金額');
+    mergeOrPushCartItem({
+      rowId: id(),
+      productId: '_discount_',
+      name: '折扣 -$' + amount,
+      basePrice: -amount,
+      qty: 1,
+      note: '',
+      selections: [],
+      extraPrice: 0
+    });
+    renderCart();
+  };
+  grid.appendChild(discountCard);
+
   });
 }
 
@@ -192,12 +221,17 @@ window.refreshPublicProducts = renderProducts;
 
 export function renderCart(){
   const list = document.getElementById('cartList');
+  const listModal = document.getElementById('cartListModal');
   list.innerHTML = '';
+  if(listModal) listModal.innerHTML = '';
+
   if(!state.cart.length){
     list.className = 'cart-list empty';
     list.textContent = '尚未加入商品';
+    if(listModal){ listModal.className = 'cart-list empty'; listModal.textContent = '尚未加入商品'; }
   } else {
     list.className = 'cart-list';
+    if(listModal) listModal.className = 'cart-list';
     state.cart.forEach(item=>{
       const desc = (item.selections||[]).map(s=> `${s.moduleName}:${s.optionName}`).join(' / ');
       const row = document.createElement('div');
@@ -215,24 +249,38 @@ export function renderCart(){
           <button class="secondary-btn small-btn">-</button>
           <span>${item.qty}</span>
           <button class="secondary-btn small-btn">+</button>
-          <button class="secondary-btn small-btn">編輯</button>
+          ${item.productId !== '_discount_' ? '<button class="secondary-btn small-btn">編輯</button>' : ''}
           <button class="danger-btn small-btn">刪除</button>
         </div>
       `;
-      const [minus, plus, edit, del] = row.querySelectorAll('button');
-      minus.onclick = ()=>{ item.qty = Math.max(1, item.qty-1); renderCart(); };
-      plus.onclick = ()=>{ item.qty += 1; renderCart(); };
-      edit.onclick = ()=> openProductConfigForEdit(item.rowId);
-      del.onclick = ()=>{ state.cart = state.cart.filter(x=>x.rowId!==item.rowId); renderCart(); };
+      const buttons = row.querySelectorAll('button');
+      let btnIdx = 0;
+      buttons[btnIdx++].onclick = ()=>{ item.qty = Math.max(1, item.qty-1); renderCart(); };
+      buttons[btnIdx++].onclick = ()=>{ item.qty += 1; renderCart(); };
+      if(item.productId !== '_discount_'){
+        buttons[btnIdx++].onclick = ()=> openProductConfigForEdit(item.rowId);
+      }
+      buttons[btnIdx].onclick = ()=>{ state.cart = state.cart.filter(x=>x.rowId!==item.rowId); renderCart(); };
       list.appendChild(row);
+      if(listModal) listModal.appendChild(row.cloneNode(true));
     });
   }
+
   const subtotal = state.cart.reduce((s,x)=>s + (x.basePrice + x.extraPrice) * x.qty, 0);
-  const discountAmount = 0;
-  const total = subtotal;
+  const total = Math.max(0, subtotal);
+
   document.getElementById('subtotalText').textContent = money(subtotal);
   document.getElementById('totalText').textContent = money(total);
+
+  if(document.getElementById('subtotalTextModal'))
+    document.getElementById('subtotalTextModal').textContent = money(subtotal);
+  if(document.getElementById('totalTextModal'))
+    document.getElementById('totalTextModal').textContent = money(total);
+
+  const badge = document.getElementById('cartBadge');
+  if(badge) badge.textContent = state.cart.reduce((s,x)=> s + x.qty, 0);
 }
+
 
 function finalizeOrder(paymentMethod){
   const mode = document.getElementById('paymentTargetMode').value || 'new';
