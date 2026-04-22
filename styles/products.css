@@ -1,0 +1,78 @@
+/* 中文備註：styles/products.css，卡片式佈局 */
+.products-layout{display:flex;flex-direction:column;gap:20px}
+.panel-section{border:1px solid var(--line);border-radius:18px;padding:14px;background:#fff}
+
+/* 分類與模組用小卡片 */
+.entity-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.entity-card{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff;font-size:13px}
+.entity-card.warning{border-color:#f59e0b;background:#fff7ed}
+.entity-card strong{font-size:14px;display:block;margin-bottom:4px}
+.entity-card .meta{font-size:12px;color:var(--muted)}
+.entity-card .card-actions{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+.entity-card .card-actions button{padding:4px 8px;font-size:11px;border-radius:6px;border:none;background:#e5e7eb;cursor:pointer}
+.entity-card .card-actions .delete{background:#fecaca}
+
+/* 模組小卡片 */
+.module-card{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff;font-size:13px}
+.module-card strong{font-size:14px}
+.module-card .meta{font-size:12px;color:var(--muted)}
+.module-card .card-actions{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+.module-card .card-actions button{padding:4px 8px;font-size:11px;border-radius:6px;border:none;background:#e5e7eb;cursor:pointer}
+.module-card .card-actions .delete{background:#fecaca}
+.module-expand{margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:10px;background:#f8fafc}
+
+/* 商品小卡片 */
+.product-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.product-card{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff;font-size:13px;position:relative}
+.product-card.disabled{background:#f8fafc;opacity:.7}
+.product-card .card-thumb{width:100%;aspect-ratio:1;border-radius:10px;object-fit:cover;margin-bottom:6px}
+.product-card .card-thumb-placeholder{width:100%;aspect-ratio:1;border-radius:10px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:24px;margin-bottom:6px}
+.product-card .card-name{font-weight:bold;font-size:14px;margin-bottom:2px}
+.product-card .card-price{font-weight:600;color:#2563eb;margin-bottom:4px}
+.product-card .card-meta{font-size:11px;color:var(--muted)}
+.product-card .card-actions{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.product-card .card-actions button{padding:4px 8px;font-size:11px;border-radius:6px;border:none;background:#e5e7eb;cursor:pointer}
+.product-card .card-actions .delete{background:#fecaca}
+.product-card .status{position:absolute;top:8px;right:8px}
+
+/* 商品編輯浮動視窗 */
+.product-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:8000;display:flex;align-items:center;justify-content:center}
+.product-modal{background:#fff;border-radius:18px;padding:20px;max-width:520px;width:92%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.2)}
+.product-modal h3{margin:0 0 16px;font-size:18px}
+.product-modal .form-grid{display:flex;flex-direction:column;gap:12px}
+.product-modal .form-row{display:flex;flex-direction:column;gap:4px}
+.product-modal .form-row label{font-size:13px;font-weight:600;color:#334155}
+.product-modal .form-row input,
+.product-modal .form-row select{padding:10px;border:1px solid var(--line);border-radius:10px;font-size:15px}
+.product-modal .form-actions{display:flex;gap:10px;margin-top:16px}
+.product-modal .form-actions button{flex:1;padding:12px;border-radius:10px;border:none;font-size:15px;font-weight:bold;cursor:pointer}
+
+.chip{background:#e5edff;padding:4px 8px;border-radius:999px;font-size:12px}
+.status.on{background:#dcfce7;color:#166534;padding:2px 6px;border-radius:6px;font-size:11px}
+.status.off{background:#fee2e2;color:#b91c1c;padding:2px 6px;border-radius:6px;font-size:11px}
+.tag{background:#f1f5f9;padding:2px 6px;border-radius:6px;font-size:11px;color:#64748b}
+
+.option-edit-row{display:grid;grid-template-columns:1.2fr .8fr auto auto;gap:8px;align-items:center;font-size:13px}
+.module-options{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.attached-module{border:1px solid var(--line);border-radius:12px;padding:8px;font-size:13px}
+.switch-row{display:flex;justify-content:space-between;align-items:center;margin:8px 0}
+.switch{min-width:44px;padding:4px 10px;border-radius:999px;border:none;font-weight:bold;background:#e5e7eb;color:#374151;font-size:12px;cursor:pointer}
+.switch.on{background:#2563eb;color:#fff}
+.checkbox-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.checkbox-item{display:flex;gap:6px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:8px;font-size:13px}
+.checkbox-item input{width:auto;margin-top:2px}
+.field-error{color:#b91c1c;font-size:12px;margin-top:4px}
+.input-error{border-color:#ef4444 !important;background:#fef2f2 !important}
+
+.product-image-preview{width:120px;height:120px;border:1px dashed var(--line);border-radius:12px;display:flex;align-items:center;justify-content:center;background:#f8fafc;overflow:hidden}
+.product-form-image{width:100%;height:100%;object-fit:cover}
+.product-list-thumb{width:48px;height:48px;border-radius:10px;object-fit:cover}
+
+.pending-card{border:1px solid var(--line);border-radius:12px;background:#fff;padding:12px;font-size:13px}
+
+@media (max-width:768px){
+  .entity-grid{grid-template-columns:repeat(2,1fr)}
+  .product-grid{grid-template-columns:repeat(3,1fr)}
+  .product-modal{max-width:95%;padding:16px}
+}
+
