@@ -112,44 +112,13 @@ function ensureBeepAudio(){
       beepAudio._custom = customSound;
     }
     return beepAudio;
-  }
-  if(!beepAudio){
-    try{
-      var sr = 8000;
-      var numSamples = 4800;
-      var fileSize = 44 + numSamples;
-      var buf = new ArrayBuffer(fileSize);
-      var dv = new DataView(buf);
-      var o = 0;
-      dv.setUint8(o++,82);dv.setUint8(o++,73);dv.setUint8(o++,70);dv.setUint8(o++,70);
-      dv.setUint32(o,fileSize-8,true);o+=4;
-      dv.setUint8(o++,87);dv.setUint8(o++,65);dv.setUint8(o++,86);dv.setUint8(o++,69);
-      dv.setUint8(o++,102);dv.setUint8(o++,109);dv.setUint8(o++,116);dv.setUint8(o++,32);
-      dv.setUint32(o,16,true);o+=4;
-      dv.setUint16(o,1,true);o+=2;
-      dv.setUint16(o,1,true);o+=2;
-      dv.setUint32(o,sr,true);o+=4;
-      dv.setUint32(o,sr,true);o+=4;
-      dv.setUint16(o,1,true);o+=2;
-      dv.setUint16(o,8,true);o+=2;
-      dv.setUint8(o++,100);dv.setUint8(o++,97);dv.setUint8(o++,116);dv.setUint8(o++,97);
-      dv.setUint32(o,numSamples,true);o+=4;
-      for(var i=0;i<numSamples;i++){
-        var t=i/sr, val=0;
-        if(t<0.15) val=Math.sin(6.2832*880*t)*0.4*(1-t/0.15);
-        else if(t>=0.18&&t<0.33) val=Math.sin(6.2832*1047*(t-0.18))*0.4*(1-(t-0.18)/0.15);
-        else if(t>=0.36&&t<0.51) val=Math.sin(6.2832*1319*(t-0.36))*0.4*(1-(t-0.36)/0.15);
-        dv.setUint8(o++, 128+Math.round(val*127));
-      }
-      var blob = new Blob([buf],{type:'audio/wav'});
-      beepAudio = new Audio(URL.createObjectURL(blob));
-    }catch(e){
-      console.error('建立 beep 失敗：',e);
-      return null;
-    }
+    
+  }  if(!beepAudio){
+    beepAudio = new Audio('A123.mp3');
   }
   return beepAudio;
 }
+
 
 function playOnce(){
   var cfg = ensureRealtimeConfig();
