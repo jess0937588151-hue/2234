@@ -293,9 +293,17 @@ function beep(){
 
 export async function signInPOSWithGoogle(){
   await loadFirebaseModules();
-  const result = await authApi.signInWithPopup(authInstance, googleProvider);
-  return result.user;
+  try {
+    const result = await authApi.getRedirectResult(authInstance);
+    if(result && result.user) return result.user;
+  } catch(e){ console.warn('getRedirectResult:', e); }
+  await authApi.signInWithRedirect(authInstance, googleProvider);
 }
+export async function getRedirectResultForPOS(){
+  await loadFirebaseModules();
+  return await authApi.getRedirectResult(authInstance);
+}
+
 
 
 
