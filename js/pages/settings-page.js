@@ -11,8 +11,9 @@ import { backupToGoogle, getGoogleBackupConfig, getGoogleDriveSession, initializ
 import { getRealtimeAuthUser, getRealtimeConfig, signInPOSWithGoogle, signOutPOSGoogle, startPOSRealtimeListener, verifyPOSAccess, waitForAuthReady, fetchMenuFromFirebase, watchMenuFromFirebase } from '../modules/realtime-order-service.js';
 
 // ── 主函式 ──
+export function initSettingsPage(){ 
     // 處理 Google redirect 登入回來的結果
-  async function checkRedirectResult(){
+  (async function checkRedirectResult(){
     try {
       const cfg = getRealtimeConfig();
       if(!cfg.apiKey || !cfg.databaseURL || !cfg.projectId || !cfg.appId) return;
