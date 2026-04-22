@@ -4,7 +4,6 @@ import { escapeHtml, money, id } from '../core/utils.js';
 import { getDiscountResult, getDiscountType, setDiscountType, handleDiscountInput } from '../modules/cart-service.js';
 import { createOrUpdateOrder, markPendingOrderPaid } from '../modules/order-service.js';
 import { buildCartPreviewOrder, getPrintSettings, printOrderLabels, printOrderReceipt } from '../modules/print-service.js';
-import { fetchMenuFromFirebase, watchMenuFromFirebase } from '../modules/realtime-order-service.js';
 
 function createConfigState(product){
   const selections = {};
@@ -308,33 +307,7 @@ function finalizeOrder(paymentMethod){
   alert(paymentMethod === '待付款' ? '已加入待付款' : '結帳完成');
 }
 
-export async function initPOSPage(){
-  // 從機模式：從雲端載入菜單並即時監聽
-  try {
-    const _role = state.settings?.realtimeOrder?.deviceRole;
-    if(_role === 'slave'){
-      try {
-        await fetchMenuFromFirebase();
-        watchMenuFromFirebase(() => {
-          renderTabs();
-          renderProducts();
-        });
-      } catch(err) {
-        console.error('從機載入雲端菜單失敗：', err);
-      }
-    }
-  } catch(e) {
-    console.error('角色判斷失敗：', e);
-  }
-
-  renderTabs();
-  renderProducts();
-  renderCart();
-
-  document.getElementById('productSearch').addEventListener('input', renderProducts);
-
-  }
-
+export function initPOSPage(){
   document.getElementById('productSearch').addEventListener('input', renderProducts);
   document.getElementById('itemQtyInput').addEventListener('input', ()=>{
     const p = state.products.find(x=>x.id===state.configTarget?.productId);
