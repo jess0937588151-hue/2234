@@ -11,21 +11,22 @@ import { backupToGoogle, getGoogleBackupConfig, getGoogleDriveSession, initializ
 import { getRealtimeAuthUser, getRealtimeConfig, signInPOSWithGoogle, signOutPOSGoogle, startPOSRealtimeListener, verifyPOSAccess, waitForAuthReady, fetchMenuFromFirebase, watchMenuFromFirebase } from '../modules/realtime-order-service.js';
 
 // ── 主函式 ──
-export function initSettingsPage(){
   // 處理 Google redirect 登入回來的結果
   (async function checkRedirectResult(){
     try {
       const mod = await import('../modules/realtime-order-service.js');
-      await mod.waitForAuthReady();
-      const user = mod.getRealtimeAuthUser();
-      if(user){
-        document.getElementById('posGoogleAccountBox').innerHTML = 'POS 登入帳號：' + (user.email || user.uid);
+      await mod.loadFirebaseModules();
+      const result = await mod.getRedirectResultForPOS();
+      if(result && result.user){
+        document.getElementById('posGoogleAccountBox').innerHTML = 'POS 登入帳號：' + (result.user.email || result.user.uid);
         await mod.verifyPOSAccess();
         await mod.startPOSRealtimeListener(function(){ window.refreshAllViews(); });
         if(typeof window.refreshRealtimeOrderPanel === 'function') window.refreshRealtimeOrderPanel();
+        alert('POS Google 登入成功');
       }
     } catch(e){ console.warn('checkRedirectResult:', e); }
   })();
+
 
   // ============================
   // 1. 列印設定 - 初始化欄位
