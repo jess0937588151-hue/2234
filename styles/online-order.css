@@ -52,3 +52,89 @@ body{background:#f6f8fb}
 .online-status-card{width:min(420px,100%);background:#fff;border-radius:20px;padding:24px;text-align:center;box-shadow:0 20px 50px rgba(15,23,42,.18)}
 .online-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#0f172a;color:#fff;padding:12px 18px;border-radius:999px;box-shadow:0 10px 30px rgba(15,23,42,.25);opacity:0;pointer-events:none;transition:all .2s ease;z-index:70;font-weight:700}
 .online-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media (max-width: 600px) {
+  .online-order-layout {
+    flex-direction: column;
+    padding: 6px;
+    gap: 8px;
+  }
+
+  .online-customer-panel {
+    width: 100%;
+    max-width: 100%;
+    position: static;
+    padding: 10px;
+  }
+
+  .online-product-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  .online-product-card {
+    font-size: 12px;
+    border-radius: 8px;
+  }
+
+  .online-product-image {
+    height: 60px;
+  }
+
+  .online-product-image img {
+    height: 60px;
+    object-fit: cover;
+  }
+
+  .online-product-name {
+    font-size: 13px;
+    line-height: 1.2;
+  }
+
+  .online-product-price {
+    font-size: 12px;
+  }
+
+  .online-product-meta {
+    font-size: 11px;
+  }
+
+  .online-product-body {
+    padding: 6px;
+  }
+
+  .online-product-footer .primary-btn {
+    padding: 5px 8px;
+    font-size: 12px;
+  }
+
+  .online-category-chip {
+    padding: 3px 8px;
+    font-size: 12px;
+  }
+
+  .online-header h1 {
+    font-size: 16px;
+  }
+
+  .online-header .muted {
+    font-size: 12px;
+  }
+
+  #openCartBtn {
+    font-size: 13px;
+    padding: 6px 12px;
+  }
+
+  .modal .modal-dialog {
+    width: 95vw;
+    padding: 14px;
+    max-height: 90vh;
+  }
+
+  .option-chip {
+    padding: 3px 10px;
+    font-size: 12px;
+    min-width: 50px;
+  }
+}
