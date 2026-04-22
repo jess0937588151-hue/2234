@@ -220,7 +220,7 @@ export function renderCategoryList(){
     card.querySelector('.delete').onclick = ()=>{
       if(!confirm(`確定刪除分類「${cat}」？`)) return;
       state.categories = state.categories.filter(c=>c!==cat);
-      state.products.forEach(p=>{ if(p.category===catㄓ) p.category = '未分類'; });
+      state.products.forEach(p=>{ if(p.category===cat) p.category = '未分類'; });
       if(state.settings.selectedCategory===cat) state.settings.selectedCategory='全部';
       persistAll(); window.refreshAllViews();
     };
@@ -377,10 +377,23 @@ export function renderProductsTable(){
     const card = document.createElement('div');
     card.className = 'product-card' + (p.enabled===false ? ' disabled' : '');
     const modNames = getProductModuleNames(p);
-    card.innerHTML = `${p.image ? `<img class="card-thumb" src="${escapeAttr(p.image)}" alt="${escapeAttr(p.name)}">` : `<div class="card-thumb-placeholder">📦</div>`}<span class="status ${p.enabled!==false?'on':'off'}">${p.enabled!==false?'啟用':'停用'}</span><div class="card-name">${escapeHtml(p.name)}</div><div class="card-price">$${money(p.price)}</div><div class="card-meta">${escapeHtml(p.category||'未分類')}${modNames.length ? ' ・ ' + modNames.join('、') : ''}</div><div class="card-actions"><button class="edit">編輯</button><button class="toggle">${p.enabled!==false?'停用':'啟用'}</button><button class="delete">刪除</button></div>`;
+       card.innerHTML = `${p.image ? `<img class="card-thumb" src="${escapeAttr(p.image)}">` : '<div class="card-thumb-placeholder">📷</div>'}
+      <div class="card-name">${escapeHtml(p.name)}</div>
+      <div class="price">${money(p.price)}</div>
+      <div class="meta">${escapeHtml(p.category)}${modNames.length ? ' ・ ' + modNames.join('、') : ''}</div>
+      <div class="card-status"><span class="badge ${p.enabled===false?'off':'on'}">${p.enabled===false?'已下架':'上架中'}</span></div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">
+        <button class="move-up secondary-btn small-btn">▲</button>
+        <button class="move-down secondary-btn small-btn">▼</button>
+        <button class="edit secondary-btn small-btn">編輯</button>
+        <button class="toggle secondary-btn small-btn">${p.enabled===false?'上架':'下架'}</button>
+        <button class="delete danger-btn small-btn">刪除</button>
+      </div>`;
+    card.querySelector('.move-up').onclick = ()=> moveProduct(p.id, 'up');
+    card.querySelector('.move-down').onclick = ()=> moveProduct(p.id, 'down');
     card.querySelector('.edit').onclick = ()=> openProductEditModal(p);
-    card.querySelector('.toggle').onclick = ()=>{ p.enabled = !(p.enabled!==false); persistAll(); window.refreshAllViews(); };
-    card.querySelector('.delete').onclick = ()=>{ if(!confirm(`確定刪除「${p.name}」？`)) return; state.products = state.products.filter(x=>x.id!==p.id); state.products.forEach((item, i)=> item.sortOrder = i); persistAll(); window.refreshAllViews(); };
+    card.querySelector('.toggle').onclick = ()=>{ p.enabled = !(p.enabled!==false); persistAll(); renderProductsTable(); if(window.refreshPublicProducts) window.refreshPublicProducts(); };
+    card.querySelector('.delete').onclick = ()=>{ if(!confirm(`確定刪除「${p.name}」？`)) return; state.products = state.products.filter(x=>x.id!==p.id); persistAll(); renderProductsTable(); if(window.refreshPublicProducts) window.refreshPublicProducts(); };
     wrap.appendChild(card);
   });
 }
