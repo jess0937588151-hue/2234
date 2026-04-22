@@ -44,7 +44,8 @@ function ensureRealtimeConfig(){
     incomingSoundEnabled: current.incomingSoundEnabled !== false,
     lastSyncStatus: current.lastSyncStatus || '尚未啟用',
     lastOrderAt: current.lastOrderAt || '',
-    lastConfirmedAt: current.lastConfirmedAt || ''
+        lastConfirmedAt: current.lastConfirmedAt || '',
+    deviceRole: current.deviceRole || 'master'
   };
   return state.settings.realtimeOrder;
 }
