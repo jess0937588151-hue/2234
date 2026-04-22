@@ -9,6 +9,7 @@ import { downloadFile } from '../core/utils.js';
 import { buildCartPreviewOrder, printOrderLabels, printOrderReceipt, getPrintSettings, previewInModal, getReceiptHtml, getLabelHtml } from '../modules/print-service.js';
 import { backupToGoogle, getGoogleBackupConfig, getGoogleDriveSession, initializeGoogleDriveApi, listGoogleBackups, restoreFromGoogle, signInGoogleDrive, signOutGoogleDrive, startGoogleAutoBackup } from '../modules/google-backup-service.js';
 import { getRealtimeAuthUser, getRealtimeConfig, signInPOSWithGoogle, signOutPOSGoogle, startPOSRealtimeListener, verifyPOSAccess, waitForAuthReady } from '../modules/realtime-order-service.js';
+import { fetchMenuFromFirebase, watchMenuFromFirebase } from '../modules/realtime-order-service.js';
 
 // ── 主函式 ──
 export function initSettingsPage(){
@@ -52,6 +53,12 @@ export function initSettingsPage(){
   document.getElementById('onlineConfirmAutoPrintKitchen').checked = !!realtimeCfg.autoPrintKitchenOnConfirm;
   document.getElementById('onlineConfirmAutoPrintReceipt').checked = !!realtimeCfg.autoPrintReceiptOnConfirm;
   document.getElementById('onlineIncomingSoundEnabled').checked = realtimeCfg.incomingSoundEnabled !== false;
+  
+   // 裝置角色初始化
+  const deviceRoleEl = document.getElementById('deviceRole');
+  if(deviceRoleEl){
+    deviceRoleEl.value = realtimeCfg.deviceRole || 'master';
+  }
 
   // ============================
   // 3. 即時接單 - POS 帳號顯示
@@ -101,7 +108,9 @@ export function initSettingsPage(){
     cfg.autoPrintKitchenOnConfirm = document.getElementById('onlineConfirmAutoPrintKitchen').checked;
     cfg.autoPrintReceiptOnConfirm = document.getElementById('onlineConfirmAutoPrintReceipt').checked;
     cfg.incomingSoundEnabled = document.getElementById('onlineIncomingSoundEnabled').checked;
-    persistAll();
+     cfg.deviceRole = document.getElementById('deviceRole').value || 'master';
+
+   persistAll();
     renderRealtimeOrderPanel();
     startPOSRealtimeListener(function(){ window.refreshAllViews(); }).catch(function(err){ console.error(err); });
     alert('即時接單設定已儲存');
