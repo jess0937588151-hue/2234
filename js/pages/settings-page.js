@@ -11,7 +11,23 @@ import { backupToGoogle, getGoogleBackupConfig, getGoogleDriveSession, initializ
 import { getRealtimeAuthUser, getRealtimeConfig, signInPOSWithGoogle, signOutPOSGoogle, startPOSRealtimeListener, verifyPOSAccess, waitForAuthReady, fetchMenuFromFirebase, watchMenuFromFirebase } from '../modules/realtime-order-service.js';
 
 // ── 主函式 ──
-  // 處理 Google redirect 登入回來的結果
+    // 處理 Google redirect 登入回來的結果
+  async function checkRedirectResult()
+    try {
+      const cfg = getRealtimeConfig();
+      if(!cfg.apiKey || !cfg.databaseURL || !cfg.projectId || !cfg.appId) return;
+      const mod = await import('../modules/realtime-order-service.js');
+      const result = await mod.getRedirectResultForPOS();
+      if(result && result.user){
+        document.getElementById('posGoogleAccountBox').innerHTML = 'POS 登入帳號：' + (result.user.email || result.user.uid);
+        await mod.verifyPOSAccess();
+        await mod.startPOSRealtimeListener(function(){ window.refreshAllViews(); });
+        if(typeof window.refreshRealtimeOrderPanel === 'function') window.refreshRealtimeOrderPanel();
+        alert('POS Google 登入成功');
+      }
+    } catch(e){ console.warn('checkRedirectResult:', e); }
+  })();
+
  
 
 
