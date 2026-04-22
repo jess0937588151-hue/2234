@@ -299,6 +299,12 @@ export async function signInPOSWithGoogle(){
   } catch(e){ console.warn('getRedirectResult:', e); }
   await authApi.signInWithRedirect(authInstance, googleProvider);
 }
+export async function getRedirectResultForPOS(){
+  await loadFirebaseModules();
+  return await authApi.getRedirectResult(authInstance);
+}
+
+
 
 
 export async function signOutPOSGoogle(){
