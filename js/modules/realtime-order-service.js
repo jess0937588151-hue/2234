@@ -45,7 +45,7 @@ function ensureRealtimeConfig(){
     lastSyncStatus: current.lastSyncStatus || '尚未啟用',
     lastOrderAt: current.lastOrderAt || '',
         lastConfirmedAt: current.lastConfirmedAt || '',
-    deviceRole: current.deviceRole || 'master'
+    deviceRole: current.deviceRole || 'master',
   };
 
   
