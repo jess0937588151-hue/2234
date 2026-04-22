@@ -8,7 +8,7 @@ import { state, persistAll, seedDefaults } from '../core/store.js';
 import { downloadFile } from '../core/utils.js';
 import { buildCartPreviewOrder, printOrderLabels, printOrderReceipt, getPrintSettings, previewInModal, getReceiptHtml, getLabelHtml } from '../modules/print-service.js';
 import { backupToGoogle, getGoogleBackupConfig, getGoogleDriveSession, initializeGoogleDriveApi, listGoogleBackups, restoreFromGoogle, signInGoogleDrive, signOutGoogleDrive, startGoogleAutoBackup } from '../modules/google-backup-service.js';
-import { getRealtimeAuthUser, getRealtimeConfig, signInPOSWithGoogle, signOutPOSGoogle, startPOSRealtimeListener, verifyPOSAccess, waitForAuthReady } from '../modules/realtime-order-service.js';
+import { getRealtimeAuthUser, getRealtimeConfig, signInPOSWithGoogle, signOutPOSGoogle, startPOSRealtimeListener, verifyPOSAccess, waitForAuthReady, fetchMenuFromFirebase, watchMenuFromFirebase } from '../modules/realtime-order-service.js';
 
 // ── 主函式 ──
 export function initSettingsPage(){
@@ -52,6 +52,8 @@ export function initSettingsPage(){
   document.getElementById('onlineConfirmAutoPrintKitchen').checked = !!realtimeCfg.autoPrintKitchenOnConfirm;
   document.getElementById('onlineConfirmAutoPrintReceipt').checked = !!realtimeCfg.autoPrintReceiptOnConfirm;
   document.getElementById('onlineIncomingSoundEnabled').checked = realtimeCfg.incomingSoundEnabled !== false;
+  const deviceRoleEl = document.getElementById('deviceRole');
+  if(deviceRoleEl){ deviceRoleEl.value = realtimeCfg.deviceRole || 'master'; }
 
   // ============================
   // 3. 即時接單 - POS 帳號顯示
@@ -101,7 +103,19 @@ export function initSettingsPage(){
     cfg.autoPrintKitchenOnConfirm = document.getElementById('onlineConfirmAutoPrintKitchen').checked;
     cfg.autoPrintReceiptOnConfirm = document.getElementById('onlineConfirmAutoPrintReceipt').checked;
     cfg.incomingSoundEnabled = document.getElementById('onlineIncomingSoundEnabled').checked;
-    persistAll();
+     
+      cfg.deviceRole = document.getElementById('deviceRole').value || 'master';
+
+     persistAll();
+         if(cfg.deviceRole === 'slave'){
+      fetchMenuFromFirebase().then(function(){
+        watchMenuFromFirebase(function(){ if(window.refreshAllViews) window.refreshAllViews(); });
+        alert('從機模式：已從雲端載入菜單，菜單將即時同步');
+      }).catch(function(err){
+        alert('從機載入雲端菜單失敗：' + (err.message || err));
+      });
+    }
+
     renderRealtimeOrderPanel();
     startPOSRealtimeListener(function(){ window.refreshAllViews(); }).catch(function(err){ console.error(err); });
     alert('即時接單設定已儲存');
