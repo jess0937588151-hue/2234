@@ -314,6 +314,9 @@ async function submitOnlineOrder(){
   try{
     openStatusOverlay('等待店家確認訂單', '送出後請稍候，店家確認後才算完成訂購。');
     const orderId = await pushOnlineOrder(payload);
+    localStorage.setItem('online_customer_name', name);
+    localStorage.setItem('online_customer_phone', phone);
+
     const { signInCustomerAnonymously } = await import('../modules/realtime-order-service.js');
     await signInCustomerAnonymously();
     const stopWatch = await watchCustomerOrder(orderId, (remote)=>{
@@ -356,6 +359,12 @@ async function init(){
   renderCategoryTabs();
   renderProducts();
   renderCart();
+    const _savedName = localStorage.getItem('online_customer_name') || '';
+    const _savedPhone = localStorage.getItem('online_customer_phone') || '';
+    const _nameEl = document.getElementById('onlineCustomerName');
+    const _phoneEl = document.getElementById('onlineCustomerPhone');
+    if(_nameEl && _savedName) _nameEl.value = _savedName;
+    if(_phoneEl && _savedPhone) _phoneEl.value = _savedPhone;
 
   document.getElementById('onlineSearchInput').addEventListener('input', renderProducts);
   document.getElementById('onlineItemQtyInput').addEventListener('input', ()=>{
