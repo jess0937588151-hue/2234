@@ -3,6 +3,17 @@ import { state, persistAll } from '../core/store.js';
 import { escapeHtml, deepCopy, money } from '../core/utils.js';
 import { buildRealtimeOrderForPOS, confirmOnlineOrder, getRealtimeConfig, rejectOnlineOrder } from '../modules/realtime-order-service.js';
 import { printKitchenCopies, printOrderLabels, printOrderReceipt } from '../modules/print-service.js';
+function previewInModal(html){
+  let modal = document.getElementById('printPreviewModal');
+  if(!modal) return;
+  const body = modal.querySelector('.modal-dialog') || modal.querySelector('.print-preview-body');
+  if(body){
+    const content = body.querySelector('.preview-content') || body;
+    content.innerHTML = html;
+  }
+  modal.classList.remove('hidden');
+  modal.style.display = 'flex';
+}
 
 function renderIncomingOnlineOrders(){
   const wrap = document.getElementById('incomingOnlineOrdersList');
@@ -158,9 +169,25 @@ function renderOrdersSection(wrap, orders, isPending){
       persistAll();
       window.refreshAllViews();
     };
-    btns[2].onclick = ()=> printOrderReceipt(o, 'customer');
-    btns[3].onclick = ()=> printKitchenCopies(o);
-    btns[4].onclick = ()=> printOrderLabels(o);
+    btns[2].onclick = ()=>{
+  import('../modules/print-service.js').then(m=>{
+    const html = m.getReceiptHtml(o, 'customer');
+    previewInModal(html);
+  });
+};
+btns[3].onclick = ()=>{
+  import('../modules/print-service.js').then(m=>{
+    const html = m.getReceiptHtml(o, 'kitchen');
+    previewInModal(html);
+  });
+};
+btns[4].onclick = ()=>{
+  import('../modules/print-service.js').then(m=>{
+    const html = m.getLabelHtml(o);
+    previewInModal(html);
+  });
+};
+
     if(isPending && btns[5]){
       btns[5].onclick = ()=>{
         document.getElementById('paymentTargetMode').value = 'pending';
