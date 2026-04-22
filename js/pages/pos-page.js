@@ -308,22 +308,31 @@ function finalizeOrder(paymentMethod){
   alert(paymentMethod === '待付款' ? '已加入待付款' : '結帳完成');
 }
 
-export asyncfunction initPOSPage(){
-    // 從機模式：從雲端載入菜單並即時監聽
-  const _role = state.settings?.realtimeOrder?.deviceRole;
-  if(_role === 'slave'){
-    try {
-      await fetchMenuFromFirebase();
-      watchMenuFromFirebase(() => {
-        renderTabs();
-        renderProducts();
-      });
-    } catch(err) {
-      console.error('從機載入雲端菜單失敗：', err);
+export async function initPOSPage(){
+  // 從機模式：從雲端載入菜單並即時監聽
+  try {
+    const _role = state.settings?.realtimeOrder?.deviceRole;
+    if(_role === 'slave'){
+      try {
+        await fetchMenuFromFirebase();
+        watchMenuFromFirebase(() => {
+          renderTabs();
+          renderProducts();
+        });
+      } catch(err) {
+        console.error('從機載入雲端菜單失敗：', err);
+      }
     }
-    renderTabs();
-    renderProducts();
-    renderCart();
+  } catch(e) {
+    console.error('角色判斷失敗：', e);
+  }
+
+  renderTabs();
+  renderProducts();
+  renderCart();
+
+  document.getElementById('productSearch').addEventListener('input', renderProducts);
+
   }
 
   document.getElementById('productSearch').addEventListener('input', renderProducts);
