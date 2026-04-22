@@ -12,6 +12,20 @@ import { getRealtimeAuthUser, getRealtimeConfig, signInPOSWithGoogle, signOutPOS
 
 // ── 主函式 ──
 export function initSettingsPage(){
+  // 處理 Google redirect 登入回來的結果
+  (async function checkRedirectResult(){
+    try {
+      const mod = await import('../modules/realtime-order-service.js');
+      await mod.waitForAuthReady();
+      const user = mod.getRealtimeAuthUser();
+      if(user){
+        document.getElementById('posGoogleAccountBox').innerHTML = 'POS 登入帳號：' + (user.email || user.uid);
+        await mod.verifyPOSAccess();
+        await mod.startPOSRealtimeListener(function(){ window.refreshAllViews(); });
+        if(typeof window.refreshRealtimeOrderPanel === 'function') window.refreshRealtimeOrderPanel();
+      }
+    } catch(e){ console.warn('checkRedirectResult:', e); }
+  })();
 
   // ============================
   // 1. 列印設定 - 初始化欄位
