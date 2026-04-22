@@ -309,6 +309,15 @@
         <!-- 即時接單設定 -->
         <section class="card settings-list">
           <h2>即時接單設定</h2>
+          <div style="margin-bottom:12px;">
+              <label style="font-weight:600;">裝置角色</label>
+              <select id="deviceRole" style="width:100%;padding:8px;margin-top:4px;">
+                <option value="master">主機（可編輯商品、同步菜單）</option>
+                <option value="slave">從機（僅讀取雲端菜單，不可編輯）</option>
+              </select>
+              <div class="muted" style="margin-top:4px;">從機啟動時會自動從雲端載入菜單，無法編輯商品。</div>
+            </div>
+
           <label class="inline-check"><input id="realtimeOrderEnabled" type="checkbox"> 啟用 Firebase 即時接單</label>
           <label>Firebase API Key<input id="firebaseApiKey"></label>
           <label>Firebase Auth Domain<input id="firebaseAuthDomain"></label>
