@@ -11,6 +11,7 @@ import { backupToGoogle, getGoogleBackupConfig, getGoogleDriveSession, initializ
 import { getRealtimeAuthUser, getRealtimeConfig, signInPOSWithGoogle, signOutPOSGoogle, startPOSRealtimeListener, verifyPOSAccess, waitForAuthReady, fetchMenuFromFirebase, watchMenuFromFirebase } from '../modules/realtime-order-service.js';
 
 // ── 主函式 ──
+export function initSettingsPage(){
 async function checkRedirectResult()
     try {
       const cfg = getRealtimeConfig();
