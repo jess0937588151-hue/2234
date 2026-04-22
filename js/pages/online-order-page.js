@@ -134,8 +134,8 @@ function updateItemPricePreview(product){
 function renderProductConfig(product){
   document.getElementById('onlineModalTitle').textContent = product.name + ' - 設定';
   const imageWrap = document.getElementById('onlineModalImageWrap');
-  imageWrap.innerHTML = product.image ? `<img src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}">` : '';
-  imageWrap.classList.toggle('hidden', !product.image);
+    imageWrap.innerHTML = '';
+    imageWrap.classList.add('hidden');
 
   const wrap = document.getElementById('onlineModalModules');
   wrap.innerHTML = '';
