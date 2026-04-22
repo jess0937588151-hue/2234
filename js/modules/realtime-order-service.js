@@ -294,15 +294,17 @@ function beep(){
 export async function signInPOSWithGoogle(){
   await loadFirebaseModules();
   try {
-    const result = await authApi.getRedirectResult(authInstance);
-    if(result && result.user) return result.user;
-  } catch(e){ console.warn('getRedirectResult:', e); }
-  await authApi.signInWithRedirect(authInstance, googleProvider);
+    const result = await authApi.signInWithPopup(authInstance, googleProvider);
+    return result.user;
+  } catch(e){
+    if(e.code === 'auth/popup-blocked' || e.code === 'auth/cancelled-popup-request'){
+      await authApi.signInWithRedirect(authInstance, googleProvider);
+    } else {
+      throw e;
+    }
+  }
 }
-export async function getRedirectResultForPOS(){
-  await loadFirebaseModules();
-  return await authApi.getRedirectResult(authInstance);
-}
+
 
 
 
