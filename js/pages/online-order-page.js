@@ -342,7 +342,17 @@ async function submitOnlineOrder(){
 async function init(){
   document.getElementById('onlineStoreName').textContent = getStoreName();
   document.getElementById('onlineStoreMeta').textContent = getStoreMeta();
-  try{ await fetchMenuFromFirebase(); }catch(err){ console.error('讀取雲端菜單失敗：',err); }
+  try {
+    await fetchMenuFromFirebase();
+    watchMenuFromFirebase(() => {
+      renderCategoryTabs();
+      renderProducts();
+    });
+  } catch(err) {
+    console.error('讀取雲端菜單失敗：', err);
+  }
+
+  
   renderCategoryTabs();
   renderProducts();
   renderCart();
