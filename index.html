@@ -310,6 +310,14 @@
         <section class="card settings-list">
           <h2>即時接單設定</h2>
           <label class="inline-check"><input id="realtimeOrderEnabled" type="checkbox"> 啟用 Firebase 即時接單</label>
+          <div style="margin-bottom:12px;">
+  <label style="font-weight:600;">裝置角色</label>
+  <select id="deviceRole" style="width:100%;padding:8px;margin-top:4px;border-radius:6px;border:1px solid #ccc;">
+    <option value="master">主機（可編輯商品、同步菜單）</option>
+    <option value="slave">從機（僅讀取雲端菜單）</option>
+  </select>
+</div>
+
           <label>Firebase API Key<input id="firebaseApiKey"></label>
           <label>Firebase Auth Domain<input id="firebaseAuthDomain"></label>
           <label>Firebase Realtime Database URL<input id="firebaseDatabaseUrl" placeholder="https://xxx-default-rtdb.firebaseio.com"></label>
