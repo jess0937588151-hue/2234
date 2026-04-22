@@ -12,20 +12,7 @@ import { getRealtimeAuthUser, getRealtimeConfig, signInPOSWithGoogle, signOutPOS
 
 // ── 主函式 ──
   // 處理 Google redirect 登入回來的結果
-  (async function checkRedirectResult(){
-    try {
-      const mod = await import('../modules/realtime-order-service.js');
-      await mod.loadFirebaseModules();
-      const result = await mod.getRedirectResultForPOS();
-      if(result && result.user){
-        document.getElementById('posGoogleAccountBox').innerHTML = 'POS 登入帳號：' + (result.user.email || result.user.uid);
-        await mod.verifyPOSAccess();
-        await mod.startPOSRealtimeListener(function(){ window.refreshAllViews(); });
-        if(typeof window.refreshRealtimeOrderPanel === 'function') window.refreshRealtimeOrderPanel();
-        alert('POS Google 登入成功');
-      }
-    } catch(e){ console.warn('checkRedirectResult:', e); }
-  })();
+ 
 
 
   // ============================
