@@ -565,8 +565,23 @@ export async function fetchMenuFromFirebase(){
   if(data.modules && Array.isArray(data.modules)){
     state.modules = data.modules;
   }
+  
   if(data.categories && Array.isArray(data.categories)){
     state.categories = data.categories;
   }
   return data;
+}
+export async function watchMenuFromFirebase(callback){
+  await loadFirebaseModules();
+  const cfg = ensureRealtimeConfig();
+  const storeId = cfg.projectId || 'default';
+  const menuRef = await getRef('menu/' + storeId);
+  dbApi.onValue(menuRef, (snapshot) => {
+    const data = snapshot.val();
+    if(!data) return;
+    if(Array.isArray(data.products)) state.products = data.products;
+    if(Array.isArray(data.modules))  state.modules  = data.modules;
+    if(Array.isArray(data.categories)) state.categories = data.categories;
+    if(callback) callback(data);
+  });
 }
