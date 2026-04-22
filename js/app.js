@@ -1,6 +1,4 @@
 /* 中文備註：主程式初始化檔。此版已移除 OCR 頁初始化，只保留點餐、訂單、報表、商品管理、設定。 */
-alert('寬度：' + window.innerWidth);
-
 import { persistAll } from './core/store.js';
 import { renderTabs, renderProducts, renderCart, initPOSPage } from './pages/pos-page.js';
 import { renderOrders, initOrdersPage } from './pages/orders-page.js';
