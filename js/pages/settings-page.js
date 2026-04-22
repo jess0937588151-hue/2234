@@ -12,7 +12,7 @@ import { getRealtimeAuthUser, getRealtimeConfig, signInPOSWithGoogle, signOutPOS
 
 // ── 主函式 ──
     // 處理 Google redirect 登入回來的結果
-  async function checkRedirectResult()
+  async function checkRedirectResult(){
     try {
       const cfg = getRealtimeConfig();
       if(!cfg.apiKey || !cfg.databaseURL || !cfg.projectId || !cfg.appId) return;
