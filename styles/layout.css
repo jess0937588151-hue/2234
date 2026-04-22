@@ -1,10 +1,9 @@
 /* 中文備註：styles/layout.css，此樣式檔已加入中文說明，方便後續維護。 */
-#app{display:grid;grid-template-columns:200px 1fr;min-height:100vh}
+#app{display:grid;grid-template-columns:180px 1fr;min-height:100vh}
 .sidebar{background:#0f172a;color:#fff;padding:10px;display:flex;flex-direction:column;gap:4px}
 .brand{font-size:13px;font-weight:800;margin-bottom:4px}
-.nav-btn{background:rgba(255,255,255,.08);color:#fff;text-align:left;padding:8px 10px !important;font-size:13px;border-radius:8px}
+.nav-btn{background:rgba(255,255,255,.08);color:#fff;text-align:left;padding:8px 10px;font-size:13px}
 .nav-btn.active,.nav-btn:hover{background:#1d4ed8}
-.nav-btn.active,.nav-btn:hover{background:#1d4ed8;padding:8px 10px !important}
 .main{padding:24px}
 .view{display:none}
 .view.active{display:block}
@@ -36,11 +35,10 @@
 @media (max-width:1280px){.responsive-filters{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (max-width:1024px){
   #app{grid-template-columns:1fr}
-  .sidebar{position:sticky;top:0;z-index:10;flex-direction:row;flex-wrap:wrap;padding:6px 10px;gap:4px}
-  .brand{display:none}
-  .nav-btn{padding:6px 10px;font-size:12px}
+  .sidebar{position:sticky;top:0;z-index:10;flex-direction:row;flex-wrap:wrap;padding:14px}
+  .brand{width:100%}
   .content-grid,.content-grid.two,.grid2{grid-template-columns:1fr}
-  .main{padding:10px}
+  .main{padding:16px}
 }
 @media (max-width:768px){
   .responsive-filters{grid-template-columns:1fr 1fr}
