@@ -12,25 +12,7 @@ import { getRealtimeAuthUser, getRealtimeConfig, signInPOSWithGoogle, signOutPOS
 
 // ── 主函式 ──
 export function initSettingsPage(){
-    // 處理 Google redirect 登入回來的結果
-    (async function checkRedirectLogin(){
-      try {
-        const cfg = getRealtimeConfig();
-        if(!cfg.apiKey || !cfg.databaseURL || !cfg.projectId || !cfg.appId) return;
-        await waitForAuthReady();
-        const user = getRealtimeAuthUser();
-        if(user){
-          document.getElementById('posGoogleAccountBox').innerHTML = 'POS 登入帳號：' + (user.email || user.uid);
-          try {
-            await verifyPOSAccess();
-            await startPOSRealtimeListener(function(){ window.refreshAllViews(); });
-          } catch(e){ console.warn('startListener:', e); }
-          if(typeof window.refreshRealtimeOrderPanel === 'function') window.refreshRealtimeOrderPanel();
-        }
-      } catch(e){ console.warn('checkRedirectLogin:', e); }
-    })();
-
- 
+   
 
 
   // ============================
