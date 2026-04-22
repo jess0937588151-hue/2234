@@ -1,4 +1,4 @@
-/* 中文備註：線上點餐頁樣式，採用圖片菜單、分類切換、單頁購物車抽屜。 */
+我/* 中文備註：線上點餐頁樣式，採用圖片菜單、分類切換、單頁購物車抽屜。 */
 body{background:#f6f8fb}
 .online-shell{max-width:1440px;margin:0 auto;padding:20px}
 .online-hero{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 0 20px}
@@ -34,6 +34,9 @@ body{background:#f6f8fb}
 .modal.hidden{display:none}
 .modal .modal-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.55)}
 .modal .modal-dialog{position:relative;z-index:1;background:#fff;border-radius:16px;width:min(500px,90vw);max-height:85vh;overflow-y:auto;padding:24px;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+.option-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;border:1px solid #c7d2fe;background:#fff;color:#1d4ed8;font-size:14px;cursor:pointer}
+.option-chip.active{background:#1d4ed8;color:#fff;border-color:#1d4ed8}
+
 
 #onlineProductModal{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.55)}
 #onlineProductModal.hidden{display:none}
