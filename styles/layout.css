@@ -30,15 +30,16 @@
 .modal-dialog{position:relative;background:#fff;border-radius:24px;padding:20px;max-width:720px;width:min(92vw,720px);max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(15,23,42,.2)}
 .modal-dialog.wide{max-width:860px;width:min(94vw,860px)}
 .small-btn{padding:10px 12px;border-radius:12px}
-.toolbar{margin-bottom:16px}
+.toolbar{margin-bottom:16px}啊
 .hidden-mobile{display:block}
 @media (max-width:1280px){.responsive-filters{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (max-width:1024px){
   #app{grid-template-columns:1fr}
-  .sidebar{position:sticky;top:0;z-index:10;flex-direction:row;flex-wrap:wrap;padding:14px}
-  .brand{width:100%}
+  .sidebar{position:sticky;top:0;z-index:10;flex-direction:row;flex-wrap:wrap;padding:6px 10px;gap:4px}
+  .brand{display:none}
+  .nav-btn{padding:6px 10px;font-size:12px}
   .content-grid,.content-grid.two,.grid2{grid-template-columns:1fr}
-  .main{padding:16px}
+  .main{padding:10px}
 }
 @media (max-width:768px){
   .responsive-filters{grid-template-columns:1fr 1fr}
