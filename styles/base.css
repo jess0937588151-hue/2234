@@ -7,7 +7,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC",sans-serif}
 button,input,select,textarea{font:inherit}
-button{cursor:pointer;border:none;border-radius:10px;padding:12px 12px}
+button{cursor:pointer;border:none;border-radius:10px;padding:6px 18px}
 input,select,textarea{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:#fff}
 label{display:block;margin-bottom:8px;font-size:14px;font-weight:700}
 h1,h2,h3{margin:0}
