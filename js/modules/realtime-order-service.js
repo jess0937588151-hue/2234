@@ -551,3 +551,22 @@ export async function syncMenuToFirebase(){
   cfg.lastSyncTime = new Date().toISOString();
   persistAll();
 }
+export async function fetchMenuFromFirebase(){
+  await loadFirebaseModules();
+  const cfg = ensureRealtimeConfig();
+  const storeId = cfg.projectId || 'default';
+  const menuRef = await getRef('menu/' + storeId);
+  const snapshot = await dbApi.get(menuRef);
+  const data = snapshot.val();
+  if(!data) throw new Error('雲端尚無菜單資料，請先在 POS 同步菜單到雲端');
+  if(data.products && Array.isArray(data.products)){
+    state.products = data.products;
+  }
+  if(data.modules && Array.isArray(data.modules)){
+    state.modules = data.modules;
+  }
+  if(data.categories && Array.isArray(data.categories)){
+    state.categories = data.categories;
+  }
+  return data;
+}
