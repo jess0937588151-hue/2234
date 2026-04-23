@@ -90,22 +90,25 @@ body{background:#f6f8fb}
       display: block;
     }
 
-    .online-product-body {
-      padding: 2px 6px;
-      gap: 0;
-    }
+ .online-product-body {
+  padding: 2px 6px !important;
+  gap: 0 !important;
+  height: auto !important;
+}
+
 
     .online-product-name {
       font-size: 15px;
-      line-height: 1;
+      line-height: 1.2;
       margin: 0;
     }
 
-    .online-product-price {
-      font-size: 11px;
-      line-height: 1;
-      margin: 0;
-    }
+  .online-product-price {
+  font-size: 13px;
+  line-height: 1.2;
+  margin: 0;
+}
+
 
     .online-product-meta {
       display: none;
