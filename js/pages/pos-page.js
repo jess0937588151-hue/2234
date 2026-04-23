@@ -4,6 +4,7 @@ import { escapeHtml, money, id } from '../core/utils.js';
 import { getDiscountResult, getDiscountType, setDiscountType, handleDiscountInput } from '../modules/cart-service.js';
 import { createOrUpdateOrder, markPendingOrderPaid } from '../modules/order-service.js';
 import { buildCartPreviewOrder, getPrintSettings, printOrderLabels, printOrderReceipt, printKitchenCopies, openCashDrawer } from '../modules/print-service.js';
+import { sunmiPrintReceipt, sunmiPrintKitchen, sunmiOpenCashDrawer } from '../services/print-service.js';
 
 function createConfigState(product){
   const selections = {};
