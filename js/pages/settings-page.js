@@ -6,7 +6,7 @@
 // ── 匯入模組 ──
 import { state, persistAll, seedDefaults } from '../core/store.js';
 import { downloadFile } from '../core/utils.js';
-import { buildCartPreviewOrder, printOrderLabels, printOrderReceipt, getPrintSettings, previewInModal, getReceiptHtml, getLabelHtml } from '../modules/print-service.js';
+import { buildCartPreviewOrder, printOrderLabels, printOrderReceipt, printKitchenCopies, openCashDrawer, getPrintSettings, previewInModal, getReceiptHtml, getLabelHtml } from '../modules/print-service.js';
 import { backupToGoogle, getGoogleBackupConfig, getGoogleDriveSession, initializeGoogleDriveApi, listGoogleBackups, restoreFromGoogle, signInGoogleDrive, signOutGoogleDrive, startGoogleAutoBackup } from '../modules/google-backup-service.js';
 import { getRealtimeAuthUser, getRealtimeConfig, signInPOSWithGoogle, signOutPOSGoogle, startPOSRealtimeListener, verifyPOSAccess, waitForAuthReady, fetchMenuFromFirebase, watchMenuFromFirebase } from '../modules/realtime-order-service.js';
 
@@ -364,7 +364,7 @@ export function initSettingsPage(){
     cfg.storePhone = document.getElementById('printStorePhone').value.trim();
     cfg.storeAddress = document.getElementById('printStoreAddress').value.trim();
     cfg.receiptFooter = document.getElementById('printReceiptFooter').value.trim();
-    cfg.receiptPaperWidth = document.getElementById('printReceiptPaperWidth').value || '58';
+    cfg.receiptPaperWidth = Number(document.getElementById('printReceiptPaperWidth').value) || 58;
     cfg.labelPaperWidth = Number(document.getElementById('printLabelPaperWidth').value || 60);
     cfg.labelPaperHeight = Number(document.getElementById('printLabelPaperHeight').value || 40);
     cfg.receiptFontSize = Number(document.getElementById('printReceiptFontSize').value || 12);
