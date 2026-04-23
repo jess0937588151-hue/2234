@@ -270,52 +270,53 @@ export function renderCart(){
 
 
 function finalizeOrder(paymentMethod){
-  var mode = document.getElementById('paymentTargetMode').value || 'new';
-  var targetOrderId = document.getElementById('paymentTargetOrderId').value || '';
-  var printConfig = getPrintSettings();
-  var order = null;
+    var mode = document.getElementById('paymentTargetMode').value || 'new';
+    var targetOrderId = document.getElementById('paymentTargetOrderId').value || '';
+    var printConfig = getPrintSettings();
+    var order = null;
 
-  if(mode === 'pending'){
-    order = markPendingOrderPaid(targetOrderId, paymentMethod);
+    if(mode === 'pending'){
+        order = markPendingOrderPaid(targetOrderId, paymentMethod);
+        document.getElementById('paymentModal').classList.add('hidden');
+        persistAll();
+        window.refreshAllViews();
+
+        // 開錢箱
+        if(order && paymentMethod !== '待付款'){
+            sunmiOpenCashDrawer() || openCashDrawer();
+        }
+
+        if(order && paymentMethod !== '待付款' && printConfig.autoPrintCheckout){
+            sunmiPrintReceipt(order, printConfig) || printOrderReceipt(order, 'customer');
+        }
+        if(order && printConfig.autoPrintKitchen){
+            sunmiPrintKitchen(order, printConfig) || printKitchenCopies(order);
+        }
+
+        alert(paymentMethod === '待付款' ? '仍維持待付款' : '已完成收款');
+        return;
+    }
+
+    order = createOrUpdateOrder(paymentMethod);
     document.getElementById('paymentModal').classList.add('hidden');
     persistAll();
     window.refreshAllViews();
 
     // 開錢箱
     if(order && paymentMethod !== '待付款'){
-      openCashDrawer();
+        sunmiOpenCashDrawer() || openCashDrawer();
     }
 
     if(order && paymentMethod !== '待付款' && printConfig.autoPrintCheckout){
-      printOrderReceipt(order, 'customer');
+        sunmiPrintReceipt(order, printConfig) || printOrderReceipt(order, 'customer');
     }
     if(order && printConfig.autoPrintKitchen){
-      printKitchenCopies(order);
+        sunmiPrintKitchen(order, printConfig) || printKitchenCopies(order);
     }
 
-    alert(paymentMethod === '待付款' ? '仍維持待付款' : '已完成收款');
-    return;
-  }
-
-  order = createOrUpdateOrder(paymentMethod);
-  document.getElementById('paymentModal').classList.add('hidden');
-  persistAll();
-  window.refreshAllViews();
-
-  // 開錢箱
-  if(order && paymentMethod !== '待付款'){
-    openCashDrawer();
-  }
-
-  if(order && paymentMethod !== '待付款' && printConfig.autoPrintCheckout){
-    printOrderReceipt(order, 'customer');
-  }
-  if(order && printConfig.autoPrintKitchen){
-    printKitchenCopies(order);
-  }
-
-  alert(paymentMethod === '待付款' ? '已加入待付款' : '結帳完成');
+    alert(paymentMethod === '待付款' ? '已加入待付款' : '結帳完成');
 }
+
 
 export function initPOSPage(){
   document.getElementById('productSearch').addEventListener('input', renderProducts);
