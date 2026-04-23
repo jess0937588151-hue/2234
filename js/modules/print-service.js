@@ -55,9 +55,16 @@ function buildSelectionText(item){
 
 // ========== 列印核心 ==========
 
-function openPrintWindow(html){
+function openPrintWindow(html) {
+  // 檢查是否在 SunmiPrinter WebView 內
+  if (window.SunmiPrinter && window.SunmiPrinter.isConnected()) {
+    // 透過 JS Bridge 列印，不需要 HTML
+    console.log('SunmiPrinter detected, use native print');
+    return;
+  }
+  // 不在 WebView 內，使用原本的 iframe 列印
   var frame = document.getElementById('_silentPrintFrame');
-  if(!frame){
+  if (!frame) {
     frame = document.createElement('iframe');
     frame.id = '_silentPrintFrame';
     frame.style.cssText = 'position:fixed;width:0;height:0;border:none;left:-9999px;';
@@ -67,8 +74,72 @@ function openPrintWindow(html){
   doc.open();
   doc.write(html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ''));
   doc.close();
-  setTimeout(function(){ frame.contentWindow.print(); }, 400);
+  setTimeout(function () { frame.contentWindow.print(); }, 400);
 }
+export function sunmiPrintReceipt(order, config) {
+  if (!window.SunmiPrinter || !window.SunmiPrinter.isConnected()) {
+    console.log('SunmiPrinter not available, fallback to HTML print');
+    return false;
+  }
+
+  var p = window.SunmiPrinter;
+  var shopName = (config && config.shopName) || '';
+  var orderNum = order.orderNumber || '';
+  var dateTime = order.dateTime || new Date().toLocaleString('zh-TW');
+  var orderType = order.orderType || '';
+  var paymentMethod = order.paymentMethod || '';
+
+  // 店名
+  p.printTextCenter(shopName, 32);
+
+  // 分隔線
+  p.printLine();
+
+  // 訂單資訊
+  if (orderNum) p.printText('單號: ' + orderNum, 24);
+  p.printText('時間: ' + dateTime, 24);
+  if (orderType) p.printText('類型: ' + orderType, 24);
+
+  p.printLine();
+
+  // 品項
+  var items = order.items || [];
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    var name = item.name || '';
+    var qty = 'x' + (item.qty || item.quantity || 1);
+    var price = '$' + (item.price || 0);
+    p.printThreeColumns(name, qty, price);
+
+    if (item.options) p.printText('  ' + item.options, 20);
+    if (item.note) p.printText('  *' + item.note, 20);
+  }
+
+  p.printLine();
+
+  // 合計
+  p.printTextCenter('合計: $' + (order.total || 0), 32);
+
+  // 付款方式
+  if (paymentMethod) p.printText('付款: ' + paymentMethod, 24);
+
+  // 頁尾
+  p.printTextCenter('謝謝光臨', 24);
+
+  // 走紙 + 切紙
+  p.feedAndCut();
+
+  return true;
+}
+
+export function sunmiOpenCashDrawer() {
+  if (window.SunmiPrinter && window.SunmiPrinter.isConnected()) {
+    window.SunmiPrinter.openCashDrawer();
+    return true;
+  }
+  return false;
+}
+
 
 
 
