@@ -376,3 +376,72 @@ export function getReceiptHtml(order, mode){
 export function getLabelHtml(order){
   return buildLabelHtml(order);
 }
+export function sunmiPrintReceipt(order, config) {
+  if (!window.SunmiPrinter || !window.SunmiPrinter.isConnected()) {
+    return false;
+  }
+  var p = window.SunmiPrinter;
+  var shopName = (config && config.shopName) || '';
+  var orderNum = order.orderNumber || '';
+  var dateTime = order.dateTime || new Date().toLocaleString('zh-TW');
+  var orderType = order.orderType || '';
+  var paymentMethod = order.paymentMethod || '';
+
+  p.printTextCenter(shopName, 32);
+  p.printLine();
+  if (orderNum) p.printText('單號: ' + orderNum, 24);
+  p.printText('時間: ' + dateTime, 24);
+  if (orderType) p.printText('類型: ' + orderType, 24);
+  p.printLine();
+
+  var items = order.items || [];
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    var name = item.name || '';
+    var qty = 'x' + (item.qty || item.quantity || 1);
+    var price = '$' + (item.price || 0);
+    p.printThreeColumns(name, qty, price);
+    if (item.options) p.printText('  ' + item.options, 20);
+    if (item.note) p.printText('  *' + item.note, 20);
+  }
+
+  p.printLine();
+  p.printTextCenter('合計: $' + (order.total || 0), 32);
+  if (paymentMethod) p.printText('付款: ' + paymentMethod, 24);
+  p.printTextCenter('謝謝光臨', 24);
+  p.feedAndCut();
+  return true;
+}
+
+export function sunmiPrintKitchen(order, config) {
+  if (!window.SunmiPrinter || !window.SunmiPrinter.isConnected()) {
+    return false;
+  }
+  var p = window.SunmiPrinter;
+  p.printTextCenter('*** 廚房單 ***', 32);
+  p.printLine();
+  if (order.orderNumber) p.printText('單號: ' + order.orderNumber, 24);
+  if (order.orderType) p.printText('類型: ' + order.orderType, 28);
+  p.printLine();
+
+  var items = order.items || [];
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    p.printText((item.name || '') + ' x' + (item.qty || item.quantity || 1), 28);
+    if (item.options) p.printText('  ' + item.options, 24);
+    if (item.note) p.printText('  *' + item.note, 24);
+  }
+
+  p.printLine();
+  p.feedAndCut();
+  return true;
+}
+
+export function sunmiOpenCashDrawer() {
+  if (window.SunmiPrinter && window.SunmiPrinter.isConnected()) {
+    window.SunmiPrinter.openCashDrawer();
+    return true;
+  }
+  return false;
+}
+
