@@ -80,7 +80,7 @@ body{background:#f6f8fb}
 
       .online-product-image {
       height: auto;
-      max-height: 50px;
+      max-height: 150px;
       overflow: hidden;
     }
 
