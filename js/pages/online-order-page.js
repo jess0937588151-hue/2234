@@ -253,6 +253,8 @@ function renderCart(){
   document.getElementById('onlineSubtotalText').textContent = money(subtotal);
   document.getElementById('onlineTotalQtyText').textContent = String(totalQty);
   document.getElementById('openCartBtn').innerHTML = `購物車 <span id="cartQtyBadge">${totalQty}</span>`;
+      updateFloatingCartBadge();
+
 }
 
 function openCartDrawer(){ document.getElementById('onlineCartDrawer').classList.remove('hidden'); }
@@ -366,6 +368,20 @@ async function init(){
     if(_nameEl && _savedName) _nameEl.value = _savedName;
     if(_phoneEl && _savedPhone) _phoneEl.value = _savedPhone;
 
+      // 浮動購物車按鈕
+    let floatBtn = document.getElementById('floatingCartBtn');
+    if (!floatBtn) {
+      floatBtn = document.createElement('button');
+      floatBtn.id = 'floatingCartBtn';
+      floatBtn.innerHTML = '🛒<span id="floatingCartBadge" style="display:none;">0</span>';
+      floatBtn.onclick = () => {
+        const drawer = document.getElementById('onlineCartDrawer');
+        if (drawer) drawer.classList.remove('hidden');
+      };
+      document.body.appendChild(floatBtn);
+    }
+    updateFloatingCartBadge();
+
   document.getElementById('onlineSearchInput').addEventListener('input', renderProducts);
   document.getElementById('onlineItemQtyInput').addEventListener('input', ()=>{
     const p = state.products.find(x=>x.id===onlineState.configTarget?.productId);
@@ -417,4 +433,12 @@ async function init(){
   document.getElementById('submitOnlineOrderBtn').onclick = submitOnlineOrder;
   document.getElementById('closeOnlineStatusBtn').onclick = closeStatusOverlay;
 }
+function updateFloatingCartBadge() {
+  const badge = document.getElementById('floatingCartBadge');
+  if (!badge) return;
+  const count = onlineState.cart.reduce((s, i) => s + i.qty, 0);
+  badge.textContent = count;
+  badge.style.display = count > 0 ? 'flex' : 'none';
+}
+
 init();
