@@ -56,26 +56,6 @@ function buildSelectionText(item){
 // ========== 列印核心 ==========
 
 function openPrintWindow(html){
-  // 優先使用 rawbt: intent 直接列印（不跳預覽）
-  try {
-    var blob = new Blob([html], {type: 'text/html; charset=utf-8'});
-    var url = URL.createObjectURL(blob);
-    var rawbtUrl = 'rawbt:' + url;
-    var a = document.createElement('a');
-    a.href = rawbtUrl;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function(){
-      try { document.body.removeChild(a); } catch(e){}
-      URL.revokeObjectURL(url);
-    }, 5000);
-    return;
-  } catch(e) {
-    console.warn('rawbt intent 失敗，改用 iframe', e);
-  }
-
-  // fallback: iframe 列印
   var frame = document.getElementById('_silentPrintFrame');
   if(!frame){
     frame = document.createElement('iframe');
@@ -90,26 +70,11 @@ function openPrintWindow(html){
   setTimeout(function(){ frame.contentWindow.print(); }, 400);
 }
 
+
 // ========== 開錢箱 ==========
 
 export function openCashDrawer(){
-  // ESC p 0 25 250 — 標準 ESC/POS 開錢箱指令
-  var cmd = new Uint8Array([27, 112, 0, 25, 250]);
-  try {
-    var blob = new Blob([cmd], {type: 'application/octet-stream'});
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = 'rawbt:' + url;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function(){
-      try { document.body.removeChild(a); } catch(e){}
-      URL.revokeObjectURL(url);
-    }, 3000);
-  } catch(e){
-    console.warn('開錢箱失敗', e);
-  }
+  // 由 ALLPOS Printer 的 Cash Drawer Command 設定控制
 }
 
 // ========== 建立收據 HTML ==========
