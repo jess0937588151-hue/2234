@@ -57,24 +57,19 @@ function buildSelectionText(item){
 
 function openPrintWindow(html){
   var frame = document.getElementById('_silentPrintFrame');
-  if(frame) frame.remove();
-  
-  frame = document.createElement('iframe');
-  frame.id = '_silentPrintFrame';
-  frame.style.cssText = 'position:fixed;left:-9999px;top:0;width:80mm;height:auto;border:none;';
-  document.body.appendChild(frame);
-  
+  if(!frame){
+    frame = document.createElement('iframe');
+    frame.id = '_silentPrintFrame';
+    frame.style.cssText = 'position:fixed;width:0;height:0;border:none;left:-9999px;';
+    document.body.appendChild(frame);
+  }
   var doc = frame.contentDocument || frame.contentWindow.document;
   doc.open();
-  doc.write(html);
+  doc.write(html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ''));
   doc.close();
-  
-  frame.onload = function(){
-    setTimeout(function(){
-      try { frame.contentWindow.print(); } catch(e){ window.print(); }
-    }, 600);
-  };
+  setTimeout(function(){ frame.contentWindow.print(); }, 400);
 }
+
 
 
 
