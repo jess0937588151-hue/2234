@@ -78,40 +78,48 @@ body{background:#f6f8fb}
       overflow: hidden;
     }
 
-      .online-product-image {
-      height: auto;
-      max-height: 150px;
+    .online-product-image {
+      height: 140px;
       overflow: hidden;
     }
 
     .online-product-image img {
       width: 100%;
-      height: auto;
-      max-height: 120px;
-      object-fit: contain;
+      height: 140px;
+      object-fit: cover;
       display: block;
     }
 
-      .online-product-name {
-      font-size: 15px;
-      line-height: 1.1;
-      margin: 0;
+    .online-product-body {
+      padding: 2px 6px;
+      gap: 0;
     }
 
-      .online-product-price {
+    .online-product-name {
       font-size: 12px;
-      line-height: 1.1;
+      line-height: 1;
       margin: 0;
     }
 
-      .online-product-meta {
+    .online-product-price {
+      font-size: 11px;
+      line-height: 1;
+      margin: 0;
+    }
+
+    .online-product-meta {
       display: none;
     }
 
-  .online-product-footer .primary-btn {
-    padding: 5px 8px;
-    font-size: 12px;
-  }
+    .online-product-footer {
+      padding: 2px 6px;
+    }
+
+    .online-product-footer .primary-btn {
+      padding: 4px 6px;
+      font-size: 11px;
+    }
+
 
   .online-category-chip {
     padding: 3px 8px;
