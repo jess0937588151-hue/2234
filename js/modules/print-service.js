@@ -23,7 +23,6 @@ function ensurePrintConfig(){
       autoPrintKitchen: true
     };
   }
-  // 確保紙寬是數字
   var cfg = state.settings.printConfig;
   cfg.receiptPaperWidth = Number(cfg.receiptPaperWidth) || 58;
   cfg.receiptFontSize = Number(cfg.receiptFontSize) || 12;
@@ -56,13 +55,10 @@ function buildSelectionText(item){
 // ========== 列印核心 ==========
 
 function openPrintWindow(html) {
-  // 檢查是否在 SunmiPrinter WebView 內
   if (window.SunmiPrinter && window.SunmiPrinter.isConnected()) {
-    // 透過 JS Bridge 列印，不需要 HTML
-    console.log('SunmiPrinter detected, use native print');
+    console.log('SunmiPrinter detected, skip HTML print');
     return;
   }
-  // 不在 WebView 內，使用原本的 iframe 列印
   var frame = document.getElementById('_silentPrintFrame');
   if (!frame) {
     frame = document.createElement('iframe');
@@ -76,372 +72,45 @@ function openPrintWindow(html) {
   doc.close();
   setTimeout(function () { frame.contentWindow.print(); }, 400);
 }
+
+// ========== Sunmi 原生列印（唯一一份）==========
+
 export function sunmiPrintReceipt(order, config) {
   if (!window.SunmiPrinter || !window.SunmiPrinter.isConnected()) {
-    console.log('SunmiPrinter not available, fallback to HTML print');
+    console.log('SunmiPrinter 不可用，回退 HTML 列印');
     return false;
   }
+  try {
+    var p = window.SunmiPrinter;
+    var cfg = config || ensurePrintConfig();
+    var shopName = cfg.storeName || '餐廳 POS';
+    var createdAt = String(order.createdAt || '').replace('T', ' ').slice(0, 16);
 
-  var p = window.SunmiPrinter;
-  var shopName = (config && config.shopName) || '';
-  var orderNum = order.orderNumber || '';
-  var dateTime = order.dateTime || new Date().toLocaleString('zh-TW');
-  var orderType = order.orderType || '';
-  var paymentMethod = order.paymentMethod || '';
+    // 店名
+    p.printTextCenter(shopName, 32, true);
+    if (cfg.storePhone) p.printTextCenter('電話：' + cfg.storePhone, 22, false);
+    p.printLine();
 
-  // 店名
-  p.printTextCenter(shopName, 32);
+    // 訂單資訊
+    if (order.orderNo) p.printText('單號：' + order.orderNo, 24, false);
+    if (createdAt) p.printText('時間：' + createdAt, 24, false);
+    if (order.orderType) p.printText('類型：' + order.orderType + (order.tableNo ? ' / ' + order.tableNo : ''), 24, false);
+    if (order.paymentMethod) p.printText('付款：' + order.paymentMethod, 24, false);
+    p.printLine();
 
-  // 分隔線
-  p.printLine();
+    // 品項標頭
+    p.printThreeColumns('品名', '數量', '小計');
+    p.printLine();
 
-  // 訂單資訊
-  if (orderNum) p.printText('單號: ' + orderNum, 24);
-  p.printText('時間: ' + dateTime, 24);
-  if (orderType) p.printText('類型: ' + orderType, 24);
+    // 品項內容
+    var items = order.items || [];
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var unitPrice = Number(item.basePrice || 0) + Number(item.extraPrice || 0);
+      var qty = Number(item.qty || 0);
+      var subtotal = unitPrice * qty;
 
-  p.printLine();
+      p.printThreeColumns(item.name || '', 'x' + qty, money(subtotal));
 
-  // 品項
-  var items = order.items || [];
-  for (var i = 0; i < items.length; i++) {
-    var item = items[i];
-    var name = item.name || '';
-    var qty = 'x' + (item.qty || item.quantity || 1);
-    var price = '$' + (item.price || 0);
-    p.printThreeColumns(name, qty, price);
-
-    if (item.options) p.printText('  ' + item.options, 20);
-    if (item.note) p.printText('  *' + item.note, 20);
-  }
-
-  p.printLine();
-
-  // 合計
-  p.printTextCenter('合計: $' + (order.total || 0), 32);
-
-  // 付款方式
-  if (paymentMethod) p.printText('付款: ' + paymentMethod, 24);
-
-  // 頁尾
-  p.printTextCenter('謝謝光臨', 24);
-
-  // 走紙 + 切紙
-  p.feedAndCut();
-
-  return true;
-}
-
-export function sunmiOpenCashDrawer() {
-  if (window.SunmiPrinter && window.SunmiPrinter.isConnected()) {
-    window.SunmiPrinter.openCashDrawer();
-    return true;
-  }
-  return false;
-}
-
-
-
-
-
-
-
-
-// ========== 開錢箱 ==========
-
-export function openCashDrawer(){
-  // 由 ALLPOS Printer 的 Cash Drawer Command 設定控制
-}
-
-// ========== 建立收據 HTML ==========
-
-function buildReceiptHtml(order, mode){
-  var cfg = ensurePrintConfig();
-  var widthMm = Math.max(30, Number(cfg.receiptPaperWidth) || 58);
-  var fontSize = Math.max(8, Number(cfg.receiptFontSize) || 12);
-  var offsetX = Number(cfg.receiptOffsetX || 0);
-  var offsetY = Number(cfg.receiptOffsetY || 0);
-  var kitchenMode = mode === 'kitchen';
-  var title = kitchenMode ? '廚房出單' : '顧客收據';
-  var createdAt = String(order.createdAt || '').replace('T', ' ').slice(0, 16);
-
-  var rows = (order.items || []).map(function(item){
-    var unitPrice = Number(item.basePrice || 0) + Number(item.extraPrice || 0);
-    var subText = buildSelectionText(item);
-    return `
-      <div class="item-row">
-        <div class="item-top">
-          <div class="item-name">${escapeHtml(item.name)}</div>
-          <div class="item-qty">x ${Number(item.qty || 0)}</div>
-        </div>
-        ${subText ? '<div class="item-sub">' + escapeHtml(subText) + '</div>' : ''}
-        ${kitchenMode ? '' : '<div class="item-sub">' + money(unitPrice) + ' / 小計 ' + money(unitPrice * Number(item.qty || 0)) + '</div>'}
-      </div>
-    `;
-  }).join('');
-
-  return `<!doctype html>
-<html lang="zh-Hant">
-<head>
-<meta charset="UTF-8">
-<title>${title}</title>
-<style>
-  @page { size: ${widthMm}mm auto; margin: 0; padding: 0; }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; padding: 0;
-    width: ${widthMm}mm;
-    font-family: "Noto Sans TC", "PingFang TC", -apple-system, sans-serif;
-    font-size: ${fontSize}px;
-    line-height: 1.7;
-    letter-spacing: 0.5px;
-    -webkit-print-color-adjust: exact;
-  }
-  .sheet {
-    width: ${widthMm}mm;
-    max-width: ${widthMm}mm;
-    padding: 3mm;
-    margin-left: ${offsetX}mm;
-    margin-top: ${offsetY}mm;
-  }
-  .center { text-align: center; }
-  .title { font-size: ${fontSize + 5}px; font-weight: 800; line-height: 1.5; margin-bottom: 4px; }
-  .sub { font-size: ${fontSize}px; margin-top: 4px; line-height: 1.6; }
-  .line { border-top: 1px dashed #000; margin: 8px 0; }
-  .row { display: flex; justify-content: space-between; gap: 6px; line-height: 1.6; padding: 2px 0; }
-  .item-row { padding: 6px 0; border-bottom: 1px dashed #bbb; }
-  .item-top { display: flex; justify-content: space-between; gap: 6px; font-weight: 700; line-height: 1.6; font-size: ${fontSize + 1}px; }
-  .item-name { flex: 1; word-break: break-word; }
-  .item-qty { white-space: nowrap; }
-  .item-sub { margin-top: 3px; font-size: ${fontSize}px; color: #333; line-height: 1.5; }
-  .big { font-size: ${fontSize + 2}px; font-weight: 800; line-height: 1.6; }
-  .footer { margin-top: 10px; text-align: center; font-size: ${fontSize}px; line-height: 1.6; }
-</style>
-</head>
-<body>
-  <div class="sheet">
-    <div class="center">
-      <div class="title">${escapeHtml(cfg.storeName || '餐廳 POS')}</div>
-      ${cfg.storePhone ? '<div class="sub">電話：' + escapeHtml(cfg.storePhone) + '</div>' : ''}
-      ${cfg.storeAddress ? '<div class="sub">地址：' + escapeHtml(cfg.storeAddress) + '</div>' : ''}
-      <div class="sub">${escapeHtml(title)}</div>
-    </div>
-    <div class="line"></div>
-      <div class="sub">單號：${escapeHtml(order.orderNo || '')}</div>
-      <div class="sub">時間：${escapeHtml(createdAt)}</div>
-      <div class="sub">類型：${escapeHtml(order.orderType || '')}${order.tableNo ? ' / ' + escapeHtml(order.tableNo) : ''}</div>
-      ${kitchenMode ? '' : '<div class="sub">付款：' + escapeHtml(order.paymentMethod || '') + '</div>'}
-    <div class="line"></div>
-    ${rows}
-    ${kitchenMode ? '' : `
-      <div class="line"></div>
-      <div class="row"><span>小計</span><strong>${money(order.subtotal || 0)}</strong></div>
-      <div class="row"><span>折扣</span><strong>${money(order.discountAmount || 0)}</strong></div>
-      <div class="row big"><span>合計</span><span>${money(order.total || 0)}</span></div>
-    `}
-    <div class="line"></div>
-    <div class="footer">${escapeHtml(cfg.receiptFooter || '')}</div>
-  </div>
-  <div style="height:25mm;"></div>
-</body>
-</html>`;
-}
-
-// ========== 建立標籤 HTML ==========
-
-function buildLabelHtml(order){
-  var cfg = ensurePrintConfig();
-  var widthMm = Math.max(30, Number(cfg.labelPaperWidth || 60));
-  var heightMm = Math.max(20, Number(cfg.labelPaperHeight || 40));
-  var fontSize = Math.max(8, Number(cfg.labelFontSize || 12));
-  var offsetX = Number(cfg.labelOffsetX || 0);
-  var offsetY = Number(cfg.labelOffsetY || 0);
-
-  var labels = (order.items || []).map(function(item){
-    var subText = buildSelectionText(item);
-    return `
-      <div class="label">
-        <div class="store">${escapeHtml(cfg.storeName || '餐廳 POS')}</div>
-        <div class="main">${escapeHtml(item.name)} x ${Number(item.qty || 0)}</div>
-        ${subText ? '<div class="sub">' + escapeHtml(subText) + '</div>' : ''}
-        <div class="sub">單號：${escapeHtml(order.orderNo || '')}</div>
-        <div class="sub">${escapeHtml(String(order.createdAt || '').replace('T', ' ').slice(0, 16))}</div>
-      </div>
-    `;
-  }).join('');
-
-  return `<!doctype html>
-<html lang="zh-Hant">
-<head>
-<meta charset="UTF-8">
-<title>商品標籤</title>
-<style>
-  @page { size: ${widthMm}mm ${heightMm}mm; margin: 0; }
-  body {
-    margin: 0;
-    font-family: "Noto Sans TC", "PingFang TC", -apple-system, sans-serif;
-  }
-  .label {
-    width: ${widthMm}mm;
-    height: ${heightMm}mm;
-    box-sizing: border-box;
-    page-break-after: always;
-    padding: 3mm;
-    margin-left: ${offsetX}mm;
-    margin-top: ${offsetY}mm;
-    font-size: ${fontSize}px;
-    line-height: 1.5;
-  }
-  .store { font-size: ${fontSize - 1}px; font-weight: 700; }
-  .main { font-size: ${fontSize + 3}px; font-weight: 800; margin-top: 2mm; }
-  .sub { font-size: ${fontSize - 1}px; margin-top: 1mm; }
-</style>
-</head>
-<body>
-  ${labels}
-</body>
-</html>`;
-}
-
-// ========== 列印功能 ==========
-
-export function printOrderReceipt(order, mode){
-  if(!order) return;
-  openPrintWindow(buildReceiptHtml(order, mode || 'customer'));
-}
-
-export function printKitchenCopies(order){
-  var copies = Math.max(1, Number(ensurePrintConfig().kitchenCopies || 1));
-  for(var i = 0; i < copies; i++){
-    setTimeout(function(){ printOrderReceipt(order, 'kitchen'); }, i * 500);
-  }
-}
-
-export function printOrderLabels(order){
-  if(!order) return;
-  openPrintWindow(buildLabelHtml(order));
-}
-
-// ========== 預覽用 ==========
-
-export function buildCartPreviewOrder(){
-  var subtotal = state.cart.reduce(function(s,x){ return s + ((Number(x.basePrice)||0) + (Number(x.extraPrice)||0)) * x.qty; }, 0);
-  var discountValue = Number(document.getElementById('discountValue')?.value || 0);
-  var discountType = state.settings.discountType || 'amount';
-  var discountAmount = discountType === 'percent'
-    ? Math.floor(subtotal * (discountValue / 100))
-    : Math.min(subtotal, discountValue);
-  var total = Math.max(0, subtotal - discountAmount);
-
-  return {
-    orderNo: 'PREVIEW-' + Date.now(),
-    createdAt: new Date().toISOString(),
-    orderType: document.getElementById('orderType')?.value || '內用',
-    tableNo: document.getElementById('tableNo')?.value?.trim() || '',
-    paymentMethod: '未結帳',
-    subtotal: subtotal,
-    discountAmount: discountAmount,
-    total: total,
-    items: state.cart
-  };
-}
-
-export function previewInModal(html){
-  var modal = document.getElementById('printPreviewModal');
-  var frame = document.getElementById('printPreviewFrame');
-  var title = document.getElementById('printPreviewTitle');
-  if(!modal || !frame) return;
-  modal.classList.remove('hidden');
-  var doc = frame.contentDocument || frame.contentWindow.document;
-  doc.open();
-  doc.write(html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ''));
-  doc.close();
-
-  document.getElementById('printPreviewPrintBtn').onclick = function(){
-    frame.contentWindow.print();
-  };
-  document.getElementById('closePrintPreviewModal').onclick = function(){
-    modal.classList.add('hidden');
-  };
-  var backdrop = modal.querySelector('.modal-backdrop');
-  if(backdrop){
-    backdrop.onclick = function(){ modal.classList.add('hidden'); };
-  }
-}
-
-export function getReceiptHtml(order, mode){
-  return buildReceiptHtml(order, mode);
-}
-
-export function getLabelHtml(order){
-  return buildLabelHtml(order);
-}
-export function sunmiPrintReceipt(order, config) {
-  if (!window.SunmiPrinter || !window.SunmiPrinter.isConnected()) {
-    return false;
-  }
-  var p = window.SunmiPrinter;
-  var shopName = (config && config.shopName) || '';
-  var orderNum = order.orderNumber || '';
-  var dateTime = order.dateTime || new Date().toLocaleString('zh-TW');
-  var orderType = order.orderType || '';
-  var paymentMethod = order.paymentMethod || '';
-
-  p.printTextCenter(shopName, 32);
-  p.printLine();
-  if (orderNum) p.printText('單號: ' + orderNum, 24);
-  p.printText('時間: ' + dateTime, 24);
-  if (orderType) p.printText('類型: ' + orderType, 24);
-  p.printLine();
-
-  var items = order.items || [];
-  for (var i = 0; i < items.length; i++) {
-    var item = items[i];
-    var name = item.name || '';
-    var qty = 'x' + (item.qty || item.quantity || 1);
-    var price = '$' + (item.price || 0);
-    p.printThreeColumns(name, qty, price);
-    if (item.options) p.printText('  ' + item.options, 20);
-    if (item.note) p.printText('  *' + item.note, 20);
-  }
-
-  p.printLine();
-  p.printTextCenter('合計: $' + (order.total || 0), 32);
-  if (paymentMethod) p.printText('付款: ' + paymentMethod, 24);
-  p.printTextCenter('謝謝光臨', 24);
-  p.feedAndCut();
-  return true;
-}
-
-export function sunmiPrintKitchen(order, config) {
-  if (!window.SunmiPrinter || !window.SunmiPrinter.isConnected()) {
-    return false;
-  }
-  var p = window.SunmiPrinter;
-  p.printTextCenter('*** 廚房單 ***', 32);
-  p.printLine();
-  if (order.orderNumber) p.printText('單號: ' + order.orderNumber, 24);
-  if (order.orderType) p.printText('類型: ' + order.orderType, 28);
-  p.printLine();
-
-  var items = order.items || [];
-  for (var i = 0; i < items.length; i++) {
-    var item = items[i];
-    p.printText((item.name || '') + ' x' + (item.qty || item.quantity || 1), 28);
-    if (item.options) p.printText('  ' + item.options, 24);
-    if (item.note) p.printText('  *' + item.note, 24);
-  }
-
-  p.printLine();
-  p.feedAndCut();
-  return true;
-}
-
-export function sunmiOpenCashDrawer() {
-  if (window.SunmiPrinter && window.SunmiPrinter.isConnected()) {
-    window.SunmiPrinter.openCashDrawer();
-    return true;
-  }
-  return false;
-}
-
+      // 選項
+      var
