@@ -56,19 +56,20 @@ function buildSelectionText(item){
 // ========== 列印核心 ==========
 
 function openPrintWindow(html){
-  var w = window.open('', '_blank', 'width=400,height=600');
-  if(!w){
-    alert('請允許彈出視窗');
-    return;
+  var frame = document.getElementById('_silentPrintFrame');
+  if(!frame){
+    frame = document.createElement('iframe');
+    frame.id = '_silentPrintFrame';
+    frame.style.cssText = 'position:fixed;width:0;height:0;border:none;left:-9999px;';
+    document.body.appendChild(frame);
   }
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
-  setTimeout(function(){
-    w.print();
-    setTimeout(function(){ w.close(); }, 1000);
-  }, 500);
+  var doc = frame.contentDocument || frame.contentWindow.document;
+  doc.open();
+  doc.write(html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ''));
+  doc.close();
+  setTimeout(function(){ frame.contentWindow.print(); }, 400);
 }
+
 
 
 
