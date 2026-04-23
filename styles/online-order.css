@@ -80,14 +80,14 @@ body{background:#f6f8fb}
 
       .online-product-image {
       height: auto;
-      max-height: 240px;
+      max-height: 80px;
       overflow: hidden;
     }
 
     .online-product-image img {
       width: 100%;
       height: auto;
-      max-height: 120px;
+      max-height: 110px;
       object-fit: contain;
       display: block;
     }
