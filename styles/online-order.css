@@ -153,4 +153,54 @@ body{background:#f6f8fb}
     font-size: 12px;
     min-width: 50px;
   }
+      #floatingCartBtn {
+      width: 48px;
+      height: 48px;
+      font-size: 20px;
+      right: 8px;
+    }
+
+    #floatingCartBadge {
+      font-size: 10px;
+      min-width: 16px;
+      height: 16px;
+    }
+
 }
+#floatingCartBtn {
+  position: fixed;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #0f172a;
+  color: #fff;
+  font-size: 24px;
+  border: none;
+  cursor: pointer;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+#floatingCartBadge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+
