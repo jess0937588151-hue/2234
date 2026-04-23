@@ -79,13 +79,13 @@ body{background:#f6f8fb}
     }
 
     .online-product-image {
-      height: 200px;
+      height: 130px;
       overflow: hidden;
     }
 
     .online-product-image img {
       width: 100%;
-      height: 200px;
+      height: 130px;
       object-fit: cover;
       display: block;
     }
