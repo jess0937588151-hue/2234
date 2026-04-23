@@ -3,7 +3,7 @@ import { state, persistAll } from '../core/store.js';
 import { escapeHtml, money, id } from '../core/utils.js';
 import { getDiscountResult, getDiscountType, setDiscountType, handleDiscountInput } from '../modules/cart-service.js';
 import { createOrUpdateOrder, markPendingOrderPaid } from '../modules/order-service.js';
-import { buildCartPreviewOrder, getPrintSettings, printOrderLabels, printOrderReceipt } from '../modules/print-service.js';
+import { buildCartPreviewOrder, getPrintSettings, printOrderLabels, printOrderReceipt, printKitchenCopies, openCashDrawer } from '../modules/print-service.js';
 
 function createConfigState(product){
   const selections = {};
@@ -270,16 +270,21 @@ export function renderCart(){
 
 
 function finalizeOrder(paymentMethod){
-  const mode = document.getElementById('paymentTargetMode').value || 'new';
-  const targetOrderId = document.getElementById('paymentTargetOrderId').value || '';
-  const printConfig = getPrintSettings();
-  let order = null;
+  var mode = document.getElementById('paymentTargetMode').value || 'new';
+  var targetOrderId = document.getElementById('paymentTargetOrderId').value || '';
+  var printConfig = getPrintSettings();
+  var order = null;
 
   if(mode === 'pending'){
     order = markPendingOrderPaid(targetOrderId, paymentMethod);
     document.getElementById('paymentModal').classList.add('hidden');
     persistAll();
     window.refreshAllViews();
+
+    // 開錢箱
+    if(order && paymentMethod !== '待付款'){
+      openCashDrawer();
+    }
 
     if(order && paymentMethod !== '待付款' && printConfig.autoPrintCheckout){
       printOrderReceipt(order, 'customer');
@@ -296,6 +301,11 @@ function finalizeOrder(paymentMethod){
   document.getElementById('paymentModal').classList.add('hidden');
   persistAll();
   window.refreshAllViews();
+
+  // 開錢箱
+  if(order && paymentMethod !== '待付款'){
+    openCashDrawer();
+  }
 
   if(order && paymentMethod !== '待付款' && printConfig.autoPrintCheckout){
     printOrderReceipt(order, 'customer');
