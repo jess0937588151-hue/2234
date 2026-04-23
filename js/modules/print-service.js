@@ -50,15 +50,20 @@ function buildSelectionText(item){
 }
 
 function openPrintWindow(html){
-  const printWindow = window.open('', '_blank', 'width=480,height=820');
-  if(!printWindow){
-    alert('瀏覽器阻擋了列印視窗，請允許彈出視窗後再試。');
-    return;
+  let frame = document.getElementById('_silentPrintFrame');
+  if(!frame){
+    frame = document.createElement('iframe');
+    frame.id = '_silentPrintFrame';
+    frame.style.cssText = 'position:fixed;width:0;height:0;border:none;left:-9999px;';
+    document.body.appendChild(frame);
   }
-  printWindow.document.open();
-  printWindow.document.write(html);
-  printWindow.document.close();
+  const doc = frame.contentDocument || frame.contentWindow.document;
+  doc.open();
+  doc.write(html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ''));
+  doc.close();
+  setTimeout(()=> frame.contentWindow.print(), 300);
 }
+
 
 function buildReceiptHtml(order, mode){
   const cfg = ensurePrintConfig();
@@ -131,7 +136,7 @@ function buildReceiptHtml(order, mode){
     <div class="line"></div>
     <div class="footer">${escapeHtml(cfg.receiptFooter || '')}</div>
   </div>
-  <script>window.onload=()=>setTimeout(()=>window.print(),120);</script>
+<!-- print triggered by parent -->
 </body>
 </html>`;
 }
@@ -182,7 +187,7 @@ function buildLabelHtml(order){
 </head>
 <body>
   ${labels}
-  <script>window.onload=()=>setTimeout(()=>window.print(),120);</script>
+  <!-- print triggered by parent -->
 </body>
 </html>`;
 }
