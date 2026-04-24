@@ -286,10 +286,8 @@ function finalizeOrder(paymentMethod){
             sunmiOpenCashDrawer() || openCashDrawer();
         }
 
-        if(order && paymentMethod !== '待付款' && printConfig.autoPrintCheckout){
-    alert('嘗試列印: SunmiPrinter=' + !!window.SunmiPrinter);
-    sunmiPrintReceipt(order, printConfig) || printOrderReceipt(order, 'customer');
-}
+       alert('DEBUG: order=' + !!order + ', method=' + paymentMethod + ', autoPrint=' + printConfig.autoPrintCheckout + ', Sunmi=' + !!window.SunmiPrinter);
+if(order && paymentMethod !== '待付款' && printConfig.autoPrintCheckout){
 
         if(order && printConfig.autoPrintKitchen){
             sunmiPrintKitchen(order, printConfig) || printKitchenCopies(order);
