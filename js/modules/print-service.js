@@ -85,13 +85,13 @@ function sunmiPrintFromHtml(html) {
     // 店名
     var title = doc.querySelector('.title');
     if (title) {
-      printer.printTextCenter(title.textContent.trim(), 32, true);
+      printer.printTextCenter(title.textContent.trim(), 32);
     }
 
     // 副標題
     var subs = doc.querySelectorAll('.sub');
     subs.forEach(function (el) {
-      printer.printTextCenter(el.textContent.trim(), 24, false);
+      printer.printTextCenter(el.textContent.trim(), 24);
     });
 
     // 分隔線
@@ -104,7 +104,7 @@ function sunmiPrintFromHtml(html) {
       if (spans.length >= 2) {
         printer.printRow(spans[0].textContent.trim(), spans[1].textContent.trim(), 24);
       } else {
-        printer.printText(row.textContent.trim(), 24, false);
+        printer.printText(row.textContent.trim(), 24);
       }
     });
 
@@ -123,7 +123,7 @@ function sunmiPrintFromHtml(html) {
         }
         var sub = item.querySelector('.item-sub');
         if (sub && sub.textContent.trim()) {
-          printer.printText('  ' + sub.textContent.trim(), 20, false);
+          printer.printText('  ' + sub.textContent.trim(), 20);
         }
       });
     }
@@ -134,13 +134,13 @@ function sunmiPrintFromHtml(html) {
     // 合計
     var big = doc.querySelector('.big');
     if (big) {
-      printer.printTextCenter(big.textContent.trim(), 32, true);
+      printer.printTextCenter(big.textContent.trim(), 32);
     }
 
     // 頁尾
     var footers = doc.querySelectorAll('.footer');
     footers.forEach(function (el) {
-      printer.printTextCenter(el.textContent.trim(), 24, false);
+      printer.printTextCenter(el.textContent.trim(), 24);
     });
 
     // 走紙 + 切紙
