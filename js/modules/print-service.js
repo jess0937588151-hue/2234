@@ -170,7 +170,7 @@ export function sunmiPrintReceipt(order, config) {
         alert('列印錯誤: ' + e.message);
         return false;
     }
-
+}
 
 export function sunmiPrintKitchen(order, config) {
   if (!window.SunmiPrinter || !window.SunmiPrinter.isConnected()) {
