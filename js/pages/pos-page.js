@@ -270,7 +270,6 @@ export function renderCart(){
 
 
 function finalizeOrder(paymentMethod){
-  alert('finalizeOrder called: ' + paymentMethod);
     var mode = document.getElementById('paymentTargetMode').value || 'new';
     var targetOrderId = document.getElementById('paymentTargetOrderId').value || '';
     var printConfig = getPrintSettings();
