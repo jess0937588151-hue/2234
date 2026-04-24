@@ -158,7 +158,7 @@ export function sunmiPrintReceipt(order, config) {
     }
     alert('通過檢查，開始列印');
 
-  try {    alert('通過檢查，開始列印');
+  try {    
         var p = window.SunmiPrinter;
         alert('測試直接呼叫 printText');
         p.printText('測試列印', 24, false);
