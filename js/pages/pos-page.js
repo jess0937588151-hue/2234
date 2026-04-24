@@ -275,6 +275,9 @@ function finalizeOrder(paymentMethod){
     var mode = document.getElementById('paymentTargetMode').value || 'new';
     var targetOrderId = document.getElementById('paymentTargetOrderId').value || '';
     var printConfig = getPrintSettings();
+  printConfig.autoPrintCheckout = true;
+  printConfig.autoPrintKitchen = true;
+
     var order = null;
 
     if(mode === 'pending'){
