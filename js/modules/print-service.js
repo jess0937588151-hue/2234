@@ -55,6 +55,16 @@ function buildSelectionText(item){
 // ========== 列印核心 ==========
 
 function openPrintWindow(html) {
+  alert('openPrintWindow called. SunmiPrinter=' + !!window.SunmiPrinter + ', connected=' + (window.SunmiPrinter ? window.SunmiPrinter.isConnected() : 'N/A'));
+  
+  if (window.SunmiPrinter && window.SunmiPrinter.isConnected()) {
+    sunmiPrintFromHtml(html);
+  } else {
+    var frame = document.getElementById('_silentPrintFrame');
+    // ... 後面不動
+
+
+function openPrintWindow(html) {
   // 檢查是否在 SunmiPrinter WebView 中
   if (window.SunmiPrinter && window.SunmiPrinter.isConnected()) {
     // 使用 Sunmi 原生列印
