@@ -268,6 +268,10 @@ export function renderCart(){
   if(badge) badge.textContent = state.cart.reduce((s,x)=> s + x.qty, 0);
 }
 
+function finalizeOrder(paymentMethod){
+    alert('finalizeOrder called: ' + paymentMethod);
+    // ... 後面不動
+
 
 function finalizeOrder(paymentMethod){
     var mode = document.getElementById('paymentTargetMode').value || 'new';
