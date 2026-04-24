@@ -425,7 +425,8 @@ export function printOrderLabels(order){
 
 export function buildCartPreviewOrder(){
     var subtotal = state.cart.reduce(function(s,x){ return s + ((Number(x.basePrice)||0) + (Number(x.extraPrice)||0)) * x.qty; }, 0);
-    var discountValue = Number(document.getElementById('discountValue')?.value || 0);
+    var el = document.getElementById('discountValue');
+    var discountValue = Number(el ? el.value : 0);
     var discountType = state.settings.discountType || 'amount';
     var discountAmount = discountType === 'percent'
         ? Math.floor(subtotal * (discountValue / 100))
@@ -435,7 +436,8 @@ export function buildCartPreviewOrder(){
     return {
         orderNo: 'PREVIEW-' + Date.now(),
         createdAt: new Date().toISOString(),
-        orderType: document.getElementById('orderType')?.value || '內用',
+        orderType: (document.getElementById('orderType') ? document.getElementById('orderType').value : '') || '內用',
+        tableNo: (document.getElementById('tableNo') ? document.getElementById('tableNo').value.trim() : '') || '',
         tableNo: document.getElementById('tableNo')?.value?.trim() || '',
         paymentMethod: '未結帳',
         subtotal: subtotal,
