@@ -151,10 +151,13 @@ function sunmiPrintFromHtml(html) {
   }
 }
 export function sunmiPrintReceipt(order, config) {
-  if (!window.SunmiPrinter || !window.SunmiPrinter.isConnected()) {
-    console.log('SunmiPrinter 不可用，回退收據列印');
-    return false;
-  }
+    alert('sunmiPrintReceipt內部: SunmiPrinter=' + !!window.SunmiPrinter + ', connected=' + (window.SunmiPrinter ? window.SunmiPrinter.isConnected() : 'N/A'));
+    if (!window.SunmiPrinter || !window.SunmiPrinter.isConnected()) {
+        alert('SunmiPrinter不可用，回退');
+        return false;
+    }
+    alert('通過檢查，開始列印');
+
   try {
     var p = window.SunmiPrinter;
     var cfg = config || ensurePrintConfig();
