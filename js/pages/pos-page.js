@@ -292,16 +292,15 @@ function finalizeOrder(paymentMethod){
 
         // 列印收據
         if(order && paymentMethod !== '待付款' && printConfig.autoPrintCheckout){
-           alert('debug: ' + window.SunmiPrinter.debugInfo());
-            try {
-              
-                var result = sunmiPrintReceipt(order, printConfig);
-                alert('sunmiPrintReceipt結果=' + result);
-            } catch(e) {
-                alert('列印錯誤: ' + e.message);
-            }
-            if(!result) printOrderReceipt(order, 'customer');
-        }
+    var html = getReceiptHtml(order, 'customer');
+    var w = window.open('', '_blank');
+    if(w){
+        w.document.write(html);
+        w.document.close();
+        setTimeout(function(){ w.print(); }, 500);
+    }
+}
+
 
         // 列印廚房單
         if(order && printConfig.autoPrintKitchen){
