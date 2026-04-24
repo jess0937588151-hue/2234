@@ -264,86 +264,95 @@ function buildReceiptHtml(order, mode){
     var title = kitchenMode ? '廚房出單' : '顧客收據';
     var createdAt = String(order.createdAt || '').replace('T', ' ').slice(0, 16);
 
-    var rows = (order.items || []).map(function(item){
+    var rows = '';
+    var orderItems = order.items || [];
+    for (var i = 0; i < orderItems.length; i++) {
+        var item = orderItems[i];
         var unitPrice = Number(item.basePrice || 0) + Number(item.extraPrice || 0);
         var subText = buildSelectionText(item);
-        return `
-            <div class="item-row">
-                <div class="item-top">
-                    <div class="item-name">${escapeHtml(item.name)}</div>
-                    <div class="item-qty">x ${Number(item.qty || 0)}</div>
-                </div>
-                ${subText ? '<div class="item-sub">' + escapeHtml(subText) + '</div>' : ''}
-                ${kitchenMode ? '' : '<div class="item-sub">' + money(unitPrice) + ' / 小計 ' + money(unitPrice * Number(item.qty || 0)) + '</div>'}
-            </div>
-        `;
-    }).join('');
+        rows += '<div class="item-row">';
+        rows += '<div class="item-top">';
+        rows += '<div class="item-name">' + escapeHtml(item.name) + '</div>';
+        rows += '<div class="item-qty">x ' + Number(item.qty || 0) + '</div>';
+        rows += '</div>';
+        if (subText) {
+            rows += '<div class="item-sub">' + escapeHtml(subText) + '</div>';
+        }
+        if (!kitchenMode) {
+            rows += '<div class="item-sub">' + money(unitPrice) + ' / 小計 ' + money(unitPrice * Number(item.qty || 0)) + '</div>';
+        }
+        rows += '</div>';
+    }
 
-    return `<!doctype html>
-<html lang="zh-Hant">
-<head>
-    <meta charset="UTF-8">
-    <title>${title}</title>
-    <style>
-        @page { size: ${widthMm}mm auto; margin: 0; padding: 0; }
-        * { box-sizing: border-box; }
-        body {
-            margin: 0; padding: 0;
-            width: ${widthMm}mm;
-            font-family: "Noto Sans TC", "PingFang TC", -apple-system, sans-serif;
-            font-size: ${fontSize}px;
-            line-height: 1.7;
-            letter-spacing: 0.5px;
-            -webkit-print-color-adjust: exact;
-        }
-        .sheet {
-            width: ${widthMm}mm;
-            max-width: ${widthMm}mm;
-            padding: 3mm;
-            margin-left: ${offsetX}mm;
-            margin-top: ${offsetY}mm;
-        }
-        .center { text-align: center; }
-        .title { font-size: ${fontSize + 5}px; font-weight: 800; line-height: 1.5; margin-bottom: 4px; }
-        .sub { font-size: ${fontSize}px; margin-top: 4px; line-height: 1.6; }
-        .line { border-top: 1px dashed #000; margin: 8px 0; }
-        .row { display: flex; justify-content: space-between; gap: 6px; line-height: 1.6; padding: 2px 0; }
-        .item-row { padding: 6px 0; border-bottom: 1px dashed #bbb; }
-        .item-top { display: flex; justify-content: space-between; gap: 6px; font-weight: 700; line-height: 1.6; }
-        .item-name { flex: 1; word-break: break-word; }
-        .item-qty { white-space: nowrap; }
-        .item-sub { margin-top: 3px; font-size: ${fontSize}px; color: #333; line-height: 1.5; }
-        .big { font-size: ${fontSize + 2}px; font-weight: 800; line-height: 1.6; }
-        .footer { margin-top: 10px; text-align: center; font-size: ${fontSize}px; line-height: 1.6; }
-    </style>
-</head>
-<body>
-    <div class="sheet">
-        <div class="center">
-            <div class="title">${escapeHtml(cfg.storeName || '餐廳 POS')}</div>
-            ${cfg.storePhone ? '<div class="sub">電話：' + escapeHtml(cfg.storePhone) + '</div>' : ''}
-            ${cfg.storeAddress ? '<div class="sub">地址：' + escapeHtml(cfg.storeAddress) + '</div>' : ''}
-            <div class="sub">${escapeHtml(title)}</div>
-        </div>
-        <div class="line"></div>
-            <div class="sub">單號：${escapeHtml(order.orderNo || '')}</div>
-            <div class="sub">時間：${escapeHtml(createdAt)}</div>
-            <div class="sub">類型：${escapeHtml(order.orderType || '')}${order.tableNo ? ' / ' + escapeHtml(order.tableNo) : ''}</div>
-            ${kitchenMode ? '' : '<div class="sub">付款：' + escapeHtml(order.paymentMethod || '') + '</div>'}
-        <div class="line"></div>
-        ${rows}
-        ${kitchenMode ? '' : `
-            <div class="line"></div>
-            <div class="row"><span>小計</span><strong>${money(order.subtotal || 0)}</strong></div>
-            <div class="row"><span>折扣</span><strong>${money(order.discountAmount || 0)}</strong></div>
-            <div class="row big"><span>合計</span><span>${money(order.total || 0)}</span></div>
-        `}
-        <div class="line"></div>
-        <div class="footer">${escapeHtml(cfg.receiptFooter || '')}</div>
-    </div>
-    <div style="height:25mm;"></div>
-</body>
-</html>`;
+    var html = '<!doctype html>'
+        + '<html lang="zh-Hant">'
+        + '<head>'
+        + '<meta charset="UTF-8">'
+        + '<title>' + title + '</title>'
+        + '<style>'
+        + '@page { size: ' + widthMm + 'mm auto; margin: 0; padding: 0; }'
+        + '* { box-sizing: border-box; }'
+        + 'body {'
+        + '  margin: 0; padding: 0;'
+        + '  width: ' + widthMm + 'mm;'
+        + '  font-family: "Noto Sans TC", "PingFang TC", -apple-system, sans-serif;'
+        + '  font-size: ' + fontSize + 'px;'
+        + '  line-height: 1.7;'
+        + '  letter-spacing: 0.5px;'
+        + '  -webkit-print-color-adjust: exact;'
+        + '}'
+        + '.sheet {'
+        + '  width: ' + widthMm + 'mm;'
+        + '  max-width: ' + widthMm + 'mm;'
+        + '  padding: 3mm;'
+        + '  margin-left: ' + offsetX + 'mm;'
+        + '  margin-top: ' + offsetY + 'mm;'
+        + '}'
+        + '.center { text-align: center; }'
+        + '.title { font-size: ' + (fontSize + 5) + 'px; font-weight: 800; line-height: 1.5; margin-bottom: 4px; }'
+        + '.sub { font-size: ' + fontSize + 'px; margin-top: 4px; line-height: 1.6; }'
+        + '.line { border-top: 1px dashed #000; margin: 8px 0; }'
+        + '.row { display: flex; justify-content: space-between; gap: 6px; line-height: 1.6; padding: 2px 0; }'
+        + '.item-row { padding: 6px 0; border-bottom: 1px dashed #bbb; }'
+        + '.item-top { display: flex; justify-content: space-between; gap: 6px; font-weight: 700; line-height: 1.6; }'
+        + '.item-name { flex: 1; word-break: break-word; }'
+        + '.item-qty { white-space: nowrap; }'
+        + '.item-sub { margin-top: 3px; font-size: ' + fontSize + 'px; color: #333; line-height: 1.5; }'
+        + '.big { font-size: ' + (fontSize + 2) + 'px; font-weight: 800; line-height: 1.6; }'
+        + '.footer { margin-top: 10px; text-align: center; font-size: ' + fontSize + 'px; line-height: 1.6; }'
+        + '</style>'
+        + '</head>'
+        + '<body>'
+        + '<div class="sheet">'
+        + '<div class="center">'
+        + '<div class="title">' + escapeHtml(cfg.storeName || '餐廳 POS') + '</div>'
+        + (cfg.storePhone ? '<div class="sub">電話：' + escapeHtml(cfg.storePhone) + '</div>' : '')
+        + (cfg.storeAddress ? '<div class="sub">地址：' + escapeHtml(cfg.storeAddress) + '</div>' : '')
+        + '<div class="sub">' + escapeHtml(title) + '</div>'
+        + '</div>'
+        + '<div class="line"></div>'
+        + '<div class="sub">單號：' + escapeHtml(order.orderNo || '') + '</div>'
+        + '<div class="sub">時間：' + escapeHtml(createdAt) + '</div>'
+        + '<div class="sub">類型：' + escapeHtml(order.orderType || '') + (order.tableNo ? ' / ' + escapeHtml(order.tableNo) : '') + '</div>'
+        + (kitchenMode ? '' : '<div class="sub">付款：' + escapeHtml(order.paymentMethod || '') + '</div>')
+        + '<div class="line"></div>'
+        + rows;
+
+    if (!kitchenMode) {
+        html += '<div class="line"></div>'
+            + '<div class="row"><span>小計</span><strong>' + money(order.subtotal || 0) + '</strong></div>'
+            + '<div class="row"><span>折扣</span><strong>' + money(order.discountAmount || 0) + '</strong></div>'
+            + '<div class="row big"><span>合計</span><span>' + money(order.total || 0) + '</span></div>';
+    }
+
+    html += '<div class="line"></div>'
+        + '<div class="footer">' + escapeHtml(cfg.receiptFooter || '') + '</div>'
+        + '</div>'
+        + '<div style="height:25mm;"></div>'
+        + '</body>'
+        + '</html>';
+
+    return html;
 }
 
 // ========== 建立標籤 HTML ==========
@@ -356,50 +365,55 @@ function buildLabelHtml(order){
     var offsetX = Number(cfg.labelOffsetX || 0);
     var offsetY = Number(cfg.labelOffsetY || 0);
 
-    var labels = (order.items || []).map(function(item){
+    var labels = '';
+    var orderItems = order.items || [];
+    for (var i = 0; i < orderItems.length; i++) {
+        var item = orderItems[i];
         var subText = buildSelectionText(item);
-        return `
-            <div class="label">
-                <div class="store">${escapeHtml(cfg.storeName || '餐廳 POS')}</div>
-                <div class="main">${escapeHtml(item.name)} x ${Number(item.qty || 0)}</div>
-                ${subText ? '<div class="sub">' + escapeHtml(subText) + '</div>' : ''}
-                <div class="sub">單號：${escapeHtml(order.orderNo || '')}</div>
-                <div class="sub">${escapeHtml(String(order.createdAt || '').replace('T', ' ').slice(0, 16))}</div>
-            </div>
-        `;
-    }).join('');
+        labels += '<div class="label">';
+        labels += '<div class="store">' + escapeHtml(cfg.storeName || '餐廳 POS') + '</div>';
+        labels += '<div class="main">' + escapeHtml(item.name) + ' x ' + Number(item.qty || 0) + '</div>';
+        if (subText) {
+            labels += '<div class="sub">' + escapeHtml(subText) + '</div>';
+        }
+        labels += '<div class="sub">單號：' + escapeHtml(order.orderNo || '') + '</div>';
+        labels += '<div class="sub">' + escapeHtml(String(order.createdAt || '').replace('T', ' ').slice(0, 16)) + '</div>';
+        labels += '</div>';
+    }
 
-    return `<!doctype html>
-<html lang="zh-Hant">
-<head>
-    <meta charset="UTF-8">
-    <title>商品標籤</title>
-    <style>
-        @page { size: ${widthMm}mm ${heightMm}mm; margin: 0; }
-        body {
-            margin: 0;
-            font-family: "Noto Sans TC", "PingFang TC", -apple-system, sans-serif;
-        }
-        .label {
-            width: ${widthMm}mm;
-            height: ${heightMm}mm;
-            box-sizing: border-box;
-            page-break-after: always;
-            padding: 3mm;
-            margin-left: ${offsetX}mm;
-            margin-top: ${offsetY}mm;
-            font-size: ${fontSize}px;
-            line-height: 1.5;
-        }
-        .store { font-size: ${fontSize - 1}px; font-weight: 700; }
-        .main { font-size: ${fontSize + 3}px; font-weight: 800; margin-top: 2mm; }
-        .sub { font-size: ${fontSize - 1}px; margin-top: 1mm; }
-    </style>
-</head>
-<body>
-    ${labels}
-</body>
-</html>`;
+    var html = '<!doctype html>'
+        + '<html lang="zh-Hant">'
+        + '<head>'
+        + '<meta charset="UTF-8">'
+        + '<title>商品標籤</title>'
+        + '<style>'
+        + '@page { size: ' + widthMm + 'mm ' + heightMm + 'mm; margin: 0; }'
+        + 'body {'
+        + '  margin: 0;'
+        + '  font-family: "Noto Sans TC", "PingFang TC", -apple-system, sans-serif;'
+        + '}'
+        + '.label {'
+        + '  width: ' + widthMm + 'mm;'
+        + '  height: ' + heightMm + 'mm;'
+        + '  box-sizing: border-box;'
+        + '  page-break-after: always;'
+        + '  padding: 3mm;'
+        + '  margin-left: ' + offsetX + 'mm;'
+        + '  margin-top: ' + offsetY + 'mm;'
+        + '  font-size: ' + fontSize + 'px;'
+        + '  line-height: 1.5;'
+        + '}'
+        + '.store { font-size: ' + (fontSize - 1) + 'px; font-weight: 700; }'
+        + '.main { font-size: ' + (fontSize + 3) + 'px; font-weight: 800; margin-top: 2mm; }'
+        + '.sub { font-size: ' + (fontSize - 1) + 'px; margin-top: 1mm; }'
+        + '</style>'
+        + '</head>'
+        + '<body>'
+        + labels
+        + '</body>'
+        + '</html>';
+
+    return html;
 }
 
 // ========== 列印功能 ==========
