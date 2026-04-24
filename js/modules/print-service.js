@@ -150,6 +150,66 @@ function sunmiPrintFromHtml(html) {
     console.error('Sunmi print error:', e);
   }
 }
+export function sunmiPrintReceipt(order, config) {
+  if (!window.SunmiPrinter || !window.SunmiPrinter.isConnected()) {
+    console.log('SunmiPrinter 不可用，回退收據列印');
+    return false;
+  }
+  try {
+    var p = window.SunmiPrinter;
+    var cfg = config || ensurePrintConfig();
+    var createdAt = String(order.createdAt || '').replace('T', ' ').slice(0, 16);
+
+    // 店名
+    p.printTextCenter(cfg.storeName || '餐廳 POS', 32, true);
+    if (cfg.storePhone) p.printTextCenter('電話：' + cfg.storePhone, 24, false);
+    if (cfg.storeAddress) p.printTextCenter('地址：' + cfg.storeAddress, 24, false);
+    p.printTextCenter('顧客收據', 24, false);
+
+    p.printLine();
+
+    // 訂單資訊
+    if (order.orderNo) p.printText('單號：' + order.orderNo, 24, false);
+    if (createdAt) p.printText('時間：' + createdAt, 24, false);
+    if (order.orderType) p.printText('類型：' + order.orderType + (order.tableNo ? ' / ' + order.tableNo : ''), 24, false);
+    if (order.paymentMethod) p.printText('付款：' + order.paymentMethod, 24, false);
+
+    p.printLine();
+
+    // 品項
+    var items = order.items || [];
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var unitPrice = Number(item.basePrice || 0) + Number(item.extraPrice || 0);
+      var qty = Number(item.qty || 0);
+      p.printRow(item.name || '', 'x' + qty + ' $' + (unitPrice * qty), 24);
+
+      var selText = buildSelectionText(item);
+      if (selText) p.printText('  ' + selText, 20, false);
+    }
+
+    p.printLine();
+
+    // 金額
+    p.printRow('小計', '$' + Number(order.subtotal || 0), 24);
+    if (order.discountAmount) p.printRow('折扣', '-$' + Number(order.discountAmount || 0), 24);
+    p.printTextCenter('合計：$' + Number(order.total || 0), 32, true);
+
+    p.printLine();
+
+    // 頁尾
+    if (cfg.receiptFooter) p.printTextCenter(cfg.receiptFooter, 24, false);
+
+    // 走紙 + 切紙
+    p.feedAndCut();
+
+    console.log('Sunmi 收據列印完成');
+    return true;
+  } catch (e) {
+    console.error('Sunmi 收據列印錯誤：', e);
+    return false;
+  }
+}
 
 export function sunmiPrintKitchen(order, config) {
   if (!window.SunmiPrinter || !window.SunmiPrinter.isConnected()) {
