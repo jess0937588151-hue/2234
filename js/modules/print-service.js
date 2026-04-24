@@ -155,47 +155,38 @@ export function sunmiPrintReceipt(order, config) {
         return false;
     }
     try {
-        var p = window.SunmiPrinter;
         var cfg = config || ensurePrintConfig();
         var createdAt = String(order.createdAt || '').replace('T', ' ').slice(0, 16);
 
-        p.printTextCenter(cfg.storeName || '餐廳 POS', 32);
-        if (cfg.storePhone) p.printTextCenter('電話：' + cfg.storePhone, 24);
-        if (cfg.storeAddress) p.printTextCenter('地址：' + cfg.storeAddress, 24);
-        p.printTextCenter('顧客收據', 24);
-
-        p.printLine();
-
-        if (order.orderNo) p.printText('單號：' + order.orderNo, 24);
-        if (createdAt) p.printText('時間：' + createdAt, 24);
-        if (order.orderType) p.printText('類型：' + order.orderType + (order.tableNo ? ' / ' + order.tableNo : ''), 24);
-        if (order.paymentMethod) p.printText('付款：' + order.paymentMethod, 24);
-
-        p.printLine();
-
-        var items = order.items || [];
-        for (var i = 0; i < items.length; i++) {
-            var item = items[i];
+        var itemsArr = [];
+        var orderItems = order.items || [];
+        for (var i = 0; i < orderItems.length; i++) {
+            var item = orderItems[i];
             var unitPrice = Number(item.basePrice || 0) + Number(item.extraPrice || 0);
             var qty = Number(item.qty || 0);
-            p.printRow(item.name || '', 'x' + qty + ' $' + (unitPrice * qty));
-
+            var obj = {
+                name: item.name || '',
+                qty: qty,
+                price: unitPrice * qty
+            };
             var selText = buildSelectionText(item);
-            if (selText) p.printText('  ' + selText, 20);
+            if (selText) obj.options = selText;
+            if (item.note) obj.note = item.note;
+            itemsArr.push(obj);
         }
 
-        p.printLine();
+        var json = JSON.stringify({
+            shopName: cfg.storeName || '餐廳 POS',
+            subtitle: '顧客收據',
+            orderNumber: order.orderNo || '',
+            dateTime: createdAt,
+            orderType: order.orderType || '',
+            paymentMethod: order.paymentMethod || '',
+            items: itemsArr,
+            total: String(Number(order.total || 0))
+        });
 
-        p.printRow('小計', '$' + Number(order.subtotal || 0));
-        if (order.discountAmount) p.printRow('折扣', '-$' + Number(order.discountAmount || 0));
-        p.printTextCenter('合計：$' + Number(order.total || 0), 32);
-
-        p.printLine();
-
-        if (cfg.receiptFooter) p.printTextCenter(cfg.receiptFooter, 24);
-
-        p.feedAndCut();
-
+        window.SunmiPrinter.printReceipt(json);
         return true;
     } catch (e) {
         alert('收據列印錯誤: ' + e.message);
@@ -204,43 +195,46 @@ export function sunmiPrintReceipt(order, config) {
 }
 
 export function sunmiPrintKitchen(order, config) {
-  if (!window.SunmiPrinter || !window.SunmiPrinter.isConnected()) {
-    console.log('SunmiPrinter 不可用，回退廚房列印');
-    return false;
-  }
-  try {
-    var p = window.SunmiPrinter;
-    var cfg = config || ensurePrintConfig();
-    var copies = Math.max(1, Number(cfg.kitchenCopies || 1));
-    var createdAt = String(order.createdAt || '').replace('T', ' ').slice(0, 16);
-
-    for (var c = 0; c < copies; c++) {
-      p.printTextCenter('*** 廚房單 ***', 30);
-      p.printLine();
-      if (order.orderNo) p.printText('單號：' + order.orderNo, 24);
-      if (createdAt) p.printText('時間：' + createdAt, 24);
-      if (order.orderType) p.printText('類型：' + order.orderType + (order.tableNo ? ' / ' + order.tableNo : ''), 24);
-      p.printLine();
-
-      var items = order.items || [];
-      for (var i = 0; i < items.length; i++) {
-        var item = items[i];
-        var qty = Number(item.qty || 0);
-        p.printText(qty + 'x ' + (item.name || ''), 28);
-
-        var selText = buildSelectionText(item);
-        if (selText) p.printText('  ' + selText, 22);
-      }
-
-      p.printLine();
-      p.feedAndCut();
+    if (!window.SunmiPrinter || !window.SunmiPrinter.isConnected()) {
+        return false;
     }
-    console.log('Sunmi 廚房單列印完成（' + copies + ' 份）');
-    return true;
-  } catch (e) {
-    console.error('Sunmi 廚房列印錯誤：', e);
-    return false;
-  }
+    try {
+        var cfg = config || ensurePrintConfig();
+        var copies = Math.max(1, Number(cfg.kitchenCopies || 1));
+        var createdAt = String(order.createdAt || '').replace('T', ' ').slice(0, 16);
+
+        var itemsArr = [];
+        var orderItems = order.items || [];
+        for (var i = 0; i < orderItems.length; i++) {
+            var item = orderItems[i];
+            var qty = Number(item.qty || 0);
+            var obj = {
+                name: item.name || '',
+                qty: qty,
+                price: 0
+            };
+            var selText = buildSelectionText(item);
+            if (selText) obj.options = selText;
+            if (item.note) obj.note = item.note;
+            itemsArr.push(obj);
+        }
+
+        for (var c = 0; c < copies; c++) {
+            var json = JSON.stringify({
+                shopName: '*** 廚房單 ***',
+                orderNumber: order.orderNo || '',
+                dateTime: createdAt,
+                orderType: order.orderType || '',
+                items: itemsArr
+            });
+            window.SunmiPrinter.printReceipt(json);
+        }
+
+        return true;
+    } catch (e) {
+        alert('廚房單列印錯誤: ' + e.message);
+        return false;
+    }
 }
 
 export function sunmiOpenCashDrawer() {
