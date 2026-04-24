@@ -158,10 +158,10 @@ export function sunmiPrintReceipt(order, config) {
     }
     alert('通過檢查，開始列印');
 
-  try {    
+      try {
         var p = window.SunmiPrinter;
         alert('測試直接呼叫 printText');
-        p.printText('測試列印', 24, false);
+        p.printText('測試列印', 24);
         alert('printText 呼叫完成');
         p.feedAndCut();
         alert('feedAndCut 呼叫完成');
@@ -170,6 +170,7 @@ export function sunmiPrintReceipt(order, config) {
         alert('列印錯誤: ' + e.message);
         return false;
     }
+
 }
 
 export function sunmiPrintKitchen(order, config) {
