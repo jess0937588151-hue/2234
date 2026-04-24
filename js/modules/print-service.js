@@ -19,7 +19,7 @@ function ensurePrintConfig(){
       labelOffsetX: 0,
       labelOffsetY: 0,
       kitchenCopies: 1,
-      autoPrintCheckout: false,
+      autoPrintCheckout: true,
       autoPrintKitchen: true
     };
   }
