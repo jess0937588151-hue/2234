@@ -34,7 +34,7 @@ export function getPrintSettings(){
 }
 
 function escapeHtml(text){
-    return String(text ?? '')
+    return String(text != null ? text : '')
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
@@ -47,8 +47,8 @@ function money(value){
 }
 
 function buildSelectionText(item){
-    const optionText = (item.selections || []).map(s => `${s.moduleName}:${s.optionName}`).join(' / ');
-    const noteText = item.note ? `備註：${item.note}` : '';
+    var optionText = (item.selections || []).map(function(s){ return s.moduleName + ':' + s.optionName; }).join(' / ');
+    var noteText = item.note ? '備註：' + item.note : '';
     return [optionText, noteText].filter(Boolean).join(' | ');
 }
 
