@@ -292,7 +292,7 @@ function finalizeOrder(paymentMethod){
 
         // 列印收據
         if(order && paymentMethod !== '待付款' && printConfig.autoPrintCheckout){
-            alert('進入列印區塊, order=' + order.orderNo);
+           alert('debug: ' + window.SunmiPrinter.debugInfo());
             try {
               alert('準備呼叫printReceipt, JSON=' + JSON.stringify({shopName:'測試店'}).substring(0,50));
 window.SunmiPrinter.printReceipt(JSON.stringify({shopName:'直接測試', items:[]}));
