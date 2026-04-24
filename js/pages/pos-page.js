@@ -286,9 +286,11 @@ function finalizeOrder(paymentMethod){
             sunmiOpenCashDrawer() || openCashDrawer();
         }
 
-       alert('DEBUG: order=' + !!order + ', method=' + paymentMethod + ', autoPrint=' + printConfig.autoPrintCheckout + ', Sunmi=' + !!window.SunmiPrinter);
+       alert('DEBUG: order=' + !!order + ', method=' + paymentMethod + ', autoPrint=' + 
+             printConfig.autoPrintCheckout + ', Sunmi=' + !!window.SunmiPrinter);
 if(order && paymentMethod !== '待付款' && printConfig.autoPrintCheckout){
 
+    }
         if(order && printConfig.autoPrintKitchen){
             sunmiPrintKitchen(order, printConfig) || printKitchenCopies(order);
         }
