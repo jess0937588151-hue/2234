@@ -1,5 +1,5 @@
 /* 中文備註：js/pages/pos-page.js，此檔已加入中文說明，方便後續維護。 */
-alert('pos-page v3 loaded');
+
 
 import { state, persistAll } from '../core/store.js';
 import { escapeHtml, money, id } from '../core/utils.js';
