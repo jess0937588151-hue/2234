@@ -207,8 +207,10 @@ export function sunmiOpenCashDrawer() {
 
 // ========== 開錢箱（非 Sunmi 環境）==========
 
-export function openCashDrawer(){
-  // 由 ALLPOS Printer 的 Cash Drawer Command 設定控制
+export function openCashDrawer() {
+  if (window.SunmiPrinter && window.SunmiPrinter.isConnected()) {
+    window.SunmiPrinter.openCashDrawer();
+  }
 }
 
 // ========== 建立收據 HTML ==========
