@@ -438,7 +438,6 @@ export function buildCartPreviewOrder(){
         createdAt: new Date().toISOString(),
         orderType: (document.getElementById('orderType') ? document.getElementById('orderType').value : '') || '內用',
         tableNo: (document.getElementById('tableNo') ? document.getElementById('tableNo').value.trim() : '') || '',
-        tableNo: document.getElementById('tableNo')?.value?.trim() || '',
         paymentMethod: '未結帳',
         subtotal: subtotal,
         discountAmount: discountAmount,
