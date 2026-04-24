@@ -287,8 +287,10 @@ function finalizeOrder(paymentMethod){
         }
 
         if(order && paymentMethod !== '待付款' && printConfig.autoPrintCheckout){
-            sunmiPrintReceipt(order, printConfig) || printOrderReceipt(order, 'customer');
-        }
+    alert('嘗試列印: SunmiPrinter=' + !!window.SunmiPrinter);
+    sunmiPrintReceipt(order, printConfig) || printOrderReceipt(order, 'customer');
+}
+
         if(order && printConfig.autoPrintKitchen){
             sunmiPrintKitchen(order, printConfig) || printKitchenCopies(order);
         }
