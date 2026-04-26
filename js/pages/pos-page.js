@@ -325,13 +325,14 @@ function finalizeOrder(paymentMethod){
     // 列印收據
     if(order && paymentMethod !== '待付款' && printConfig.autoPrintCheckout){
         alert('進入列印區塊, order=' + order.orderNo);
-        try {
-            var result = sunmiPrintReceipt(order, printConfig);
-            alert('sunmiPrintReceipt結果=' + result);
-        } catch(e) {
-            alert('列印錯誤: ' + e.message);
-        }
-        if(!result) printOrderReceipt(order, 'customer');
+        var result = false;
+      try {
+        result = sunmiPrintReceipt(order, printConfig);
+      } catch(e) {
+        console.error('列印錯誤:', e);
+      }
+      if(!result) printOrderReceipt(order, 'customer');
+
     }
 
     // 列印廚房單
