@@ -151,12 +151,81 @@ function sunmiPrintFromHtml(html) {
   }
 }
 export function sunmiPrintReceipt(order, config) {
+  if (!window.SunmiPrinter || !window.SunmiPrinter.isPrinterReady || !window.SunmiPrinter.isPrinterReady()) {
+    console.log('Sunmi printer not ready');
     return false;
+  }
+  try {
+    var cfg = ensurePrintConfig();
+    var createdAt = String(order.createdAt || '').replace('T', ' ').slice(0, 16);
+    var receiptData = {
+      shopName: cfg.storeName || '餐廳 POS',
+      subtitle: (cfg.storePhone ? '電話：' + cfg.storePhone : '') +
+                (cfg.storeAddress ? '\n地址：' + cfg.storeAddress : ''),
+      orderNumber: order.orderNo || '',
+      dateTime: createdAt,
+      orderType: (order.orderType || '') + (order.tableNo ? ' / ' + order.tableNo : ''),
+      paymentMethod: order.paymentMethod || '',
+      items: (order.items || []).map(function(item) {
+        var unitPrice = (Number(item.basePrice || 0) + Number(item.extraPrice || 0));
+        var subText = (item.selections || []).map(function(s) {
+          return s.moduleName + ':' + s.optionName;
+        }).join(' / ');
+        if (item.note) subText = subText ? subText + ' | 備註：' + item.note : '備註：' + item.note;
+        return {
+          name: item.name || '',
+          qty: Number(item.qty || 0),
+          price: unitPrice * Number(item.qty || 0),
+          options: subText
+        };
+      }),
+      total: String(order.total || 0)
+    };
+    window.SunmiPrinter.printPosReceipt(JSON.stringify(receiptData));
+    console.log('Sunmi receipt sent');
+    return true;
+  } catch (e) {
+    console.error('sunmiPrintReceipt error:', e);
+    return false;
+  }
 }
 
 export function sunmiPrintKitchen(order, config) {
+  if (!window.SunmiPrinter || !window.SunmiPrinter.isPrinterReady || !window.SunmiPrinter.isPrinterReady()) {
     return false;
+  }
+  try {
+    var cfg = ensurePrintConfig();
+    var createdAt = String(order.createdAt || '').replace('T', ' ').slice(0, 16);
+    var receiptData = {
+      shopName: '廚房出單',
+      subtitle: cfg.storeName || '',
+      orderNumber: order.orderNo || '',
+      dateTime: createdAt,
+      orderType: (order.orderType || '') + (order.tableNo ? ' / ' + order.tableNo : ''),
+      paymentMethod: '',
+      items: (order.items || []).map(function(item) {
+        var subText = (item.selections || []).map(function(s) {
+          return s.moduleName + ':' + s.optionName;
+        }).join(' / ');
+        if (item.note) subText = subText ? subText + ' | 備註：' + item.note : '備註：' + item.note;
+        return {
+          name: item.name || '',
+          qty: Number(item.qty || 0),
+          price: 0,
+          options: subText
+        };
+      }),
+      total: ''
+    };
+    window.SunmiPrinter.printPosReceipt(JSON.stringify(receiptData));
+    return true;
+  } catch (e) {
+    console.error('sunmiPrintKitchen error:', e);
+    return false;
+  }
 }
+
 
 export function sunmiOpenCashDrawer() {
   if (window.SunmiPrinter && window.SunmiPrinter.isConnected()) {
