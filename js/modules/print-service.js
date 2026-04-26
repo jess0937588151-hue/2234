@@ -70,7 +70,7 @@ function openPrintWindow(html) {
 }
 
 export function sunmiPrintReceipt(order, config) {
-  alert('DEBUG: sunmiPrintReceipt called, SunmiPrinter=' + (typeof window.SunmiPrinter));
+  
   if (!window.SunmiPrinter || !window.SunmiPrinter.isPrinterReady || !window.SunmiPrinter.isPrinterReady()) {
     console.log('Sunmi printer not ready');
     return false;
