@@ -55,105 +55,22 @@ function buildSelectionText(item){
 // ========== 列印核心 ==========
 
 function openPrintWindow(html) {
-  // 檢查是否在 SunmiPrinter WebView 中
-  if (window.SunmiPrinter && window.SunmiPrinter.isConnected()) {
-    // 使用 Sunmi 原生列印
-    sunmiPrintFromHtml(html);
-  } else {
-    // 降級：用 iframe 列印 (Chrome 瀏覽器)
-    var frame = document.getElementById('_silentPrintFrame');
-    if (!frame) {
-      frame = document.createElement('iframe');
-      frame.id = '_silentPrintFrame';
-      frame.style.cssText = 'position:fixed;width:0;height:0;border:none;left:-9999px;';
-      document.body.appendChild(frame);
-    }
-    var doc = frame.contentDocument || frame.contentWindow.document;
-    doc.open();
-    doc.write(html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ''));
-    doc.close();
-    setTimeout(function () { frame.contentWindow.print(); }, 400);
+  var frame = document.getElementById('_silentPrintFrame');
+  if (!frame) {
+    frame = document.createElement('iframe');
+    frame.id = '_silentPrintFrame';
+    frame.style.cssText = 'position:fixed;width:0;height:0;border:none;left:-9999px;';
+    document.body.appendChild(frame);
   }
+  var doc = frame.contentDocument || frame.contentWindow.document;
+  doc.open();
+  doc.write(html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ''));
+  doc.close();
+  setTimeout(function () { frame.contentWindow.print(); }, 400);
 }
 
-function sunmiPrintFromHtml(html) {
-  try {
-    var parser = new DOMParser();
-    var doc = parser.parseFromString(html, 'text/html');
-    var printer = window.SunmiPrinter;
-
-    // 店名
-    var title = doc.querySelector('.title');
-    if (title) {
-      printer.printTextCenter(title.textContent.trim(), 32);
-    }
-
-    // 副標題
-    var subs = doc.querySelectorAll('.sub');
-    subs.forEach(function (el) {
-      printer.printTextCenter(el.textContent.trim(), 24);
-    });
-
-    // 分隔線
-    printer.printLine();
-
-    // 資訊列（單號、時間等）
-    var rows = doc.querySelectorAll('.row');
-    rows.forEach(function (row) {
-      var spans = row.querySelectorAll('span');
-      if (spans.length >= 2) {
-        printer.printRow(spans[0].textContent.trim(), spans[1].textContent.trim(), 24);
-      } else {
-        printer.printText(row.textContent.trim(), 24);
-      }
-    });
-
-    // 品項
-    var items = doc.querySelectorAll('.item-row');
-    if (items.length > 0) {
-      printer.printLine();
-      items.forEach(function (item) {
-        var top = item.querySelector('.item-top');
-        if (top) {
-          var name = top.querySelector('.item-name');
-          var price = top.querySelector('span:last-child');
-          if (name && price) {
-            printer.printRow(name.textContent.trim(), price.textContent.trim(), 24);
-          }
-        }
-        var sub = item.querySelector('.item-sub');
-        if (sub && sub.textContent.trim()) {
-          printer.printText('  ' + sub.textContent.trim(), 20);
-        }
-      });
-    }
-
-    // 分隔線
-    printer.printLine();
-
-    // 合計
-    var big = doc.querySelector('.big');
-    if (big) {
-      printer.printTextCenter(big.textContent.trim(), 32);
-    }
-
-    // 頁尾
-    var footers = doc.querySelectorAll('.footer');
-    footers.forEach(function (el) {
-      printer.printTextCenter(el.textContent.trim(), 24);
-    });
-
-    // 走紙 + 切紙
-    printer.feedAndCut();
-
-  } catch (e) {
-    console.error('Sunmi print error:', e);
-  }
-}
 export function sunmiPrintReceipt(order, config) {
   alert('DEBUG: sunmiPrintReceipt called, SunmiPrinter=' + (typeof window.SunmiPrinter));
-  if (!window.SunmiPrinter || !window.SunmiPrinter.isPrinterReady || !window.SunmiPrinter.isPrinterReady()) {
-
   if (!window.SunmiPrinter || !window.SunmiPrinter.isPrinterReady || !window.SunmiPrinter.isPrinterReady()) {
     console.log('Sunmi printer not ready');
     return false;
@@ -229,27 +146,13 @@ export function sunmiPrintKitchen(order, config) {
   }
 }
 
-
 export function sunmiOpenCashDrawer() {
-  if (window.SunmiPrinter && window.SunmiPrinter.isConnected()) {
-    try {
-      window.SunmiPrinter.openCashDrawer();
-      console.log('Sunmi 錢箱已開啟');
-      return true;
-    } catch (e) {
-      console.error('Sunmi 開錢箱錯誤：', e);
-      return false;
-    }
-  }
   return false;
 }
 
 // ========== 開錢箱（非 Sunmi 環境）==========
 
 export function openCashDrawer() {
-  if (window.SunmiPrinter && window.SunmiPrinter.isConnected()) {
-    window.SunmiPrinter.openCashDrawer();
-  }
 }
 
 // ========== 建立收據 HTML ==========
