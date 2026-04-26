@@ -271,12 +271,10 @@ export function renderCart(){
   if(badge) badge.textContent = state.cart.reduce((s,x)=> s + x.qty, 0);
 }
 
-
 function finalizeOrder(paymentMethod){
     var mode = document.getElementById('paymentTargetMode').value || 'new';
     var targetOrderId = document.getElementById('paymentTargetOrderId').value || '';
     var printConfig = getPrintSettings();
-  
 
     var order = null;
 
@@ -293,15 +291,14 @@ function finalizeOrder(paymentMethod){
 
         // 列印收據
         if(order && paymentMethod !== '待付款' && printConfig.autoPrintCheckout){
-    var html = getReceiptHtml(order, 'customer');
-    var w = window.open('', '_blank');
-    if(w){
-        w.document.write(html);
-        w.document.close();
-        setTimeout(function(){ w.print(); }, 500);
-    }
-}
-
+            var result1 = false;
+            try {
+                result1 = sunmiPrintReceipt(order, printConfig);
+            } catch(e) {
+                console.error('列印錯誤:', e);
+            }
+            if(!result1) printOrderReceipt(order, 'customer');
+        }
 
         // 列印廚房單
         if(order && printConfig.autoPrintKitchen){
@@ -324,14 +321,13 @@ function finalizeOrder(paymentMethod){
 
     // 列印收據
     if(order && paymentMethod !== '待付款' && printConfig.autoPrintCheckout){
-                var result = false;
+        var result2 = false;
         try {
-            result = sunmiPrintReceipt(order, printConfig);
+            result2 = sunmiPrintReceipt(order, printConfig);
         } catch(e) {
             console.error('列印錯誤:', e);
         }
-        if(!result) printOrderReceipt(order, 'customer');
-
+        if(!result2) printOrderReceipt(order, 'customer');
     }
 
     // 列印廚房單
