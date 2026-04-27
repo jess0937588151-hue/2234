@@ -467,17 +467,30 @@ export function initSettingsPage() {
   // ============================
   // Google Drive — 儲存
   // ============================
-  document.getElementById('saveGoogleBackupSettingsBtn')?.addEventListener('click', function() {
+    document.getElementById('saveGoogleBackupSettingsBtn')?.addEventListener('click', function() {
     if (!state.settings) state.settings = {};
-    state.settings.googleDrive = {
+    // 保留服務端寫入的狀態欄位
+    var existing = state.settings.googleDriveBackup || {};
+    state.settings.googleDriveBackup = {   // ← 改為 googleDriveBackup
       clientId: (document.getElementById('googleClientId')?.value || '').trim(),
       folderId: (document.getElementById('googleFolderId')?.value || '').trim(),
       autoBackupEnabled: !!document.getElementById('googleAutoBackupEnabled')?.checked,
-      autoBackupMinutes: parseInt(document.getElementById('googleAutoBackupMinutes')?.value) || 30
+      autoBackupMinutes: parseInt(document.getElementById('googleAutoBackupMinutes')?.value) || 60,
+      // 保留服務端的狀態欄位
+      lastBackupAt: existing.lastBackupAt || '',
+      lastRestoreAt: existing.lastRestoreAt || '',
+      lastBackupStatus: existing.lastBackupStatus || '',
+      lastRestoreStatus: existing.lastRestoreStatus || ''
     };
     persistAll();
     alert('Google Drive 設定已儲存');
+
+    // 重啟自動備份
+    if (typeof window.startGoogleAutoBackup === 'function') {
+      window.startGoogleAutoBackup();
+    }
   });
+
 
   document.getElementById('googleLoginBtn')?.addEventListener('click', function() {
     if (typeof window.googleDriveLogin === 'function') {
