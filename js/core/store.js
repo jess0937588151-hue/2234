@@ -198,54 +198,67 @@ function buildDefaultState(){
     }
   };
 }
+// ── 建立 state（先 export 空物件，再用 try/catch 填內容，避免 IIFE 在 Safari 失敗時整個 state 變 undefined） ──
+export const state = buildDefaultState();
 
-// ── 建立 state ──
-export const state = (function(){
-  const def = buildDefaultState();
-  const saved = loadPersisted();
-  if (!saved) return def;
+(function hydrateState(){
+  let saved = null;
+  try {
+    saved = loadPersisted();
+  } catch (e) {
+    console.error('loadPersisted exception:', e);
+  }
+  if (!saved) return;
 
-  // 將存檔合併到預設值上（保留結構完整性）
-  const merged = def;
-  if (Array.isArray(saved.categories)) merged.categories = saved.categories.includes('未分類') ? saved.categories : ['未分類', ...saved.categories];
-  if (Array.isArray(saved.modules)) merged.modules = normalizeModules(saved.modules);
-  if (Array.isArray(saved.products)) merged.products = normalizeProducts(saved.products, merged.modules);
-  if (Array.isArray(saved.pendingProducts)) merged.pendingProducts = saved.pendingProducts;
-  if (Array.isArray(saved.cart)) merged.cart = saved.cart;
-  if (Array.isArray(saved.orders)) merged.orders = saved.orders;
-  if (saved.customers && typeof saved.customers === 'object') merged.customers = saved.customers;
-  if (saved.settings && typeof saved.settings === 'object') {
-    deepMerge(merged.settings, saved.settings);
-    // 確保 printConfig.fields 存在
-    if (!merged.settings.printConfig) merged.settings.printConfig = {};
-    if (!merged.settings.printConfig.fields) {
-      merged.settings.printConfig.fields = JSON.parse(JSON.stringify(DEFAULT_PRINT_FIELDS));
-    } else {
-      // 補齊缺少的子欄位
-      ['receipt','kitchen','label'].forEach(kind => {
-        if (!merged.settings.printConfig.fields[kind]) {
-          merged.settings.printConfig.fields[kind] = JSON.parse(JSON.stringify(DEFAULT_PRINT_FIELDS[kind]));
-        } else {
-          Object.keys(DEFAULT_PRINT_FIELDS[kind]).forEach(f => {
-            if (typeof merged.settings.printConfig.fields[kind][f] === 'undefined') {
-              merged.settings.printConfig.fields[kind][f] = DEFAULT_PRINT_FIELDS[kind][f];
-            }
-          });
-        }
-      });
+  try {
+    if (Array.isArray(saved.categories)) {
+      state.categories = saved.categories.includes('未分類') ? saved.categories : ['未分類', ...saved.categories];
     }
-    if (typeof merged.settings.printConfig.openDrawer === 'undefined') {
-      merged.settings.printConfig.openDrawer = true;
+    if (Array.isArray(saved.modules)) state.modules = normalizeModules(saved.modules);
+    if (Array.isArray(saved.products)) state.products = normalizeProducts(saved.products, state.modules);
+    if (Array.isArray(saved.pendingProducts)) state.pendingProducts = saved.pendingProducts;
+    if (Array.isArray(saved.cart)) state.cart = saved.cart;
+    if (Array.isArray(saved.orders)) state.orders = saved.orders;
+    if (saved.customers && typeof saved.customers === 'object') state.customers = saved.customers;
+
+    if (saved.settings && typeof saved.settings === 'object') {
+      try {
+        deepMerge(state.settings, saved.settings);
+      } catch (e) {
+        console.error('deepMerge settings failed, keeping defaults:', e);
+      }
+      // 確保 printConfig.fields 存在
+      if (!state.settings.printConfig) state.settings.printConfig = {};
+      if (!state.settings.printConfig.fields) {
+        state.settings.printConfig.fields = JSON.parse(JSON.stringify(DEFAULT_PRINT_FIELDS));
+      } else {
+        ['receipt','kitchen','label'].forEach(kind => {
+          if (!state.settings.printConfig.fields[kind]) {
+            state.settings.printConfig.fields[kind] = JSON.parse(JSON.stringify(DEFAULT_PRINT_FIELDS[kind]));
+          } else {
+            Object.keys(DEFAULT_PRINT_FIELDS[kind]).forEach(f => {
+              if (typeof state.settings.printConfig.fields[kind][f] === 'undefined') {
+                state.settings.printConfig.fields[kind][f] = DEFAULT_PRINT_FIELDS[kind][f];
+              }
+            });
+          }
+        });
+      }
+      if (typeof state.settings.printConfig.openDrawer === 'undefined') {
+        state.settings.printConfig.openDrawer = true;
+      }
     }
+
+    if (saved.reports && typeof saved.reports === 'object') {
+      state.reports = {
+        currentSession: saved.reports.currentSession || null,
+        sessions: Array.isArray(saved.reports.sessions) ? saved.reports.sessions : [],
+        savedSnapshots: Array.isArray(saved.reports.savedSnapshots) ? saved.reports.savedSnapshots : []
+      };
+    }
+  } catch (e) {
+    console.error('hydrateState failed, falling back to defaults:', e);
   }
-  if (saved.reports && typeof saved.reports === 'object') {
-    merged.reports = {
-      currentSession: saved.reports.currentSession || null,
-      sessions: Array.isArray(saved.reports.sessions) ? saved.reports.sessions : [],
-      savedSnapshots: Array.isArray(saved.reports.savedSnapshots) ? saved.reports.savedSnapshots : []
-    };
-  }
-  return merged;
 })();
 
 // ── 持久化 ──
