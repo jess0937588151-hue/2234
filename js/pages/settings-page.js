@@ -139,20 +139,21 @@ function loadRealtimeSettingsToForm() {
   var el = function(id) { return document.getElementById(id); };
   if (el('realtimeOrderEnabled')) el('realtimeOrderEnabled').checked = !!rt.enabled;
   if (el('deviceRole')) el('deviceRole').value = rt.deviceRole || 'master';
-  if (el('firebaseApiKey')) el('firebaseApiKey').value = rt.firebaseApiKey || '';
-  if (el('firebaseAuthDomain')) el('firebaseAuthDomain').value = rt.firebaseAuthDomain || '';
-  if (el('firebaseDatabaseUrl')) el('firebaseDatabaseUrl').value = rt.firebaseDatabaseUrl || '';
-  if (el('firebaseProjectId')) el('firebaseProjectId').value = rt.firebaseProjectId || '';
-  if (el('firebaseStorageBucket')) el('firebaseStorageBucket').value = rt.firebaseStorageBucket || '';
-  if (el('firebaseMessagingSenderId')) el('firebaseMessagingSenderId').value = rt.firebaseMessagingSenderId || '';
-  if (el('firebaseAppId')) el('firebaseAppId').value = rt.firebaseAppId || '';
-  if (el('firebaseMeasurementId')) el('firebaseMeasurementId').value = rt.firebaseMeasurementId || '';
+  if (el('firebaseApiKey')) el('firebaseApiKey').value = rt.apiKey || '';
+  if (el('firebaseAuthDomain')) el('firebaseAuthDomain').value = rt.authDomain || '';
+  if (el('firebaseDatabaseUrl')) el('firebaseDatabaseUrl').value = rt.databaseURL || '';
+  if (el('firebaseProjectId')) el('firebaseProjectId').value = rt.projectId || '';
+  if (el('firebaseStorageBucket')) el('firebaseStorageBucket').value = rt.storageBucket || '';
+  if (el('firebaseMessagingSenderId')) el('firebaseMessagingSenderId').value = rt.messagingSenderId || '';
+  if (el('firebaseAppId')) el('firebaseAppId').value = rt.appId || '';
+  if (el('firebaseMeasurementId')) el('firebaseMeasurementId').value = rt.measurementId || '';
   if (el('onlineStoreTitle')) el('onlineStoreTitle').value = rt.onlineStoreTitle || '';
   if (el('onlineStoreSubtitle')) el('onlineStoreSubtitle').value = rt.onlineStoreSubtitle || '';
-  if (el('onlineConfirmAutoPrintKitchen')) el('onlineConfirmAutoPrintKitchen').checked = !!rt.autoPrintKitchen;
-  if (el('onlineConfirmAutoPrintReceipt')) el('onlineConfirmAutoPrintReceipt').checked = !!rt.autoPrintReceipt;
+  if (el('onlineConfirmAutoPrintKitchen')) el('onlineConfirmAutoPrintKitchen').checked = !!rt.autoPrintKitchenOnConfirm;
+  if (el('onlineConfirmAutoPrintReceipt')) el('onlineConfirmAutoPrintReceipt').checked = !!rt.autoPrintReceiptOnConfirm;
   if (el('onlineIncomingSoundEnabled')) el('onlineIncomingSoundEnabled').checked = rt.incomingSoundEnabled !== false;
 }
+
 
 // ── Google 備份：讀取欄位 ──
 function loadGoogleSettingsToForm() {
