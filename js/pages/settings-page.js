@@ -158,12 +158,12 @@ function loadRealtimeSettingsToForm() {
 // ── Google 備份：讀取欄位 ──
 function loadGoogleSettingsToForm() {
   var s = state.settings || {};
-  var g = s.googleDrive || {};
+  var g = s.googleDriveBackup || {};   // ← 改為 googleDriveBackup
   var el = function(id) { return document.getElementById(id); };
   if (el('googleClientId')) el('googleClientId').value = g.clientId || '';
   if (el('googleFolderId')) el('googleFolderId').value = g.folderId || '';
   if (el('googleAutoBackupEnabled')) el('googleAutoBackupEnabled').checked = !!g.autoBackupEnabled;
-  if (el('googleAutoBackupMinutes')) el('googleAutoBackupMinutes').value = g.autoBackupMinutes || 30;
+  if (el('googleAutoBackupMinutes')) el('googleAutoBackupMinutes').value = g.autoBackupMinutes || 60;
 }
 
 // ── 提示音：讀取狀態 ──
@@ -402,24 +402,31 @@ export function initSettingsPage() {
   // ============================
   // 即時接單 — 儲存
   // ============================
-  document.getElementById('saveRealtimeOrderSettingsBtn')?.addEventListener('click', function() {
+    document.getElementById('saveRealtimeOrderSettingsBtn')?.addEventListener('click', function() {
     if (!state.settings) state.settings = {};
+    // 保留服務端寫入的狀態欄位
+    var existing = state.settings.realtimeOrder || {};
     state.settings.realtimeOrder = {
       enabled: !!document.getElementById('realtimeOrderEnabled')?.checked,
       deviceRole: document.getElementById('deviceRole')?.value || 'master',
-      firebaseApiKey: (document.getElementById('firebaseApiKey')?.value || '').trim(),
-      firebaseAuthDomain: (document.getElementById('firebaseAuthDomain')?.value || '').trim(),
-      firebaseDatabaseUrl: (document.getElementById('firebaseDatabaseUrl')?.value || '').trim(),
-      firebaseProjectId: (document.getElementById('firebaseProjectId')?.value || '').trim(),
-      firebaseStorageBucket: (document.getElementById('firebaseStorageBucket')?.value || '').trim(),
-      firebaseMessagingSenderId: (document.getElementById('firebaseMessagingSenderId')?.value || '').trim(),
-      firebaseAppId: (document.getElementById('firebaseAppId')?.value || '').trim(),
-      firebaseMeasurementId: (document.getElementById('firebaseMeasurementId')?.value || '').trim(),
+      apiKey: (document.getElementById('firebaseApiKey')?.value || '').trim(),
+      authDomain: (document.getElementById('firebaseAuthDomain')?.value || '').trim(),
+      databaseURL: (document.getElementById('firebaseDatabaseUrl')?.value || '').trim(),
+      projectId: (document.getElementById('firebaseProjectId')?.value || '').trim(),
+      storageBucket: (document.getElementById('firebaseStorageBucket')?.value || '').trim(),
+      messagingSenderId: (document.getElementById('firebaseMessagingSenderId')?.value || '').trim(),
+      appId: (document.getElementById('firebaseAppId')?.value || '').trim(),
+      measurementId: (document.getElementById('firebaseMeasurementId')?.value || '').trim(),
       onlineStoreTitle: (document.getElementById('onlineStoreTitle')?.value || '').trim(),
       onlineStoreSubtitle: (document.getElementById('onlineStoreSubtitle')?.value || '').trim(),
-      autoPrintKitchen: !!document.getElementById('onlineConfirmAutoPrintKitchen')?.checked,
-      autoPrintReceipt: !!document.getElementById('onlineConfirmAutoPrintReceipt')?.checked,
-      incomingSoundEnabled: !!document.getElementById('onlineIncomingSoundEnabled')?.checked
+      autoPrintKitchenOnConfirm: !!document.getElementById('onlineConfirmAutoPrintKitchen')?.checked,
+      autoPrintReceiptOnConfirm: !!document.getElementById('onlineConfirmAutoPrintReceipt')?.checked,
+      incomingSoundEnabled: !!document.getElementById('onlineIncomingSoundEnabled')?.checked,
+      // 保留服務端的狀態欄位
+      lastSyncStatus: existing.lastSyncStatus || '',
+      lastOrderAt: existing.lastOrderAt || '',
+      lastConfirmedAt: existing.lastConfirmedAt || '',
+      lastSyncTime: existing.lastSyncTime || ''
     };
     persistAll();
     alert('即時接單設定已儲存');
@@ -428,6 +435,7 @@ export function initSettingsPage() {
       window.reinitRealtimeOrder();
     }
   });
+
 
   // 同步菜單到雲端
   document.getElementById('syncMenuBtn')?.addEventListener('click', async function() {
