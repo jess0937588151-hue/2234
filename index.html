@@ -587,6 +587,31 @@
 </div>
 
 <!-- ===== 支付方式 Modal ===== -->
+    <!-- ===== 商品設定 Modal（點餐用）===== -->
+<div id="productConfigModal" class="modal hidden">
+  <div class="modal-backdrop"></div>
+  <div class="modal-dialog" style="max-width:480px">
+    <div class="row between wrap">
+      <h2 id="productConfigTitle">商品設定</h2>
+      <button id="closeProductConfigModal" class="ghost-btn">✕</button>
+    </div>
+    <div id="productConfigModules" style="margin-top:12px"></div>
+    <div style="margin-top:12px">
+      <label style="font-size:13px;font-weight:600;color:#475569">備註</label>
+      <input id="itemNoteInput" placeholder="例如：不要辣、去冰" style="width:100%;margin-top:4px;box-sizing:border-box">
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:12px">
+      <label style="font-size:13px;font-weight:600;color:#475569">數量</label>
+      <input id="itemQtyInput" type="number" min="1" value="1" style="width:70px;text-align:center">
+      <span id="itemPricePreview" style="margin-left:auto;font-size:15px;font-weight:700;color:#1e293b">小計：$0</span>
+    </div>
+    <div class="form-actions" style="margin-top:16px">
+      <button id="saveProductConfigBtn" class="primary-btn" style="flex:1">確認加入</button>
+      <button id="cancelProductConfigBtn" class="secondary-btn">取消</button>
+    </div>
+  </div>
+</div>
+
 <input type="hidden" id="paymentTargetMode" value="new">
 <input type="hidden" id="paymentTargetOrderId" value="">
 <div id="paymentModal" class="modal hidden">
