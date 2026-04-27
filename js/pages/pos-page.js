@@ -1,12 +1,7 @@
 /* 中文備註：js/pages/pos-page.js，此檔已加入中文說明，方便後續維護。 */
 
+import { buildCartPreviewOrder, getPrintSettings, printOrderLabels, printOrderReceipt, printKitchenCopies, openCashDrawer, getReceiptHtml } from '../modules/print-service.js';
 
-import { state, persistAll } from '../core/store.js';
-import { escapeHtml, money, id } from '../core/utils.js';
-import { getDiscountResult, getDiscountType, setDiscountType, handleDiscountInput } from '../modules/cart-service.js';
-import { createOrUpdateOrder, markPendingOrderPaid } from '../modules/order-service.js';
-import { buildCartPreviewOrder, getPrintSettings, printOrderLabels, printOrderReceipt, printKitchenCopies, openCashDrawer, sunmiPrintReceipt, sunmiPrintKitchen, sunmiOpenCashDrawer } from '../modules/print-service.js';
-import { getReceiptHtml } from '../modules/print-service.js';
 
 function createConfigState(product){
   const selections = {};
