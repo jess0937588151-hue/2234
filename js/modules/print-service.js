@@ -24,8 +24,16 @@ function ensurePrintConfig(){
     };
   }
   var cfg = state.settings.printConfig;
-  cfg.receiptPaperWidth = Number(cfg.receiptPaperWidth) || 58;
+    cfg.receiptPaperWidth = Number(cfg.receiptPaperWidth) || 58;
   cfg.receiptFontSize = Number(cfg.receiptFontSize) || 12;
+  cfg.labelPaperWidth = Number(cfg.labelPaperWidth) || 60;
+  cfg.labelPaperHeight = Number(cfg.labelPaperHeight) || 40;
+  cfg.labelFontSize = Number(cfg.labelFontSize) || 12;
+  cfg.receiptOffsetX = Number(cfg.receiptOffsetX) || 0;
+  cfg.receiptOffsetY = Number(cfg.receiptOffsetY) || 0;
+  cfg.labelOffsetX = Number(cfg.labelOffsetX) || 0;
+  cfg.labelOffsetY = Number(cfg.labelOffsetY) || 0;
+  cfg.kitchenCopies = Math.max(1, Number(cfg.kitchenCopies) || 1);
   return cfg;
 }
 
