@@ -1,4 +1,10 @@
-/* 中文備註：Firebase 即時接單服務。顧客匿名送單，POS 端使用 Google 登入接單，並搭配安全規則。 */
+/* 中文備註：Firebase 即時接單服務（v2.1.25）。
+ * 變更：
+ *   1. 自動列印旗標改讀 autoPrintKitchenOnConfirm / autoPrintReceiptOnConfirm
+ *   2. pushOnlineOrder 自動加 customerLookupKey（SHA-256 hash 供自助查單）
+ *   3. 確認接單後寫入顧客主檔（customer-service.upsertCustomerFromOrder + sync）
+ *   4. 公開 _getRef / _dbApi 供 customer-service 使用
+ */
 import { state, persistAll } from '../core/store.js';
 
 const FIREBASE_BASE = 'https://www.gstatic.com/firebasejs/10.12.2';
@@ -13,6 +19,7 @@ const DEFAULT_FIREBASE_CONFIG = {
   appId: '1:203764995518:web:8ebdf39837c5c59c4995ef',
   measurementId: 'G-34XEG1QCHW'
 };
+
 let appInstance = null;
 let dbInstance = null;
 let dbApi = null;
@@ -23,7 +30,9 @@ let initialized = false;
 let posListenerRef = null;
 let posListenerCallback = null;
 
-
+// ============================================================
+// 設定
+// ============================================================
 function ensureRealtimeConfig(){
   if(!state.settings) state.settings = {};
   const current = state.settings.realtimeOrder || {};
@@ -39,16 +48,14 @@ function ensureRealtimeConfig(){
     measurementId: String(current.measurementId || '').trim() || DEFAULT_FIREBASE_CONFIG.measurementId,
     onlineStoreTitle: current.onlineStoreTitle || '',
     onlineStoreSubtitle: current.onlineStoreSubtitle || '',
-    autoPrintKitchenOnConfirm: current.autoPrintKitchenOnConfirm !== false,
-    autoPrintReceiptOnConfirm: !!current.autoPrintReceiptOnConfirm,
+    autoPrintKitchenOnConfirm: current.autoPrintKitchenOnConfirm !== false,    // 預設 true
+    autoPrintReceiptOnConfirm: current.autoPrintReceiptOnConfirm !== false,    // 預設 true
     incomingSoundEnabled: current.incomingSoundEnabled !== false,
     lastSyncStatus: current.lastSyncStatus || '尚未啟用',
     lastOrderAt: current.lastOrderAt || '',
-        lastConfirmedAt: current.lastConfirmedAt || '',
+    lastConfirmedAt: current.lastConfirmedAt || '',
     deviceRole: current.deviceRole || 'master'
   };
-
-  
   return state.settings.realtimeOrder;
 }
 
@@ -63,6 +70,9 @@ export function getRealtimeConfig(){
   return ensureRealtimeConfig();
 }
 
+// ============================================================
+// Firebase 初始化
+// ============================================================
 async function loadFirebaseModules(){
   if(initialized) return;
   const appMod = await import(`${FIREBASE_BASE}/firebase-app.js`);
@@ -96,32 +106,36 @@ async function getRef(path){
   return dbApi.ref(dbInstance, path);
 }
 
-// ========== 進單提示音 & 自動接單 ==========
-// activeAlarmInterval: 重複播放計時器
-// activeAlarmTimeout: 60秒自動接單計時器
-// activeAlarmOrderId: 當前響鈴的訂單ID
+// ── 公開給 customer-service.js 使用 ──
+export async function _getRef(path){
+  return await getRef(path);
+}
+export function _dbApi(){
+  return dbApi;
+}
+
+// ============================================================
+// 進單提示音 & 自動接單
+// ============================================================
 var activeAlarmInterval = null;
 var activeAlarmTimeout = null;
 var activeAlarmOrderId = null;
-
-// 播放一次提示音（優先使用自訂音檔，否則用預設 beep）
 let beepAudio = null;
 
 function ensureBeepAudio(){
-  var customSound = localStorage.getItem('pos_custom_sound');
+  var customSound = localStorage.getItem('customAlertSound') || localStorage.getItem('pos_custom_sound');
   if(customSound){
     if(!beepAudio || beepAudio._custom !== customSound){
       beepAudio = new Audio(customSound);
       beepAudio._custom = customSound;
     }
     return beepAudio;
-    
-  }  if(!beepAudio){
+  }
+  if(!beepAudio){
     beepAudio = new Audio('A123.mp3');
   }
   return beepAudio;
 }
-
 
 function playOnce(){
   var cfg = ensureRealtimeConfig();
@@ -133,7 +147,7 @@ function playOnce(){
     var p = audio.play();
     if(p && p.catch) p.catch(function(){});
   }catch(err){
-    console.error('playOnce 失敗：',err);
+    console.error('playOnce 失敗：', err);
   }
 }
 
@@ -145,8 +159,8 @@ function showOnlineOrderOverlay(orderId){
 
   document.getElementById('overlayOrderNo').textContent = order ? (order.orderNo || order.id) : orderId;
   document.getElementById('overlayTotal').textContent = order
-  ? `$${order.total || order.subtotal || order.totalAmount || 0}`
-  : '';
+    ? `$${order.total || order.subtotal || order.totalAmount || 0}`
+    : '';
   document.getElementById('overlayMeta').textContent = order
     ? `${order.createdAt ? new Date(order.createdAt).toLocaleString('zh-TW') : ''} · 線上點餐-${order.orderType === 'dineIn' ? '內用' : '外帶'}`
     : '';
@@ -168,7 +182,7 @@ function showOnlineOrderOverlay(orderId){
 
   overlay.style.display = 'flex';
 
-   // 接受按鈕
+  // 接受按鈕
   const acceptBtn = document.getElementById('overlayAcceptBtn');
   acceptBtn.disabled = false;
   acceptBtn.textContent = '確認接單';
@@ -185,12 +199,21 @@ function showOnlineOrderOverlay(orderId){
         if(!Array.isArray(state.orders)) state.orders = [];
         state.orders.unshift(posOrder);
         persistAll();
+
+        // 更新顧客主檔（本機）
+        try {
+          const cust = await import('./customer-service.js');
+          cust.upsertCustomerFromOrder(posOrder);
+          cust.syncCustomerToFirebase(posOrder);   // 不 await，背景跑
+        } catch (e) { console.warn('顧客主檔更新失敗：', e); }
+
+        // 自動列印（依勾選）
         try{
-          const { printOrderReceipt } = await import('./print-service.js');
+          const { printOrderReceipt, printKitchenCopies } = await import('./print-service.js');
           const cfg2 = ensureRealtimeConfig();
-          if(cfg2.autoPrintOnConfirm) printOrderReceipt(posOrder,'kitchen');
-          printOrderReceipt(posOrder,'customer');
-        }catch(pe){}
+          if(cfg2.autoPrintKitchenOnConfirm) printKitchenCopies(posOrder);
+          if(cfg2.autoPrintReceiptOnConfirm) printOrderReceipt(posOrder, 'customer');
+        }catch(pe){ console.error('自動列印失敗：', pe); }
       }
       if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
       if(typeof window.refreshRealtimeOrderPanel === 'function') window.refreshRealtimeOrderPanel();
@@ -201,7 +224,6 @@ function showOnlineOrderOverlay(orderId){
     }
   };
 
- 
   // 拒絕按鈕
   const rejectBtn = document.getElementById('overlayRejectBtn');
   rejectBtn.disabled = false;
@@ -223,8 +245,6 @@ function showOnlineOrderOverlay(orderId){
   };
 }
 
-
-// 開始重複播放提示音，60秒後自動接單
 function startAlarm(orderId){
   if(activeAlarmInterval){
     activeAlarmOrderId = orderId;
@@ -234,12 +254,10 @@ function startAlarm(orderId){
 
   showOnlineOrderOverlay(orderId);
 
-  // 延遲1秒後開始播放，確保 overlay 已顯示
   setTimeout(()=>{
     if(!activeAlarmOrderId) return;
     playOnce();
     activeAlarmInterval = setInterval(()=>{
-      // 只在 overlay 可見時播放
       const overlay = document.getElementById('onlineOrderOverlay');
       if(!overlay || overlay.style.display === 'none'){
         return;
@@ -248,7 +266,7 @@ function startAlarm(orderId){
     }, 3000);
   }, 1000);
 
-  // 60秒後自動接單
+  // 60 秒自動接單
   activeAlarmTimeout = setTimeout(async ()=>{
     const autoOrderId = activeAlarmOrderId;
     stopAlarm();
@@ -260,21 +278,26 @@ function startAlarm(orderId){
         if(!Array.isArray(state.orders)) state.orders = [];
         state.orders.unshift(posOrder);
         persistAll();
+
+        try {
+          const cust = await import('./customer-service.js');
+          cust.upsertCustomerFromOrder(posOrder);
+          cust.syncCustomerToFirebase(posOrder);
+        } catch (e) { console.warn('顧客主檔更新失敗：', e); }
+
         try{
-          const { printOrderReceipt } = await import('./print-service.js');
+          const { printOrderReceipt, printKitchenCopies } = await import('./print-service.js');
           const cfg2 = ensureRealtimeConfig();
-          if(cfg2.autoPrintOnConfirm) printOrderReceipt(posOrder,'kitchen');
-          printOrderReceipt(posOrder,'customer');
-        }catch(pe){ console.error('自動接單列印失敗：',pe); }
+          if(cfg2.autoPrintKitchenOnConfirm) printKitchenCopies(posOrder);
+          if(cfg2.autoPrintReceiptOnConfirm) printOrderReceipt(posOrder, 'customer');
+        }catch(pe){ console.error('自動接單列印失敗：', pe); }
       }
       if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
       if(typeof window.refreshRealtimeOrderPanel === 'function') window.refreshRealtimeOrderPanel();
-    }catch(err){ console.error('自動接單失敗：',err); }
+    }catch(err){ console.error('自動接單失敗：', err); }
   }, 60000);
 }
 
-
-// 停止提示音和自動接單計時器
 function stopAlarm(){
   if(activeAlarmInterval){ clearInterval(activeAlarmInterval); activeAlarmInterval = null; }
   if(activeAlarmTimeout){ clearTimeout(activeAlarmTimeout); activeAlarmTimeout = null; }
@@ -283,23 +306,20 @@ function stopAlarm(){
   if(overlay) overlay.style.display = 'none';
 }
 
-// 保留向下相容的 beep 函式名稱
 function beep(){
   const cfg = ensureRealtimeConfig();
   if(!cfg.incomingSoundEnabled) return;
   playOnce();
 }
 
-
+// ============================================================
+// 認證
+// ============================================================
 export async function signInPOSWithGoogle(){
   await loadFirebaseModules();
   const result = await authApi.signInWithPopup(authInstance, googleProvider);
   return result.user;
 }
-
-
-
-
 
 export async function signOutPOSGoogle(){
   await loadFirebaseModules();
@@ -316,7 +336,7 @@ export async function signInCustomerAnonymously(){
 }
 
 export function getRealtimeAuthUser(){
-  return authInstance?.currentUser || null;
+  return (authInstance && authInstance.currentUser) || null;
 }
 
 export async function waitForAuthReady(){
@@ -348,6 +368,13 @@ export async function verifyPOSAccess(){
   };
 }
 
+// ============================================================
+// 訂單操作
+// ============================================================
+
+/**
+ * 顧客送單。會自動加上 customerLookupKey（SHA-256 hash），供顧客自助查詢。
+ */
 export async function pushOnlineOrder(order){
   const cfg = ensureRealtimeConfig();
   if(!cfg.enabled) throw new Error('即時接單尚未啟用');
@@ -355,8 +382,18 @@ export async function pushOnlineOrder(order){
   const rootRef = await getRef('onlineOrders');
   const newRef = dbApi.push(rootRef);
 
+  // 算 customerLookupKey（讓顧客之後能自助查單）
+  let customerLookupKey = '';
+  try {
+    const cust = await import('./customer-service.js');
+    customerLookupKey = await cust.buildLookupKeyForOrder(order);
+  } catch (e) {
+    console.warn('buildLookupKeyForOrder failed:', e);
+  }
+
   await dbApi.set(newRef, Object.assign({}, order, {
     customerUid: user.uid,
+    customerLookupKey,                   // ← 新增欄位
     status: 'pending_confirm',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -382,7 +419,6 @@ export async function watchCustomerOrder(orderId, onChange){
   return ()=> dbApi.off(ref, 'value', callback);
 }
 
-
 export async function startPOSRealtimeListener(onRefresh){
   const cfg = ensureRealtimeConfig();
   if(!cfg.enabled) return;
@@ -403,7 +439,7 @@ export async function startPOSRealtimeListener(onRefresh){
   let seen = new Set(JSON.parse(sessionStorage.getItem('pos_seen_online_orders') || '[]'));
 
   posListenerRef = ref;
-    posListenerCallback = snapshot => {
+  posListenerCallback = snapshot => {
     const value = snapshot.val() || {};
     const incoming = Object.entries(value)
       .map(([id, row]) => ({ id, ...row }))
@@ -515,6 +551,7 @@ export function buildRealtimeOrderForPOS(remote){
     customerName: remote.customerName || '',
     customerPhone: remote.customerPhone || '',
     customerNote: remote.customerNote || '',
+    customerLookupKey: remote.customerLookupKey || '',
     prepTimeMinutes: Number(remote.prepTimeMinutes || 0),
     estimatedReadyAt: remote.estimatedReadyAt || '',
     merchantReplyMessage: remote.replyMessage || '',
@@ -527,6 +564,9 @@ export function buildRealtimeOrderForPOS(remote){
   };
 }
 
+// ============================================================
+// 菜單同步
+// ============================================================
 export async function syncMenuToFirebase(){
   await loadFirebaseModules();
   const user = authInstance.currentUser || await waitForAuthReady();
@@ -558,6 +598,7 @@ export async function syncMenuToFirebase(){
   cfg.lastSyncTime = new Date().toISOString();
   persistAll();
 }
+
 export async function fetchMenuFromFirebase(){
   await loadFirebaseModules();
   const cfg = ensureRealtimeConfig();
@@ -572,12 +613,12 @@ export async function fetchMenuFromFirebase(){
   if(data.modules && Array.isArray(data.modules)){
     state.modules = data.modules;
   }
-  
   if(data.categories && Array.isArray(data.categories)){
     state.categories = data.categories;
   }
   return data;
 }
+
 export async function watchMenuFromFirebase(callback){
   await loadFirebaseModules();
   const cfg = ensureRealtimeConfig();
