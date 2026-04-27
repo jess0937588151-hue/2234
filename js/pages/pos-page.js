@@ -279,26 +279,23 @@ function finalizeOrder(paymentMethod){
         persistAll();
         window.refreshAllViews();
 
-        // 開錢箱
-        if(order && paymentMethod !== '待付款'){
-            sunmiOpenCashDrawer() || openCashDrawer();
-        }
+        // 開錢箱（依設定 openDrawer，且僅結帳時）
+      if(order && paymentMethod !== '待付款' && printConfig.openDrawer){
+    try { openCashDrawer(); } catch(e) { console.error('開錢箱失敗:', e); }
+}
 
-        // 列印收據
-        if(order && paymentMethod !== '待付款' && printConfig.autoPrintCheckout){
-            var result1 = false;
-            try {
-                result1 = sunmiPrintReceipt(order, printConfig);
-            } catch(e) {
-                console.error('列印錯誤:', e);
-            }
-            if(!result1) printOrderReceipt(order, 'customer');
-        }
+// 列印顧客單（路由內部會自動選 Sunmi/藍牙/網路/瀏覽器）
+if(order && paymentMethod !== '待付款' && printConfig.autoPrintCheckout){
+    try { printOrderReceipt(order, 'customer'); }
+    catch(e) { console.error('列印顧客單失敗:', e); }
+}
 
-        // 列印廚房單
-        if(order && printConfig.autoPrintKitchen){
-            sunmiPrintKitchen(order, printConfig) || printKitchenCopies(order);
-        }
+// 列印廚房單
+if(order && printConfig.autoPrintKitchen){
+    try { printKitchenCopies(order); }
+    catch(e) { console.error('列印廚房單失敗:', e); }
+}
+
 
         alert(paymentMethod === '待付款' ? '仍維持待付款' : '已完成收款');
         return;
@@ -309,26 +306,22 @@ function finalizeOrder(paymentMethod){
     persistAll();
     window.refreshAllViews();
 
-    // 開錢箱
-    if(order && paymentMethod !== '待付款'){
-        sunmiOpenCashDrawer() || openCashDrawer();
-    }
+    // 開錢箱（依設定 openDrawer，且僅結帳時）
+if(order && paymentMethod !== '待付款' && printConfig.openDrawer){
+    try { openCashDrawer(); } catch(e) { console.error('開錢箱失敗:', e); }
+}
 
-    // 列印收據
-    if(order && paymentMethod !== '待付款' && printConfig.autoPrintCheckout){
-        var result2 = false;
-        try {
-            result2 = sunmiPrintReceipt(order, printConfig);
-        } catch(e) {
-            console.error('列印錯誤:', e);
-        }
-        if(!result2) printOrderReceipt(order, 'customer');
-    }
+// 列印顧客單（路由內部會自動選 Sunmi/藍牙/網路/瀏覽器）
+if(order && paymentMethod !== '待付款' && printConfig.autoPrintCheckout){
+    try { printOrderReceipt(order, 'customer'); }
+    catch(e) { console.error('列印顧客單失敗:', e); }
+}
 
-    // 列印廚房單
-    if(order && printConfig.autoPrintKitchen){
-        sunmiPrintKitchen(order, printConfig) || printKitchenCopies(order);
-    }
+// 列印廚房單
+if(order && printConfig.autoPrintKitchen){
+    try { printKitchenCopies(order); }
+    catch(e) { console.error('列印廚房單失敗:', e); }
+}
 
     alert(paymentMethod === '待付款' ? '已加入待付款' : '結帳完成');
 }
