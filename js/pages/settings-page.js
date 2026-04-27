@@ -282,6 +282,37 @@ export function initSettingsPage() {
       }]
     };
   }
+  /** 把表單上目前填的值即時寫入設定（這樣預覽才會用到最新的數值） */
+  function applyFormToConfig() {
+    var cfg = getPrintSettings();
+    cfg.storeName = (document.getElementById('printStoreName')?.value || '').trim();
+    cfg.storePhone = (document.getElementById('printStorePhone')?.value || '').trim();
+    cfg.storeAddress = (document.getElementById('printStoreAddress')?.value || '').trim();
+    cfg.receiptFooter = (document.getElementById('printReceiptFooter')?.value || '').trim();
+    cfg.receiptPaperWidth = Number(document.getElementById('printReceiptPaperWidth')?.value) || 58;
+    cfg.labelPaperWidth = Number(document.getElementById('printLabelPaperWidth')?.value) || 60;
+    cfg.labelPaperHeight = Number(document.getElementById('printLabelPaperHeight')?.value) || 40;
+    cfg.receiptFontSize = Number(document.getElementById('printReceiptFontSize')?.value) || 12;
+    cfg.labelFontSize = Number(document.getElementById('printLabelFontSize')?.value) || 12;
+    cfg.receiptOffsetX = Number(document.getElementById('printReceiptOffsetX')?.value) || 0;
+    cfg.receiptOffsetY = Number(document.getElementById('printReceiptOffsetY')?.value) || 0;
+    cfg.labelOffsetX = Number(document.getElementById('printLabelOffsetX')?.value) || 0;
+    cfg.labelOffsetY = Number(document.getElementById('printLabelOffsetY')?.value) || 0;
+    cfg.kitchenCopies = Math.max(1, Number(document.getElementById('printKitchenCopies')?.value) || 1);
+  }
+
+  document.getElementById('previewReceiptPrintBtn')?.addEventListener('click', function() {
+    applyFormToConfig();
+    previewInModal(getReceiptHtml(buildPreviewOrder(), 'customer'));
+  });
+  document.getElementById('previewKitchenPrintBtn')?.addEventListener('click', function() {
+    applyFormToConfig();
+    previewInModal(getReceiptHtml(buildPreviewOrder(), 'kitchen'));
+  });
+  document.getElementById('previewLabelPrintBtn')?.addEventListener('click', function() {
+    applyFormToConfig();
+    previewInModal(getLabelHtml(buildPreviewOrder()));
+  });
 
   document.getElementById('previewReceiptPrintBtn')?.addEventListener('click', function() {
     previewInModal(getReceiptHtml(buildPreviewOrder(), 'customer'));
