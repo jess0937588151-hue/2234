@@ -277,3 +277,291 @@ export function getLabelHtml(order){
       if(fields.itemNote && it.note) lines.push(`<div class="small">備註：${escapeHtml(it.note)}</div>`);
     }
     return `<div class="label">${lines.join('')}</div>`;
+  }).join('');
+
+  const css = `
+    <style>
+      @page { size: ${w}mm ${h}mm; margin: 0; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        font-family: "PingFang TC","Microsoft JhengHei","Heiti TC", sans-serif;
+        font-size: ${fontSize}px;
+        color: #000;
+        margin-left: ${offX}mm;
+        margin-top: ${offY}mm;
+      }
+      .label {
+        width: ${w}mm; height: ${h}mm; padding: 2mm; box-sizing: border-box;
+        page-break-after: always; overflow: hidden;
+      }
+      .center { text-align: center; }
+      .bold { font-weight: 700; }
+      .big-item { font-size: ${fontSize + 2}px; }
+      .small { font-size: ${fontSize - 2}px; }
+      div { line-height: 1.4; word-break: break-all; }
+    </style>
+  `;
+
+  return `<!doctype html><html><head><meta charset="utf-8">${css}</head><body>${labels}</body></html>`;
+}
+
+// ============================================================
+// 印表機判斷 / 路由
+// ============================================================
+function hasSunmi(){
+  return !!(window.SunmiPrinter && typeof window.SunmiPrinter.isPrinterReady === 'function');
+}
+function isSunmiReady(){
+  try { return hasSunmi() && window.SunmiPrinter.isPrinterReady(); }
+  catch(e) { return false; }
+}
+function isBtReady(){
+  try { return hasSunmi() && typeof window.SunmiPrinter.isBtPrinterConnected === 'function' && window.SunmiPrinter.isBtPrinterConnected(); }
+  catch(e) { return false; }
+}
+function isNetReady(){
+  try { return hasSunmi() && typeof window.SunmiPrinter.isNetPrinterConnected === 'function' && window.SunmiPrinter.isNetPrinterConnected(); }
+  catch(e) { return false; }
+}
+
+// ============================================================
+// 把訂單轉成 APK Bridge 用的 JSON（含 fields 與 maskedPhone）
+// ============================================================
+function buildBridgePayload(order, mode){
+  const cfg = getPrintSettings();
+  const fields = cfg.fields[mode === 'kitchen' ? 'kitchen' : (mode === 'label' ? 'label' : 'receipt')];
+  return {
+    mode,                                     // 'receipt' | 'kitchen' | 'label'
+    fields,                                   // 欄位勾選
+    openDrawer: !!cfg.openDrawer && mode === 'receipt',
+    shopName: cfg.storeName || '',
+    shopPhone: cfg.storePhone || '',
+    shopAddress: cfg.storeAddress || '',
+    footer: cfg.receiptFooter || '',
+    orderNumber: String(order.orderNo || order.id || ''),
+    dateTime: fmtDate(order.createdAt),
+    orderType: order.orderType || '',
+    tableNo: order.tableNo || '',
+    paymentMethod: order.paymentMethod || '',
+    customerName: order.customerName || '',
+    customerPhoneMasked: maskCustomerPhone(order.customerPhone),    // ← 已遮罩
+    customerNote: order.customerNote || '',
+    items: (order.items || []).map(it => ({
+      name: it.name || '',
+      qty: Number(it.qty || 0),
+      basePrice: Number(it.basePrice || 0),
+      extraPrice: Number(it.extraPrice || 0),
+      price: (Number(it.basePrice || 0) + Number(it.extraPrice || 0)) * Number(it.qty || 0),
+      options: buildSelectionText(it),
+      note: it.note || ''
+    })),
+    subtotal: Number(order.subtotal || 0),
+    discountAmount: Number(order.discountAmount || 0),
+    total: Number(order.total || 0)
+  };
+}
+
+// ============================================================
+// 瀏覽器 fallback：用隱藏 iframe 列印
+// ============================================================
+function browserPrintHtml(html){
+  return new Promise(resolve => {
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentDocument || iframe.contentWindow.document;
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    iframe.onload = () => {
+      try { iframe.contentWindow.focus(); iframe.contentWindow.print(); }
+      catch(e) { console.error('browserPrint failed:', e); }
+      setTimeout(() => {
+        try { document.body.removeChild(iframe); } catch(e){}
+        resolve(true);
+      }, 1500);
+    };
+    // 某些 WebView 不會觸發 onload
+    setTimeout(() => {
+      try { iframe.contentWindow.focus(); iframe.contentWindow.print(); } catch(e){}
+    }, 500);
+  });
+}
+
+// ============================================================
+// 主路由：顧客單
+// ============================================================
+export async function printOrderReceipt(order, mode){
+  // mode: 'customer'（顧客單）或 'kitchen'（這邊只接 customer，廚房用 printKitchenCopies）
+  const realMode = mode === 'kitchen' ? 'kitchen' : 'receipt';
+  const payload = buildBridgePayload(order, realMode);
+  const html = getReceiptHtml(order, realMode === 'kitchen' ? 'kitchen' : 'customer');
+
+  // 1) Sunmi 內建
+  if(isSunmiReady() && typeof window.SunmiPrinter.printReceiptWithFields === 'function'){
+    try {
+      const ok = window.SunmiPrinter.printReceiptWithFields(JSON.stringify(payload));
+      if(ok) return { route: 'sunmi', ok: true };
+    } catch(e) { console.warn('Sunmi print 失敗，改用其他路徑：', e); }
+  }
+  // 1b) 沒有新版 bridge 方法，退回舊版 printPosReceipt
+  if(isSunmiReady() && typeof window.SunmiPrinter.printPosReceipt === 'function'){
+    try {
+      const ok = window.SunmiPrinter.printPosReceipt(JSON.stringify(payload));
+      if(ok) return { route: 'sunmi-legacy', ok: true };
+    } catch(e) { console.warn('Sunmi legacy print 失敗：', e); }
+  }
+
+  // 2) 藍牙
+  if(isBtReady() && typeof window.SunmiPrinter.btPrintReceiptWithFields === 'function'){
+    try {
+      const ok = window.SunmiPrinter.btPrintReceiptWithFields(JSON.stringify(payload));
+      if(ok) return { route: 'bluetooth', ok: true };
+    } catch(e) { console.warn('Bluetooth print 失敗：', e); }
+  }
+  if(isBtReady() && typeof window.SunmiPrinter.btPrintReceipt === 'function'){
+    try {
+      const ok = window.SunmiPrinter.btPrintReceipt(JSON.stringify(payload));
+      if(ok) return { route: 'bluetooth-legacy', ok: true };
+    } catch(e) { console.warn('Bluetooth legacy print 失敗：', e); }
+  }
+
+  // 3) 網路
+  if(isNetReady() && typeof window.SunmiPrinter.netPrintReceiptWithFields === 'function'){
+    try {
+      const ok = window.SunmiPrinter.netPrintReceiptWithFields(JSON.stringify(payload));
+      if(ok) return { route: 'network', ok: true };
+    } catch(e) { console.warn('Network print 失敗：', e); }
+  }
+  if(isNetReady() && typeof window.SunmiPrinter.netPrintReceipt === 'function'){
+    try {
+      const ok = window.SunmiPrinter.netPrintReceipt(JSON.stringify(payload));
+      if(ok) return { route: 'network-legacy', ok: true };
+    } catch(e) { console.warn('Network legacy print 失敗：', e); }
+  }
+
+  // 4) 瀏覽器 fallback
+  await browserPrintHtml(html);
+  return { route: 'browser', ok: true };
+}
+
+// ============================================================
+// 主路由：廚房單（依設定份數列印）
+// ============================================================
+export async function printKitchenCopies(order){
+  const cfg = getPrintSettings();
+  const copies = Math.max(1, Number(cfg.kitchenCopies || 1));
+  const payload = buildBridgePayload(order, 'kitchen');
+  const html = getReceiptHtml(order, 'kitchen');
+
+  for(let i = 0; i < copies; i++){
+    // 1) Sunmi
+    if(isSunmiReady() && typeof window.SunmiPrinter.printKitchenWithFields === 'function'){
+      try { window.SunmiPrinter.printKitchenWithFields(JSON.stringify(payload)); continue; }
+      catch(e) { console.warn('Sunmi kitchen 失敗：', e); }
+    }
+    if(isSunmiReady() && typeof window.SunmiPrinter.printKitchenReceipt === 'function'){
+      try { window.SunmiPrinter.printKitchenReceipt(JSON.stringify(payload)); continue; }
+      catch(e) {}
+    }
+    // 2) 藍牙
+    if(isBtReady() && typeof window.SunmiPrinter.btPrintKitchenWithFields === 'function'){
+      try { window.SunmiPrinter.btPrintKitchenWithFields(JSON.stringify(payload)); continue; }
+      catch(e) {}
+    }
+    if(isBtReady() && typeof window.SunmiPrinter.btPrintKitchen === 'function'){
+      try { window.SunmiPrinter.btPrintKitchen(JSON.stringify(payload)); continue; }
+      catch(e) {}
+    }
+    // 3) 網路
+    if(isNetReady() && typeof window.SunmiPrinter.netPrintKitchenWithFields === 'function'){
+      try { window.SunmiPrinter.netPrintKitchenWithFields(JSON.stringify(payload)); continue; }
+      catch(e) {}
+    }
+    if(isNetReady() && typeof window.SunmiPrinter.netPrintKitchen === 'function'){
+      try { window.SunmiPrinter.netPrintKitchen(JSON.stringify(payload)); continue; }
+      catch(e) {}
+    }
+    // 4) 瀏覽器
+    await browserPrintHtml(html);
+  }
+  return { ok: true, copies };
+}
+
+// ============================================================
+// 主路由：標籤
+// ============================================================
+export async function printOrderLabels(order){
+  const payload = buildBridgePayload(order, 'label');
+  const html = getLabelHtml(order);
+
+  if(isSunmiReady() && typeof window.SunmiPrinter.printLabelWithFields === 'function'){
+    try {
+      const ok = window.SunmiPrinter.printLabelWithFields(JSON.stringify(payload));
+      if(ok) return { route: 'sunmi', ok: true };
+    } catch(e) { console.warn('Sunmi label 失敗：', e); }
+  }
+  if(isBtReady() && typeof window.SunmiPrinter.btPrintLabelWithFields === 'function'){
+    try {
+      const ok = window.SunmiPrinter.btPrintLabelWithFields(JSON.stringify(payload));
+      if(ok) return { route: 'bluetooth', ok: true };
+    } catch(e) { console.warn('Bluetooth label 失敗：', e); }
+  }
+  if(isNetReady() && typeof window.SunmiPrinter.netPrintLabelWithFields === 'function'){
+    try {
+      const ok = window.SunmiPrinter.netPrintLabelWithFields(JSON.stringify(payload));
+      if(ok) return { route: 'network', ok: true };
+    } catch(e) { console.warn('Network label 失敗：', e); }
+  }
+
+  // 標籤無 legacy 對應，直接 fallback 瀏覽器
+  await browserPrintHtml(html);
+  return { route: 'browser', ok: true };
+}
+
+// ============================================================
+// 錢箱
+// ============================================================
+export function openCashDrawer(){
+  if(isSunmiReady() && typeof window.SunmiPrinter.openCashDrawer === 'function'){
+    try { return window.SunmiPrinter.openCashDrawer(); }
+    catch(e) { return false; }
+  }
+  if(isBtReady() && typeof window.SunmiPrinter.btOpenCashDrawer === 'function'){
+    try { return window.SunmiPrinter.btOpenCashDrawer(); }
+    catch(e) { return false; }
+  }
+  if(isNetReady() && typeof window.SunmiPrinter.netOpenCashDrawer === 'function'){
+    try { return window.SunmiPrinter.netOpenCashDrawer(); }
+    catch(e) { return false; }
+  }
+  return false;
+}
+
+// ============================================================
+// 預覽用：依購物車組假訂單
+// ============================================================
+export function buildCartPreviewOrder(){
+  const items = Array.isArray(state.cart) ? state.cart : [];
+  const subtotal = items.reduce((s, it) => s + (Number(it.basePrice || 0) + Number(it.extraPrice || 0)) * Number(it.qty || 0), 0);
+  return {
+    orderNo: 'PREVIEW-' + Date.now(),
+    createdAt: new Date().toISOString(),
+    orderType: '內用',
+    tableNo: '',
+    paymentMethod: '現金',
+    customerName: '範例顧客',
+    customerPhone: '0912345678',
+    items,
+    subtotal,
+    discountAmount: 0,
+    total: subtotal
+  };
+}
