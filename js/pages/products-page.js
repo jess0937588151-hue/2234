@@ -1,4 +1,10 @@
-/* 中文備註：商品管理頁程式。此版已移除 OCR，改為 Excel 菜單匯入。 */
+/* 中文備註：商品管理頁程式（v2.1.25 Hotfix）。
+ * 此版修補：
+ *   1. 對所有可能不存在的元素改用 ?.（可選鏈），避免 initProductsPage 中斷
+ *   2. renderProductModulesEditor 加上 state.editModules 空值檢查
+ *   3. renderCategoryList / renderModuleSelect / renderModuleLibrary / renderProductsTable
+ *      / renderPendingMenuList 全部 null guard
+ */
 
 import { state, persistAll } from '../core/store.js';
 import { escapeHtml, escapeAttr, money, id, deepCopy } from '../core/utils.js';
@@ -19,7 +25,7 @@ function renderProductImagePreview(imageData){
     preview.innerHTML = `<img src="${escapeAttr(imageData)}" alt="商品圖片預覽" class="product-form-image">`;
     preview.classList.remove('muted');
   }else{
-    preview.textContent = '尚未上傳圖片（上傳後會自動裁成正方形並壓縮）';
+    preview.textContent = '尚未上傳圖片';
     preview.classList.add('muted');
   }
 }
@@ -45,18 +51,15 @@ function loadImageFromDataURL(dataUrl){
 async function optimizeProductImage(file){
   const rawDataUrl = await readImageFileAsDataURL(file);
   const image = await loadImageFromDataURL(rawDataUrl);
-
   const sourceSize = Math.min(image.width, image.height);
   const sx = Math.max(0, Math.floor((image.width - sourceSize) / 2));
   const sy = Math.max(0, Math.floor((image.height - sourceSize) / 2));
-
   const targetSize = 900;
   const canvas = document.createElement('canvas');
   canvas.width = targetSize;
   canvas.height = targetSize;
   const ctx = canvas.getContext('2d');
   ctx.drawImage(image, sx, sy, sourceSize, sourceSize, 0, 0, targetSize, targetSize);
-
   return canvas.toDataURL('image/jpeg', 0.82);
 }
 
@@ -71,6 +74,7 @@ function getProductFormElements(){
 }
 function validateProductForm(showMessage = false){
   const { nameInput, priceInput, nameError, priceError, saveBtn } = getProductFormElements();
+  if(!nameInput || !priceInput) return { valid: false, nameOk: false, priceOk: false };
   const name = nameInput.value.trim();
   const rawPrice = priceInput.value;
   const price = Number(rawPrice);
@@ -78,8 +82,8 @@ function validateProductForm(showMessage = false){
   const priceOk = rawPrice !== '' && !Number.isNaN(price) && price > 0;
   nameInput.classList.toggle('input-error', !nameOk && showMessage);
   priceInput.classList.toggle('input-error', !priceOk && showMessage);
-  nameError.classList.toggle('hidden', nameOk || !showMessage);
-  priceError.classList.toggle('hidden', priceOk || !showMessage);
+  if(nameError) nameError.classList.toggle('hidden', nameOk || !showMessage);
+  if(priceError) priceError.classList.toggle('hidden', priceOk || !showMessage);
   if(saveBtn){
     saveBtn.disabled = !(nameOk && priceOk);
     saveBtn.style.opacity = nameOk && priceOk ? '1' : '0.5';
@@ -88,12 +92,11 @@ function validateProductForm(showMessage = false){
 }
 function focusFirstInvalidField(result){
   const { nameInput, priceInput } = getProductFormElements();
-  if(!result.nameOk) return nameInput.focus();
-  if(!result.priceOk) return priceInput.focus();
+  if(!result.nameOk && nameInput) return nameInput.focus();
+  if(!result.priceOk && priceInput) return priceInput.focus();
 }
 
-
-/* 中文備註：以下為 Excel 匯入工具。Excel 匯入後先進待處理菜單，確認後才正式加入菜單。 */
+// ── Excel 工具 ──
 function createExcelTemplateRows(){
   return [
     { 商品名稱:'紅茶', 價格:30, 分類:'飲料', 狀態:'啟用', 商品別名:'古早味紅茶' },
@@ -101,7 +104,6 @@ function createExcelTemplateRows(){
     { 商品名稱:'雞排', 價格:80, 分類:'炸物', 狀態:'啟用', 商品別名:'大雞排' }
   ];
 }
-
 function buildWorkbookFromRows(rows){
   if(!window.XLSX) throw new Error('XLSX library not loaded');
   const workbook = window.XLSX.utils.book_new();
@@ -109,14 +111,10 @@ function buildWorkbookFromRows(rows){
   window.XLSX.utils.book_append_sheet(workbook, worksheet, '菜單');
   return workbook;
 }
-
 function workbookToBlob(workbook){
   const buffer = window.XLSX.write(workbook, { bookType:'xlsx', type:'array' });
-  return new Blob([buffer], {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-  });
+  return new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
-
 function downloadBlob(blob, filename){
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
@@ -125,7 +123,6 @@ function downloadBlob(blob, filename){
   anchor.click();
   setTimeout(()=> URL.revokeObjectURL(url), 1200);
 }
-
 function normalizeImportedRow(row){
   const name = String(row['商品名稱'] ?? row['名稱'] ?? row['name'] ?? row['Name'] ?? '').trim();
   const price = Number(row['價格'] ?? row['售價'] ?? row['price'] ?? row['Price'] ?? 0);
@@ -135,80 +132,66 @@ function normalizeImportedRow(row){
   const enabled = !['false', '停用', '0', '關閉'].includes(enabledText);
   return { name, price, category, aliases, enabled };
 }
-
 function importExcelRowsToPending(rows){
   const imported = [];
   rows.forEach(raw => {
     const item = normalizeImportedRow(raw);
     if(!item.name) return;
     if(!(item.price > 0)) return;
-
     const exists = state.pendingProducts.some(p => p.name === item.name && Number(p.price) === Number(item.price))
       || state.products.some(p => p.name === item.name && Number(p.price) === Number(item.price));
     if(exists) return;
-
     imported.push({
-      id: id(),
-      name: item.name,
-      price: item.price,
-      category: item.category || '未分類',
-      enabled: item.enabled,
-      aliases: item.aliases,
-      modules: [],
-      sortOrder: state.products.length + imported.length,
-      status: 'pending'
+      id: id(), name: item.name, price: item.price,
+      category: item.category || '未分類', enabled: item.enabled,
+      aliases: item.aliases, modules: [],
+      sortOrder: state.products.length + imported.length, status: 'pending'
     });
   });
-
-  if(!imported.length){
-    alert('Excel 沒有可匯入的新資料，請檢查欄位名稱或內容。');
-    return;
-  }
-
+  if(!imported.length){ alert('Excel 沒有可匯入的新資料'); return; }
   state.pendingProducts.unshift(...imported);
   persistAll();
   window.refreshAllViews();
   alert(`已匯入 ${imported.length} 筆到待處理菜單`);
 }
-
 async function importExcelFile(file){
-  if(!window.XLSX){
-    alert('Excel 套件尚未載入，請重新整理後再試。');
-    return;
-  }
+  if(!window.XLSX){ alert('Excel 套件尚未載入，請重新整理'); return; }
   const arrayBuffer = await file.arrayBuffer();
   const workbook = window.XLSX.read(arrayBuffer, { type:'array' });
   const firstSheetName = workbook.SheetNames[0];
-  if(!firstSheetName){
-    alert('Excel 內沒有工作表。');
-    return;
-  }
+  if(!firstSheetName){ alert('Excel 內沒有工作表'); return; }
   const worksheet = workbook.Sheets[firstSheetName];
   const rows = window.XLSX.utils.sheet_to_json(worksheet, { defval:'' });
   importExcelRowsToPending(rows);
 }
 
+// ============================================================
+// 渲染函式（全部 null guard）
+// ============================================================
 export function renderCategoryOptions(){
   const sel = document.getElementById('productCategory');
+  if(!sel) return;
   const current = sel.value;
-  sel.innerHTML = state.categories.map(c=> `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join('');
-  if(state.categories.includes(current)) sel.value = current;
+  sel.innerHTML = (state.categories || []).map(c=> `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join('');
+  if((state.categories || []).includes(current)) sel.value = current;
 }
+
 export function renderCategoryList(){
   const wrap = document.getElementById('categoryList');
-  const uncategorized = state.products.filter(p => !p.category || p.category === '未分類');
+  if(!wrap) return;
+  const uncategorized = (state.products || []).filter(p => !p.category || p.category === '未分類');
   wrap.innerHTML = '';
   const uncatCard = document.createElement('div');
   uncatCard.className = 'entity-card warning';
   uncatCard.innerHTML = `<strong>未分類</strong><div class="meta">${uncategorized.length} 筆商品</div>`;
   wrap.appendChild(uncatCard);
 
-  state.categories.filter(cat => cat !== '未分類').forEach(cat=>{
-    const count = state.products.filter(p=>p.category===cat).length;
+  (state.categories || []).filter(cat => cat !== '未分類').forEach(cat=>{
+    const count = (state.products || []).filter(p=>p.category===cat).length;
     const card = document.createElement('div');
     card.className = 'entity-card';
     card.innerHTML = `<strong>${escapeHtml(cat)}</strong><div class="meta">${count} 筆商品</div><div class="card-actions"><button class="manage">管理</button><button class="rename">改名</button><button class="delete">刪除</button></div>`;
-    card.querySelector('.manage').onclick = ()=> openCategoryManage(cat);
+    card.querySelector('.manage').onclick = ()=> openCategoryManage && openCategoryManage(cat);
     card.querySelector('.rename').onclick = ()=>{
       const nv = prompt('輸入新分類名稱', cat);
       if(!nv || nv.trim()===cat) return;
@@ -221,20 +204,23 @@ export function renderCategoryList(){
       if(!confirm(`確定刪除分類「${cat}」？`)) return;
       state.categories = state.categories.filter(c=>c!==cat);
       state.products.forEach(p=>{ if(p.category===cat) p.category = '未分類'; });
-      if(state.settings.selectedCategory===cat) state.settings.selectedCategory='全部';
+      if(state.settings && state.settings.selectedCategory===cat) state.settings.selectedCategory='全部';
       persistAll(); window.refreshAllViews();
     };
     wrap.appendChild(card);
   });
-
 }
+
 export function renderModuleSelect(){
   const sel = document.getElementById('moduleSelect');
-  sel.innerHTML = state.modules.map(m=> `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+  if(!sel) return;
+  sel.innerHTML = (state.modules || []).map(m=> `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
 }
+
 function renderModuleEditorOptions(optWrap, mod, expandModuleId){
+  if(!optWrap) return;
   optWrap.innerHTML = '';
-  mod.options.forEach((opt, index)=>{
+  (mod.options || []).forEach((opt, index)=>{
     const row = document.createElement('div');
     row.className = 'option-edit-row';
     row.innerHTML = `<input value="${escapeAttr(opt.name)}" placeholder="選項名稱"><input type="number" min="0" value="${Number(opt.price||0)}" placeholder="加價"><button type="button" class="secondary-btn small-btn">${opt.enabled!==false ? '啟用中' : '已停用'}</button><button type="button" class="danger-btn small-btn">刪除</button>`;
@@ -246,16 +232,18 @@ function renderModuleEditorOptions(optWrap, mod, expandModuleId){
     optWrap.appendChild(row);
   });
 }
+
 export function renderModuleLibrary(expandModuleId=''){
   const wrap = document.getElementById('moduleLibraryList');
+  if(!wrap) return;
   wrap.innerHTML = '';
-  state.modules.forEach(mod=>{
-    const usedCount = state.products.filter(p=> (p.modules||[]).some(a=>a.moduleId===mod.id)).length;
+  (state.modules || []).forEach(mod=>{
+    const usedCount = (state.products || []).filter(p=> (p.modules||[]).some(a=>a.moduleId===mod.id)).length;
     const isOpen = expandModuleId === mod.id;
     const card = document.createElement('div');
     card.className = 'module-card';
     card.innerHTML = `<strong>${escapeHtml(mod.name)}</strong><div class="meta">${mod.selection==='multi'?'多選':'單選'} ・ ${mod.required?'必選':'非必選'} ・ ${usedCount} 商品</div><div class="card-actions"><button class="apply">套用</button><button class="edit">${isOpen?'收合':'編輯'}</button><button class="delete">刪除</button></div>${isOpen ? '<div class="module-expand"></div>' : ''}`;
-    card.querySelector('.apply').onclick = ()=> openModuleManage(mod.id);
+    card.querySelector('.apply').onclick = ()=> openModuleManage && openModuleManage(mod.id);
     card.querySelector('.edit').onclick = ()=> renderModuleLibrary(isOpen ? '' : mod.id);
     card.querySelector('.delete').onclick = ()=>{
       if(!confirm(`確定刪除模組「${mod.name}」？`)) return;
@@ -265,7 +253,7 @@ export function renderModuleLibrary(expandModuleId=''){
     };
     if(isOpen){
       const expandDiv = card.querySelector('.module-expand');
-      expandDiv.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label style="font-size:12px">模組名稱</label><input class="module-name" value="${escapeAttr(mod.name)}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:8px"></div><div><label style="font-size:12px">規則</label><select class="module-selection" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:8px"><option value="single" ${mod.selection==='single'?'selected':''}>單選</option><option value="multi" ${mod.selection==='multi'?'selected':''}>多選</option></select></div></div><div class="switch-row"><span style="font-size:12px">必選</span><button type="button" class="switch ${mod.required?'on':''}">${mod.required?'開':'關'}</button></div><div class="module-options-list"></div><button type="button" class="secondary-btn small-btn" style="margin-top:6px;font-size:11px">新增子選項</button>`;
+      expandDiv.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label style="font-size:12px">模組名稱</label><input class="module-name" value="${escapeAttr(mod.name)}" style="width:100%;padding:6px;border:1px solid #e2e8f0;border-radius:8px"></div><div><label style="font-size:12px">規則</label><select class="module-selection" style="width:100%;padding:6px;border:1px solid #e2e8f0;border-radius:8px"><option value="single" ${mod.selection==='single'?'selected':''}>單選</option><option value="multi" ${mod.selection==='multi'?'selected':''}>多選</option></select></div></div><div class="switch-row"><span style="font-size:12px">必選</span><button type="button" class="switch ${mod.required?'on':''}">${mod.required?'開':'關'}</button></div><div class="module-options-list"></div><button type="button" class="secondary-btn small-btn" style="margin-top:6px;font-size:11px">新增子選項</button>`;
       const nameInput = expandDiv.querySelector('.module-name');
       const selectionSel = expandDiv.querySelector('.module-selection');
       const switchBtn = expandDiv.querySelector('.switch');
@@ -277,14 +265,17 @@ export function renderModuleLibrary(expandModuleId=''){
     }
     wrap.appendChild(card);
   });
-
 }
+
 export function renderProductModulesEditor(){
   const wrap = document.getElementById('productModulesEditor');
+  if(!wrap) return;
+  // 確保 state.editModules 一定是陣列
+  if(!Array.isArray(state.editModules)) state.editModules = [];
   wrap.innerHTML = '';
-  if(!state.editModules.length) return wrap.innerHTML = '<div class="muted">尚未套用口味模組</div>';
+  if(!state.editModules.length){ wrap.innerHTML = '<div class="muted">尚未套用口味模組</div>'; return; }
   state.editModules.forEach((att, index)=>{
-    const mod = state.modules.find(m=>m.id===att.moduleId);
+    const mod = (state.modules || []).find(m=>m.id===att.moduleId);
     if(!mod) return;
     const effectiveRequired = att.requiredOverride === null ? mod.required : att.requiredOverride;
     const block = document.createElement('div');
@@ -296,8 +287,9 @@ export function renderProductModulesEditor(){
     wrap.appendChild(block);
   });
 }
+
 function moveProduct(productId, direction){
-  const list = [...state.products].sort((a,b)=>a.sortOrder-b.sortOrder);
+  const list = [...(state.products || [])].sort((a,b)=>a.sortOrder-b.sortOrder);
   const idx = list.findIndex(p=>p.id===productId);
   if(idx < 0) return;
   const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
@@ -305,28 +297,15 @@ function moveProduct(productId, direction){
   const a = list[idx], b = list[swapIdx], temp = a.sortOrder;
   a.sortOrder = b.sortOrder; b.sortOrder = temp;
   state.products.sort((x,y)=>x.sortOrder-y.sortOrder);
-  persistAll(); renderProductsTable(); if(window.refreshPublicProducts) window.refreshPublicProducts();
+  persistAll(); renderProductsTable();
+  if(window.refreshPublicProducts) window.refreshPublicProducts();
 }
-function saveInlinePrice(product, value){
-  const price = Number(value || 0);
-  if(Number.isNaN(price) || price < 0) return;
-  product.price = price;
-  persistAll(); if(window.refreshPublicProducts) window.refreshPublicProducts();
-}
-function toggleInlineModule(product, moduleId, checked){
-  const has = (product.modules||[]).some(m=>m.moduleId===moduleId);
-  if(checked && !has) product.modules = [...(product.modules||[]), {moduleId, requiredOverride:null}];
-  if(!checked && has) product.modules = (product.modules||[]).filter(m=>m.moduleId!==moduleId);
-  persistAll(); if(window.refreshPublicProducts) window.refreshPublicProducts();
-}
-function productRowHtml(p, index, total, expanded){
-  const modNames = getProductModuleNames(p);
-  return `<div class="product-card-row ${p.enabled===false ? 'disabled' : ''}"><div class="left">${p.image ? `<img class="product-list-thumb" src="${escapeAttr(p.image)}" alt="${escapeAttr(p.name)}">` : `<div class="drag-icon">≡</div>`}</div><div class="center"><div class="title">${escapeHtml(p.name)}<span class="tag">${escapeHtml(p.category || '未分類')}</span><span class="status ${p.enabled!==false ? 'on' : 'off'}">${p.enabled!==false ? '啟用中' : '停用中'}</span></div><div class="inline-edit-row"><label class="inline-label">價格</label><input class="inline-price" type="number" min="0" value="${Number(p.price||0)}"></div><div class="modules">${modNames.length ? modNames.map(n=>`<span class="chip">${escapeHtml(n)}</span>`).join('') : '<span class="muted">無模組</span>'}</div><button type="button" class="inline-module-toggle">${expanded ? '收合模組' : '編輯模組'}</button></div><div class="right"><button type="button" class="move-up" ${index===0?'disabled':''}>⬆</button><button type="button" class="move-down" ${index===total-1?'disabled':''}>⬇</button><button type="button" class="toggle">${p.enabled!==false ? '停用' : '啟用'}</button><button type="button" class="edit">編輯</button><button type="button" class="delete">刪除</button></div></div><div class="inline-module-panel ${expanded ? '' : 'hidden'}"><div class="inline-module-grid">${state.modules.map(mod => `<label class="inline-module-item"><input type="checkbox" data-module-id="${mod.id}" ${(p.modules||[]).some(m=>m.moduleId===mod.id) ? 'checked' : ''}><span>${escapeHtml(mod.name)}</span></label>`).join('')}</div></div>`;
-}
+
 export function renderPendingMenuList(){
   const wrap = document.getElementById('pendingMenuList');
+  if(!wrap) return;
   wrap.innerHTML = '';
-  if(!state.pendingProducts.length) return wrap.innerHTML = '<div class="muted">目前沒有待處理菜單</div>';
+  if(!(state.pendingProducts || []).length){ wrap.innerHTML = '<div class="muted">目前沒有待處理菜單</div>'; return; }
   state.pendingProducts.forEach(item=>{
     const row = document.createElement('div');
     row.className = 'pending-card';
@@ -349,9 +328,11 @@ export function renderPendingMenuList(){
     wrap.appendChild(row);
   });
 }
+
 export function renderProductsTable(){
-  state.products.sort((a,b)=>a.sortOrder-b.sortOrder);
+  (state.products || []).sort((a,b)=>a.sortOrder-b.sortOrder);
   const wrap = document.getElementById('productsTable');
+  if(!wrap) return;
   wrap.innerHTML = '';
   var syncBar = document.createElement('div');
   syncBar.style.cssText = 'grid-column:1/-1;margin-bottom:4px';
@@ -372,12 +353,12 @@ export function renderProductsTable(){
   };
   syncBar.appendChild(syncBtn);
   wrap.appendChild(syncBar);
-  if(!state.products.length) return wrap.innerHTML = '<div class="muted" style="grid-column:1/-1">尚無商品</div>';
+  if(!(state.products || []).length){ wrap.innerHTML += '<div class="muted" style="grid-column:1/-1">尚無商品</div>'; return; }
   state.products.forEach((p)=>{
     const card = document.createElement('div');
     card.className = 'product-card' + (p.enabled===false ? ' disabled' : '');
     const modNames = getProductModuleNames(p);
-       card.innerHTML = `${p.image ? `<img class="card-thumb" src="${escapeAttr(p.image)}">` : '<div class="card-thumb-placeholder">📷</div>'}
+    card.innerHTML = `${p.image ? `<img class="card-thumb" src="${escapeAttr(p.image)}">` : '<div class="card-thumb-placeholder">📷</div>'}
       <div class="card-name">${escapeHtml(p.name)}</div>
       <div class="price">${money(p.price)}</div>
       <div class="meta">${escapeHtml(p.category)}${modNames.length ? ' ・ ' + modNames.join('、') : ''}</div>
@@ -399,137 +380,198 @@ export function renderProductsTable(){
 }
 
 export function resetProductForm(){
-  document.getElementById('productId').value = '';
-  document.getElementById('productName').value = '';
-  document.getElementById('productPrice').value = '';
-  document.getElementById('productAliases').value = '';
-  document.getElementById('productImageData').value = '';
-  if(document.getElementById('productImageInput')) document.getElementById('productImageInput').value = '';
-  document.getElementById('productEnabled').value = 'true';
+  const idEl = document.getElementById('productId');
+  const nameEl = document.getElementById('productName');
+  const priceEl = document.getElementById('productPrice');
+  const aliasEl = document.getElementById('productAliases');
+  const imgDataEl = document.getElementById('productImageData');
+  const imgInputEl = document.getElementById('productImageInput');
+  const enabledEl = document.getElementById('productEnabled');
+  const catEl = document.getElementById('productCategory');
+  if(idEl) idEl.value = '';
+  if(nameEl) nameEl.value = '';
+  if(priceEl) priceEl.value = '';
+  if(aliasEl) aliasEl.value = '';
+  if(imgDataEl) imgDataEl.value = '';
+  if(imgInputEl) imgInputEl.value = '';
+  if(enabledEl) enabledEl.value = 'true';
   renderCategoryOptions();
-  document.getElementById('productCategory').value = '未分類';
+  if(catEl) catEl.value = '未分類';
   state.editModules = [];
   renderProductImagePreview('');
   renderProductModulesEditor();
   validateProductForm(false);
   bindFormButtonsState();
 }
+
 function bindFormButtonsState(){
-  const hasId = !!document.getElementById('productId').value;
+  const idEl = document.getElementById('productId');
   const btn = document.getElementById('deleteProductBtn');
+  if(!idEl || !btn) return;
+  const hasId = !!idEl.value;
   btn.disabled = !hasId;
   btn.style.opacity = hasId ? '1' : '0.5';
 }
+
 function openProductForm(product){
-  document.getElementById('productId').value = product.id;
+  const idEl = document.getElementById('productId');
+  if(!idEl) return;
+  idEl.value = product.id;
   document.getElementById('productName').value = product.name;
   document.getElementById('productPrice').value = product.price;
   document.getElementById('productAliases').value = (product.aliases||[]).join(', ');
-  document.getElementById('productImageData').value = product.image || '';
-  if(document.getElementById('productImageInput')) document.getElementById('productImageInput').value = '';
+  const imgData = document.getElementById('productImageData');
+  if(imgData) imgData.value = product.image || '';
+  const imgInput = document.getElementById('productImageInput');
+  if(imgInput) imgInput.value = '';
   renderProductImagePreview(product.image || '');
   document.getElementById('productEnabled').value = String(product.enabled!==false);
   renderCategoryOptions();
   document.getElementById('productCategory').value = product.category || '未分類';
   state.editModules = deepCopy(product.modules||[]);
-  renderProductImagePreview('');
   renderProductModulesEditor();
   validateProductForm(false);
   bindFormButtonsState();
 }
+
 function openProductEditModal(product){
   const modal = document.getElementById('productEditModal');
   const title = document.getElementById('productEditModalTitle');
+  if(!modal) return;
   if(product){
-    title.textContent = '編輯商品';
+    if(title) title.textContent = '編輯商品';
     openProductForm(product);
   } else {
-    title.textContent = '新增商品';
+    if(title) title.textContent = '新增商品';
     resetProductForm();
   }
   modal.style.display = 'flex';
 }
 
 function closeProductEditModal(){
-  document.getElementById('productEditModal').style.display = 'none';
+  const modal = document.getElementById('productEditModal');
+  if(modal) modal.style.display = 'none';
   resetProductForm();
 }
 
+// ============================================================
+// 初始化（全部用 ?. 可選綁定，缺元素也不會炸）
+// ============================================================
 export function initProductsPage(){
-  /* 中文備註：商品管理頁新增三個 Excel 按鈕。這些功能只影響商品管理，不會影響其他頁面。 */
-  document.getElementById('addProductBtn').onclick = ()=> openProductEditModal(null);
-  document.getElementById('closeProductEditModal').onclick = closeProductEditModal;
-  document.getElementById('productEditModal').onclick = (e)=>{
+  document.getElementById('addProductBtn')?.addEventListener('click', ()=> openProductEditModal(null));
+  document.getElementById('closeProductEditModal')?.addEventListener('click', closeProductEditModal);
+  document.getElementById('productEditModal')?.addEventListener('click', (e)=>{
     if(e.target.id === 'productEditModal') closeProductEditModal();
-  };
+  });
 
-  document.getElementById('excelTemplateBtn').onclick = ()=>{
-    const workbook = buildWorkbookFromRows(createExcelTemplateRows());
-    const blob = workbookToBlob(workbook);
-    downloadBlob(blob, '菜單匯入範本.xlsx');
-  };
+  document.getElementById('excelTemplateBtn')?.addEventListener('click', ()=>{
+    try{
+      const workbook = buildWorkbookFromRows(createExcelTemplateRows());
+      const blob = workbookToBlob(workbook);
+      downloadBlob(blob, '菜單匯入範本.xlsx');
+    }catch(e){ alert('範本下載失敗：' + e.message); }
+  });
 
-  document.getElementById('excelImportInput').onchange = async (e)=>{
+  document.getElementById('excelImportBtn')?.addEventListener('click', ()=>{
+    document.getElementById('excelImportInput')?.click();
+  });
+
+  document.getElementById('excelImportInput')?.addEventListener('change', async (e)=>{
     const file = e.target.files && e.target.files[0];
     if(!file) return;
     await importExcelFile(file);
     e.target.value = '';
-  };
+  });
 
-  document.getElementById('addCategoryBtn').onclick = ()=>{ const input = document.getElementById('newCategoryInput'); const name = input.value.trim(); if(!name) return; if(state.categories.includes(name)) return alert('分類已存在'); state.categories.push(name); input.value = ''; persistAll(); window.refreshAllViews(); };
-  document.getElementById('addModuleBtn').onclick = ()=>{ const input = document.getElementById('newModuleInput'); const name = input.value.trim(); if(!name) return; state.modules.push({id:id(), name, selection:'single', required:true, options:[]}); input.value = ''; persistAll(); window.refreshAllViews(); };
-  document.getElementById('attachModuleBtn').onclick = ()=>{ const moduleId = document.getElementById('moduleSelect').value; if(!moduleId) return; if(state.editModules.some(m=>m.moduleId===moduleId)) return alert('此模組已加入'); state.editModules.push({moduleId, requiredOverride:null}); renderProductModulesEditor(); };
-  document.getElementById('removeProductImageBtn').onclick = ()=>{
-    document.getElementById('productImageData').value = '';
-    if(document.getElementById('productImageInput')) document.getElementById('productImageInput').value = '';
+  document.getElementById('addCategoryBtn')?.addEventListener('click', ()=>{
+    const input = document.getElementById('newCategoryInput'); if(!input) return;
+    const name = input.value.trim(); if(!name) return;
+    if(state.categories.includes(name)) return alert('分類已存在');
+    state.categories.push(name); input.value = ''; persistAll(); window.refreshAllViews();
+  });
+
+  document.getElementById('addModuleBtn')?.addEventListener('click', ()=>{
+    const input = document.getElementById('newModuleInput'); if(!input) return;
+    const name = input.value.trim(); if(!name) return;
+    state.modules.push({id:id(), name, selection:'single', required:true, options:[]});
+    input.value = ''; persistAll(); window.refreshAllViews();
+  });
+
+  document.getElementById('attachModuleBtn')?.addEventListener('click', ()=>{
+    const moduleId = document.getElementById('moduleSelect')?.value; if(!moduleId) return;
+    if(!Array.isArray(state.editModules)) state.editModules = [];
+    if(state.editModules.some(m=>m.moduleId===moduleId)) return alert('此模組已加入');
+    state.editModules.push({moduleId, requiredOverride:null});
+    renderProductModulesEditor();
+  });
+
+  document.getElementById('removeProductImageBtn')?.addEventListener('click', ()=>{
+    const imgData = document.getElementById('productImageData'); if(imgData) imgData.value = '';
+    const imgInput = document.getElementById('productImageInput'); if(imgInput) imgInput.value = '';
     renderProductImagePreview('');
-  };
-  document.getElementById('productImageInput').onchange = async (e)=>{
-    const file = e.target.files && e.target.files[0];
-    if(!file) return;
+  });
+
+  document.getElementById('productImageInput')?.addEventListener('change', async (e)=>{
+    const file = e.target.files && e.target.files[0]; if(!file) return;
     try{
       const dataUrl = await optimizeProductImage(file);
-      document.getElementById('productImageData').value = dataUrl;
+      const imgData = document.getElementById('productImageData');
+      if(imgData) imgData.value = dataUrl;
       renderProductImagePreview(dataUrl);
-    }catch(err){
-      alert('圖片處理失敗，請換一張圖片再試');
-    }
-  };
-  document.getElementById('deleteProductBtn').onclick = ()=>{ const pid = document.getElementById('productId').value; if(!pid) return; const product = state.products.find(p=>p.id===pid); if(!product) return; if(!confirm(`確定刪除商品「${product.name}」？`)) return; state.products = state.products.filter(p=>p.id!==pid); state.products.forEach((item, i)=> item.sortOrder = i); persistAll(); window.refreshAllViews(); resetProductForm(); };
+    }catch(err){ alert('圖片處理失敗，請換一張圖片再試'); }
+  });
+
+  document.getElementById('deleteProductBtn')?.addEventListener('click', ()=>{
+    const pid = document.getElementById('productId')?.value; if(!pid) return;
+    const product = state.products.find(p=>p.id===pid); if(!product) return;
+    if(!confirm(`確定刪除商品「${product.name}」？`)) return;
+    state.products = state.products.filter(p=>p.id!==pid);
+    state.products.forEach((item, i)=> item.sortOrder = i);
+    persistAll(); window.refreshAllViews(); resetProductForm();
+  });
+
   const { nameInput, priceInput } = getProductFormElements();
-  nameInput.addEventListener('input', ()=> validateProductForm(false));
-  priceInput.addEventListener('input', ()=> validateProductForm(false));
-  document.getElementById('productForm').onsubmit = (e)=>{
+  nameInput?.addEventListener('input', ()=> validateProductForm(false));
+  priceInput?.addEventListener('input', ()=> validateProductForm(false));
+
+  document.getElementById('productForm')?.addEventListener('submit', (e)=>{
     e.preventDefault();
     const validation = validateProductForm(true);
     if(!validation.valid){ focusFirstInvalidField(validation); return; }
+    const idEl = document.getElementById('productId');
     const product = {
-      id: document.getElementById('productId').value || id(),
+      id: idEl?.value || id(),
       name: document.getElementById('productName').value.trim(),
       price: Number(document.getElementById('productPrice').value || 0),
       category: document.getElementById('productCategory').value || '未分類',
       enabled: document.getElementById('productEnabled').value === 'true',
       aliases: document.getElementById('productAliases').value.split(',').map(s=>s.trim()).filter(Boolean),
-      image: document.getElementById('productImageData').value || '',
-      modules: deepCopy(state.editModules),
-      sortOrder: document.getElementById('productId').value ? (state.products.find(p=>p.id===document.getElementById('productId').value)?.sortOrder ?? state.products.length) : state.products.length,
+      image: document.getElementById('productImageData')?.value || '',
+      modules: deepCopy(state.editModules || []),
+      sortOrder: idEl?.value ? (state.products.find(p=>p.id===idEl.value)?.sortOrder ?? state.products.length) : state.products.length,
     };
     const idx = state.products.findIndex(p=>p.id===product.id);
     if(idx>=0) state.products[idx] = product;
     else state.products.push(product);
     state.products.sort((a,b)=>a.sortOrder-b.sortOrder).forEach((item, i)=> item.sortOrder = i);
-    persistAll(); window.refreshAllViews(); resetProductForm(); alert('商品已保存');closeProductEditModal();
-  };
-  document.getElementById('saveAllBtn').onclick = ()=>{ persistAll(); alert('已保存'); };
-  document.getElementById('closeCategoryManageModal').onclick = closeCategoryManage;
-  document.getElementById('cancelCategoryManageBtn').onclick = closeCategoryManage;
-  document.querySelector('#categoryManageModal .modal-backdrop').onclick = closeCategoryManage;
-  document.getElementById('categoryManageSearch').addEventListener('input', renderCategoryManage);
-  document.getElementById('saveCategoryManageBtn').onclick = ()=>{ saveCategoryManage(); persistAll(); window.refreshAllViews(); };
-  document.getElementById('closeModuleManageModal').onclick = closeModuleManage;
-  document.getElementById('cancelModuleManageBtn').onclick = closeModuleManage;
-  document.querySelector('#moduleManageModal .modal-backdrop').onclick = closeModuleManage;
-  document.getElementById('moduleManageSearch').addEventListener('input', renderModuleManage);
-  document.getElementById('saveModuleManageBtn').onclick = ()=>{ saveModuleManage(); persistAll(); window.refreshAllViews(); };
+    persistAll(); window.refreshAllViews(); resetProductForm();
+    alert('商品已保存');
+    closeProductEditModal();
+  });
+
+  document.getElementById('saveAllBtn')?.addEventListener('click', ()=>{ persistAll(); alert('已保存'); });
+
+  // 以下為舊版分類/模組管理 modal 的綁定（這些元素可能不存在於新版 HTML，全部用 ?.）
+  document.getElementById('closeCategoryManageModal')?.addEventListener('click', closeCategoryManage);
+  document.getElementById('cancelCategoryManageBtn')?.addEventListener('click', closeCategoryManage);
+  document.querySelector('#categoryManageModal .modal-backdrop')?.addEventListener('click', closeCategoryManage);
+  document.getElementById('categoryManageSearch')?.addEventListener('input', renderCategoryManage);
+  document.getElementById('saveCategoryManageBtn')?.addEventListener('click', ()=>{ saveCategoryManage(); persistAll(); window.refreshAllViews(); });
+  document.getElementById('closeModuleManageModal')?.addEventListener('click', closeModuleManage);
+  document.getElementById('cancelModuleManageBtn')?.addEventListener('click', closeModuleManage);
+  document.querySelector('#moduleManageModal .modal-backdrop')?.addEventListener('click', closeModuleManage);
+  document.getElementById('moduleManageSearch')?.addEventListener('input', renderModuleManage);
+  document.getElementById('saveModuleManageBtn')?.addEventListener('click', ()=>{ saveModuleManage(); persistAll(); window.refreshAllViews(); });
+
   resetProductForm();
 }
