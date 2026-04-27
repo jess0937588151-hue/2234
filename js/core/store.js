@@ -151,16 +151,18 @@ function buildDefaultState(){
     modules,
     products,
     pendingProducts: [],
-    cart: [],
+        cart: [],
     orders: [],
     onlineIncomingOrders: [],
     customers: {},                    // 新增：顧客主檔
     customerLookupRateLimit: {},      // 新增：自助查單節流（記憶體用，不持久化）
     editingOrderId: null,
     viewReportOrders: null,
+    editModules: [],                  // 修補：商品編輯時的暫存模組
     settings: {
       printConfig: JSON.parse(JSON.stringify(DEFAULT_PRINT_CONFIG)),
       discountType: 'amount',
+      selectedCategory: '全部',        // 修補：預設分類
       showProductImages: true,
       lastCleanupAt: '',              // 新增：90 天清理節流
       realtimeOrder: {
