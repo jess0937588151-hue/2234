@@ -69,6 +69,12 @@ window.addEventListener('unhandledrejection', (ev)=>{
   const msg = ev.reason && ev.reason.message ? ev.reason.message : String(ev.reason);
   showGlobalError(`Promise錯誤：${msg}`);
 });
+// 模組載入錯誤偵聽（Safari 對 module link error 不會冒泡到 window，只能在 script 元素抓）
+document.querySelectorAll('script[type="module"]').forEach(s => {
+  s.addEventListener('error', e => {
+    showGlobalError('模組載入失敗：' + (s.src || s.textContent.slice(0,50)));
+  });
+});
 
 // ============================================================
 // 導覽
