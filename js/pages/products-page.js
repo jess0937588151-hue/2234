@@ -1,21 +1,25 @@
-/* 中文備註：商品管理頁（Batch 06.10/5）。
- * 改採 2 欄版型；分類/模組卡點擊即彈出設定窗；商品列表獨立可捲。
+/* 中文備註：商品管理頁（Batch 06.10/5-fix2 - 適配字串陣列分類 + 名稱模組）。
+ * - state.categories 是字串陣列 ["未分類","主餐",...]
+ * - state.products[*].modules 是模組「名稱」字串陣列 ["辣度","灑粉"]
+ * - state.modules 是物件陣列 [{id,name,options}]
  */
 import { state, persistAll } from '../core/store.js';
-import { escapeHtml, money, rid } from '../core/utils.js';
+import { escapeHtml, money } from '../core/utils.js';
 import { openCategoryManage } from '../modules/product-category-manager.js';
 import { openModuleManage } from '../modules/product-module-manager.js';
+
+function rid(){ return Math.random().toString(36).slice(2,10); }
 
 /* ---- 渲染：分類清單 ---- */
 function renderCategoryList(){
   const wrap = document.getElementById('categoryList');
   if (!wrap) return;
   const cats = state.categories || [];
-  wrap.innerHTML = cats.length ? cats.map(c => {
-    const count = (state.products||[]).filter(p => p.category === c.name).length;
-    return `<div class="card" data-cid="${c.id}">
+  wrap.innerHTML = cats.length ? cats.map(name => {
+    const count = (state.products||[]).filter(p => p.category === name).length;
+    return `<div class="card" data-cname="${escapeHtml(name)}">
       <div>
-        <div class="card-title">${escapeHtml(c.name)}</div>
+        <div class="card-title">${escapeHtml(name)}</div>
         <div class="card-meta">${count} 項商品</div>
       </div>
       <div class="card-actions"><button class="btn small">設定</button></div>
@@ -24,8 +28,8 @@ function renderCategoryList(){
 
   wrap.querySelectorAll('.card').forEach(card=>{
     card.addEventListener('click', ()=>{
-      const cid = card.getAttribute('data-cid');
-      openCategoryManage(cid);
+      const cname = card.getAttribute('data-cname');
+      openCategoryManage(cname);
     });
   });
 }
@@ -36,8 +40,10 @@ function renderModuleLibrary(){
   if (!wrap) return;
   const mods = state.modules || [];
   wrap.innerHTML = mods.length ? mods.map(m => {
-    const cnt = (state.products||[]).filter(p => Array.isArray(p.modules) && p.modules.includes(m.id)).length;
-    const ruleTxt = (m.rule === 'multi' || m.multi) ? '複選' : '單選';
+    const cnt = (state.products||[]).filter(p =>
+      Array.isArray(p.modules) && p.modules.includes(m.name)
+    ).length;
+    const ruleTxt = (m.rule === 'multi' || m.multi || m.selection === 'multi') ? '複選' : '單選';
     const reqTxt = m.required ? '・必選' : '';
     return `<div class="card" data-mid="${m.id}">
       <div>
@@ -62,11 +68,11 @@ function renderProductTable(){
   if (!wrap) return;
   const term = (document.getElementById('productSearchTop')?.value || '').trim().toLowerCase();
   const list = (state.products||[]).filter(p => !term || (p.name||'').toLowerCase().includes(term));
-  document.getElementById('productCountLabel') && (document.getElementById('productCountLabel').textContent = `共 ${list.length} 項`);
+  const lbl = document.getElementById('productCountLabel');
+  if (lbl) lbl.textContent = `共 ${list.length} 項`;
   wrap.innerHTML = list.length ? list.map(p => {
-    const modNames = (p.modules||[])
-      .map(mid => (state.modules||[]).find(m => m.id === mid)?.name)
-      .filter(Boolean).join('、') || '—';
+    // p.modules 是名稱字串陣列
+    const modNames = (p.modules||[]).filter(Boolean).join('、') || '—';
     return `<div class="card" data-pid="${p.id}">
       <div style="flex:1">
         <div class="card-title">${escapeHtml(p.name||'(未命名)')} <span class="muted" style="font-weight:400">${money(p.price||0)}</span></div>
@@ -94,7 +100,7 @@ function renderProductTable(){
   });
 }
 
-/* ---- 商品新增/編輯（簡易彈窗） ---- */
+/* ---- 商品新增/編輯 ---- */
 const PRODUCT_MODAL_ID = '__productEditorDynamicModal';
 function ensureProductModal(){
   let el = document.getElementById(PRODUCT_MODAL_ID);
@@ -141,11 +147,13 @@ function openProductEditor(pid){
   el.querySelector(`#${PRODUCT_MODAL_ID}_name`).value = p.name||'';
   el.querySelector(`#${PRODUCT_MODAL_ID}_price`).value = Number(p.price)||0;
   const catSel = el.querySelector(`#${PRODUCT_MODAL_ID}_cat`);
-  catSel.innerHTML = (state.categories||[]).map(c => `<option value="${escapeHtml(c.name)}" ${c.name===(p.category||'未分類')?'selected':''}>${escapeHtml(c.name)}</option>`).join('');
+  catSel.innerHTML = (state.categories||[]).map(name =>
+    `<option value="${escapeHtml(name)}" ${name===(p.category||'未分類')?'selected':''}>${escapeHtml(name)}</option>`
+  ).join('');
   const modsWrap = el.querySelector(`#${PRODUCT_MODAL_ID}_mods`);
-  const cur = new Set(p.modules||[]);
+  const cur = new Set(p.modules||[]);  // p.modules 是名稱字串陣列
   modsWrap.innerHTML = (state.modules||[]).map(m =>
-    `<label class="product-pick-row"><input type="checkbox" value="${m.id}" ${cur.has(m.id)?'checked':''}> ${escapeHtml(m.name)}</label>`
+    `<label class="product-pick-row"><input type="checkbox" value="${escapeHtml(m.name)}" ${cur.has(m.name)?'checked':''}> ${escapeHtml(m.name)}</label>`
   ).join('') || '<div class="muted">尚未建立模組</div>';
   el.style.display = 'flex';
 }
@@ -157,13 +165,14 @@ function saveProductEditor(){
   if (!name){ alert('名稱不可空白'); return; }
   const price = Number(el.querySelector(`#${PRODUCT_MODAL_ID}_price`).value)||0;
   const category = el.querySelector(`#${PRODUCT_MODAL_ID}_cat`).value || '未分類';
+  // mods 存模組「名稱」字串
   const mods = Array.from(el.querySelectorAll(`#${PRODUCT_MODAL_ID}_mods input:checked`)).map(i=>i.value);
   if (editingPid){
     const p = state.products.find(x=>x.id===editingPid);
     if (p){ p.name=name; p.price=price; p.category=category; p.modules=mods; }
   } else {
     state.products = state.products || [];
-    state.products.push({ id: rid(), name, price, category, modules: mods });
+    state.products.push({ id: rid(), name, price, category, modules: mods, enabled:true, sortOrder:0, aliases:[], image:'' });
   }
   persistAll();
   el.style.display='none';
@@ -176,9 +185,9 @@ function addCategory(){
   if (!name) return;
   const trimmed = name.trim();
   if (!trimmed) return;
-  if ((state.categories||[]).some(c=>c.name===trimmed)){ alert('已存在相同分類'); return; }
+  if ((state.categories||[]).includes(trimmed)){ alert('已存在相同分類'); return; }
   state.categories = state.categories || [];
-  state.categories.push({ id: rid(), name: trimmed });
+  state.categories.push(trimmed);
   persistAll();
   refreshAll();
 }
@@ -189,12 +198,11 @@ function addModule(){
   if (!trimmed) return;
   if ((state.modules||[]).some(m=>m.name===trimmed)){ alert('已存在相同模組'); return; }
   state.modules = state.modules || [];
-  state.modules.push({ id: rid(), name: trimmed, rule:'single', required:false, options:[] });
+  const newMod = { id: rid(), name: trimmed, rule:'single', required:false, options:[] };
+  state.modules.push(newMod);
   persistAll();
   refreshAll();
-  // 直接打開設定窗
-  const last = state.modules[state.modules.length-1];
-  openModuleManage(last.id);
+  openModuleManage(newMod.id);
 }
 
 /* ---- 雲端 / Excel ---- */
@@ -235,15 +243,14 @@ export function initProductsPage(){
 
 export { renderCategoryList, renderModuleLibrary, renderProductTable, refreshAll };
 
-// === 兼容 app.js 舊 import 名稱（Batch 06.10/5-fix）===
+// === 兼容 app.js 舊 import 名稱 ===
 export { renderProductTable as renderProductsTable };
-export function renderCategoryOptions(){ /* 新版改用 modal 內 select，無需獨立函式 */ }
-export function renderModuleSelect(){ /* 新版改用 modal 內 checkbox，無需獨立函式 */ }
-export function renderProductModulesEditor(){ /* 新版改用商品編輯彈窗內的 checkbox */ }
+export function renderCategoryOptions(){}
+export function renderModuleSelect(){}
+export function renderProductModulesEditor(){}
 export function renderPendingMenuList(){
   const wrap = document.getElementById('pendingMenuList');
-  if (!wrap) return;
-  wrap.innerHTML = '';
+  if (wrap) wrap.innerHTML = '';
 }
 
 window.refreshProductsPage = refreshAll;
