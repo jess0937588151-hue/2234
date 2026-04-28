@@ -234,4 +234,16 @@ export function initProductsPage(){
 }
 
 export { renderCategoryList, renderModuleLibrary, renderProductTable, refreshAll };
+
+// === 兼容 app.js 舊 import 名稱（Batch 06.10/5-fix）===
+export { renderProductTable as renderProductsTable };
+export function renderCategoryOptions(){ /* 新版改用 modal 內 select，無需獨立函式 */ }
+export function renderModuleSelect(){ /* 新版改用 modal 內 checkbox，無需獨立函式 */ }
+export function renderProductModulesEditor(){ /* 新版改用商品編輯彈窗內的 checkbox */ }
+export function renderPendingMenuList(){
+  const wrap = document.getElementById('pendingMenuList');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+}
+
 window.refreshProductsPage = refreshAll;
