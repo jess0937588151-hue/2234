@@ -1,11 +1,11 @@
-/* 中文備註：分類管理動態彈窗（Batch 06.10/3）。
- * 點分類卡 → 彈出可改名/刪除/勾選商品的設定窗。
+/* 中文備註：分類管理動態彈窗（Batch 06.10/3-fix - 字串陣列版）。
+ * state.categories 是 ["未分類","主餐",...] 字串陣列，用 name 當 key。
  */
 import { state, persistAll } from '../core/store.js';
 import { escapeHtml } from '../core/utils.js';
 
 const MODAL_ID = '__categoryManageDynamicModal';
-let targetCatId = null;
+let targetCatName = null;
 let draftName = '';
 let draftSelected = new Set();
 
@@ -74,20 +74,18 @@ function selectAll(flag){
   renderCategoryManage();
 }
 
-export function openCategoryManage(categoryId){
-  const cat = (state.categories||[]).find(c=>c.id===categoryId);
-  if (!cat){ alert('找不到分類'); return; }
-  targetCatId = categoryId;
-  draftName = cat.name || '';
+export function openCategoryManage(categoryName){
+  if (!(state.categories||[]).includes(categoryName)){ alert('找不到分類'); return; }
+  targetCatName = categoryName;
+  draftName = categoryName;
   draftSelected = new Set(
-    (state.products||[]).filter(p => p.category === cat.name).map(p=>p.id)
+    (state.products||[]).filter(p => p.category === categoryName).map(p=>p.id)
   );
   const el = ensureModal();
-  el.querySelector(`#${MODAL_ID}_title`).textContent = `分類設定：${cat.name}`;
+  el.querySelector(`#${MODAL_ID}_title`).textContent = `分類設定：${categoryName}`;
   el.querySelector(`#${MODAL_ID}_name`).value = draftName;
   el.querySelector(`#${MODAL_ID}_search`).value = '';
-  // 「未分類」不可改名 / 不可刪除
-  const isProtected = cat.name === '未分類';
+  const isProtected = categoryName === '未分類';
   el.querySelector(`#${MODAL_ID}_name`).disabled = isProtected;
   el.querySelector('[data-act="delete"]').style.display = isProtected ? 'none' : '';
   el.style.display = 'flex';
@@ -97,7 +95,7 @@ export function openCategoryManage(categoryId){
 export function closeCategoryManage(){
   const el = document.getElementById(MODAL_ID);
   if (el) el.style.display = 'none';
-  targetCatId = null;
+  targetCatName = null;
 }
 
 export function renderCategoryManage(){
@@ -124,41 +122,38 @@ export function renderCategoryManage(){
 }
 
 export function saveCategoryManage(){
-  if (!targetCatId) return;
-  const cat = (state.categories||[]).find(c=>c.id===targetCatId);
-  if (!cat) return;
-  const oldName = cat.name;
+  if (!targetCatName) return;
+  const oldName = targetCatName;
   const newName = (draftName || '').trim();
   if (oldName !== '未分類'){
     if (!newName){ alert('分類名稱不可空白'); return; }
-    if (newName !== oldName && (state.categories||[]).some(c=>c.name===newName)){
+    if (newName !== oldName && (state.categories||[]).includes(newName)){
       alert('已存在相同名稱的分類'); return;
     }
-    cat.name = newName;
+    // 重新命名：陣列中替換
+    const idx = state.categories.indexOf(oldName);
+    if (idx >= 0) state.categories[idx] = newName;
   }
+  const finalName = oldName === '未分類' ? '未分類' : newName;
   // 套用商品歸屬：選中=屬於此分類；未選且原本屬於此分類=改為「未分類」
   (state.products||[]).forEach(p=>{
-    if (draftSelected.has(p.id)) p.category = cat.name;
+    if (draftSelected.has(p.id)) p.category = finalName;
     else if (p.category === oldName) p.category = '未分類';
-    // 若舊分類改名，原本掛此分類但未選的商品已在上一行被改成「未分類」
   });
-  // 若改名，順便把其他原本掛 oldName 的商品（沒在草稿裡的）已處理為「未分類」
   persistAll();
   try { window.refreshPublicProducts && window.refreshPublicProducts(); } catch(e){}
-  try { window.refreshAllViews && window.refreshAllViews(); } catch(e){}
+  try { window.refreshProductsPage && window.refreshProductsPage(); } catch(e){}
   closeCategoryManage();
 }
 
 export function deleteCategoryManage(){
-  if (!targetCatId) return;
-  const cat = (state.categories||[]).find(c=>c.id===targetCatId);
-  if (!cat) return;
-  if (cat.name === '未分類'){ alert('「未分類」為系統分類，無法刪除'); return; }
-  if (!confirm(`確定刪除分類「${cat.name}」？此分類下所有商品將改為「未分類」。`)) return;
-  (state.products||[]).forEach(p=>{ if (p.category === cat.name) p.category = '未分類'; });
-  state.categories = (state.categories||[]).filter(c => c.id !== targetCatId);
+  if (!targetCatName) return;
+  if (targetCatName === '未分類'){ alert('「未分類」為系統分類，無法刪除'); return; }
+  if (!confirm(`確定刪除分類「${targetCatName}」？此分類下所有商品將改為「未分類」。`)) return;
+  (state.products||[]).forEach(p=>{ if (p.category === targetCatName) p.category = '未分類'; });
+  state.categories = (state.categories||[]).filter(name => name !== targetCatName);
   persistAll();
   try { window.refreshPublicProducts && window.refreshPublicProducts(); } catch(e){}
-  try { window.refreshAllViews && window.refreshAllViews(); } catch(e){}
+  try { window.refreshProductsPage && window.refreshProductsPage(); } catch(e){}
   closeCategoryManage();
 }
