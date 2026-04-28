@@ -1,100 +1,226 @@
-/* 中文備註：模組設定浮窗（v2.1.26）
- * 整合「改名 / 規則 / 必選 / 子選項 / 刪除 / 勾選商品」於同一浮窗。
- * 點模組卡片 → 開浮窗。
+/* 中文備註：模組管理動態彈窗（Batch 06.10/4）。
+ * 點模組卡 → 彈出可改名/規則/必選/子選項/刪除/勾選商品的設定窗。
  */
 import { state, persistAll } from '../core/store.js';
-import { escapeHtml, escapeAttr, id } from '../core/utils.js';
+import { escapeHtml, rid } from '../core/utils.js';
 
 const MODAL_ID = '__moduleManageDynamicModal';
+let targetModId = null;
+let draft = null;            // { name, rule:'single'|'multi', required:bool, options:[{id,name,price}] }
+let draftSelected = new Set();// product ids attached
 
 function ensureModal(){
-  let modal = document.getElementById(MODAL_ID);
-  if(modal) return modal;
+  let el = document.getElementById(MODAL_ID);
+  if (el) return el;
+  el = document.createElement('div');
+  el.id = MODAL_ID;
+  el.className = 'dyn-modal-backdrop';
+  el.style.display = 'none';
+  el.innerHTML = `
+    <div class="dyn-modal">
+      <div class="dyn-head">
+        <h3 id="${MODAL_ID}_title">模組設定</h3>
+        <button class="btn small" data-act="close">✕</button>
+      </div>
+      <div class="dyn-body">
+        <div class="form-row">
+          <label>模組名稱</label>
+          <input type="text" class="input" id="${MODAL_ID}_name">
+        </div>
+        <div class="form-row">
+          <label>選擇規則</label>
+          <select id="${MODAL_ID}_rule">
+            <option value="single">單選</option>
+            <option value="multi">複選</option>
+          </select>
+          <label style="min-width:auto"><input type="checkbox" id="${MODAL_ID}_required"> 必選</label>
+        </div>
 
-  modal = document.createElement('div');
-  modal.id = MODAL_ID;
-  modal.style.cssText = 'display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;padding:16px;';
-  modal.innerHTML = `
-    <div style="background:#fff;border-radius:12px;max-width:640px;width:100%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;">
-      <div style="padding:14px 16px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
-        <h3 id="__modMgrTitle" style="margin:0;font-size:16px;">模組設定</h3>
-        <button id="__modMgrClose" style="background:none;border:none;font-size:20px;cursor:pointer;">✕</button>
-      </div>
-      <div style="padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;flex-direction:column;gap:10px;">
-        <label style="font-size:13px;color:#475569;">模組名稱</label>
-        <div style="display:flex;gap:8px;">
-          <input id="__modMgrName" style="flex:1;padding:8px;border:1px solid #cbd5e1;border-radius:8px;">
-          <button id="__modMgrDelete" style="padding:8px 12px;border:1px solid #fecaca;background:#fef2f2;color:#b91c1c;border-radius:8px;cursor:pointer;">刪除模組</button>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-          <div>
-            <label style="font-size:12px;color:#64748b;">選擇規則</label>
-            <select id="__modMgrSelection" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;">
-              <option value="single">單選</option>
-              <option value="multi">多選</option>
-            </select>
-          </div>
-          <div>
-            <label style="font-size:12px;color:#64748b;">是否必選</label>
-            <select id="__modMgrRequired" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;">
-              <option value="true">必選</option>
-              <option value="false">非必選</option>
-            </select>
-          </div>
-        </div>
-        <div style="font-size:13px;color:#475569;">子選項</div>
-        <div id="__modMgrOptions" style="display:flex;flex-direction:column;gap:4px;max-height:160px;overflow:auto;border:1px solid #f1f5f9;border-radius:8px;padding:6px;"></div>
-        <button id="__modMgrAddOption" style="padding:6px;border:1px dashed #cbd5e1;background:#f8fafc;border-radius:8px;cursor:pointer;font-size:12px;">+ 新增子選項</button>
-      </div>
-      <div style="padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;flex-direction:column;gap:8px;">
-        <div style="font-size:13px;color:#475569;">套用到以下商品（勾選即套用）</div>
-        <input id="__modMgrSearch" placeholder="🔍 搜尋商品名稱或別名" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;">
-        <div style="display:flex;gap:6px;font-size:12px;color:#64748b;">
-          <button id="__modMgrSelectAll" style="padding:4px 8px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;cursor:pointer;">全選</button>
-          <button id="__modMgrSelectNone" style="padding:4px 8px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;cursor:pointer;">全不選</button>
-          <span id="__modMgrCheckedCount" style="margin-left:auto;align-self:center;"></span>
-        </div>
-      </div>
-      <div id="__modMgrBody" style="flex:1;overflow:auto;padding:8px 16px;"></div>
-      <div style="padding:12px 16px;border-top:1px solid #e2e8f0;display:flex;gap:8px;justify-content:flex-end;">
-        <button id="__modMgrCancel" style="padding:8px 16px;border:1px solid #cbd5e1;background:#fff;border-radius:8px;cursor:pointer;">取消</button>
-        <button id="__modMgrSave" style="padding:8px 16px;border:none;background:#2563eb;color:#fff;border-radius:8px;cursor:pointer;">儲存</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(modal);
+        <div style="margin:10px 0 6px;font-weight:600;">子選項</div>
+        <div id="${MODAL_ID}_options"></div>
+        <button class="btn small" data-act="addOpt">＋ 新增子選項</button>
 
-  modal.addEventListener('click', (e)=>{ if(e.target === modal) closeModuleManage(); });
-  document.getElementById('__modMgrClose').addEventListener('click', closeModuleManage);
-  document.getElementById('__modMgrCancel').addEventListener('click', closeModuleManage);
-  document.getElementById('__modMgrSearch').addEventListener('input', renderModuleManage);
-  document.getElementById('__modMgrSelectAll').addEventListener('click', ()=>{
-    (state.products || []).forEach(p => state.moduleManageDraft.add(p.id));
-    renderModuleManage();
+        <hr style="margin:14px 0;border:none;border-top:1px solid #e5e7eb;">
+        <div style="margin-bottom:6px;font-weight:600;">套用至商品</div>
+        <div class="form-row">
+          <label>搜尋商品</label>
+          <input type="search" class="input" id="${MODAL_ID}_search" placeholder="輸入商品名…">
+        </div>
+        <div class="pick-tools">
+          <button class="btn small" data-act="all">全選</button>
+          <button class="btn small" data-act="none">全不選</button>
+          <span class="muted" id="${MODAL_ID}_count"></span>
+        </div>
+        <div class="product-pick-list" id="${MODAL_ID}_list"></div>
+      </div>
+      <div class="dyn-foot">
+        <button class="btn danger" data-act="delete">刪除模組</button>
+        <span style="flex:1"></span>
+        <button class="btn" data-act="close">取消</button>
+        <button class="btn primary" data-act="save">儲存</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+
+  el.addEventListener('click', (e)=>{
+    if (e.target === el){ closeModuleManage(); return; }
+    const act = e.target.getAttribute('data-act');
+    if (!act) return;
+    if (act === 'close') closeModuleManage();
+    else if (act === 'save') saveModuleManage();
+    else if (act === 'delete') deleteModuleManage();
+    else if (act === 'addOpt') addOption();
+    else if (act === 'all') selectAll(true);
+    else if (act === 'none') selectAll(false);
+    else if (act === 'rmOpt'){
+      const i = parseInt(e.target.getAttribute('data-i'),10);
+      if (!isNaN(i)){ draft.options.splice(i,1); renderOptions(); }
+    }
   });
-  document.getElementById('__modMgrSelectNone').addEventListener('click', ()=>{
-    state.moduleManageDraft.clear();
-    renderModuleManage();
-  });
-  document.getElementById('__modMgrAddOption').addEventListener('click', ()=>{
-    const mod = (state.modules || []).find(m => m.id === state.moduleManageTarget);
-    if(!mod) return;
-    if(!Array.isArray(mod.options)) mod.options = [];
-    mod.options.push({ id: id(), name:'', price:0, enabled:true });
-    renderModuleOptions();
-  });
-  document.getElementById('__modMgrDelete').addEventListener('click', ()=>{
-    const mid = state.moduleManageTarget;
-    if(!mid) return;
-    const mod = (state.modules || []).find(m => m.id === mid);
-    if(!mod) return;
-    if(!confirm(`確定刪除模組「${mod.name}」？\n所有商品上套用的此模組會一併移除`)) return;
-    state.modules = (state.modules || []).filter(m => m.id !== mid);
-    (state.products || []).forEach(p=>{
-      p.modules = (p.modules || []).filter(att => (att.moduleId || att) !== mid);
+
+  el.querySelector(`#${MODAL_ID}_search`).addEventListener('input', renderModuleProductList);
+  el.querySelector(`#${MODAL_ID}_name`).addEventListener('input', e=>{ draft.name = e.target.value; });
+  el.querySelector(`#${MODAL_ID}_rule`).addEventListener('change', e=>{ draft.rule = e.target.value; });
+  el.querySelector(`#${MODAL_ID}_required`).addEventListener('change', e=>{ draft.required = e.target.checked; });
+
+  return el;
+}
+
+function addOption(){
+  if (!draft) return;
+  draft.options = draft.options || [];
+  draft.options.push({ id: rid(), name:'', price:0 });
+  renderOptions();
+}
+
+function renderOptions(){
+  const wrap = document.getElementById(`${MODAL_ID}_options`);
+  if (!wrap || !draft) return;
+  wrap.innerHTML = (draft.options||[]).map((opt, i) => `
+    <div class="sub-option-row">
+      <input class="input" data-fld="name" data-i="${i}" placeholder="子選項名稱" value="${escapeHtml(opt.name||'')}">
+      <input class="input" data-fld="price" data-i="${i}" type="number" step="1" placeholder="加價" value="${Number(opt.price||0)}" style="max-width:100px;">
+      <button class="btn small" data-act="rmOpt" data-i="${i}">移除</button>
+    </div>`).join('');
+  wrap.querySelectorAll('input[data-fld]').forEach(inp=>{
+    inp.addEventListener('input', (e)=>{
+      const i = parseInt(e.target.getAttribute('data-i'),10);
+      const fld = e.target.getAttribute('data-fld');
+      if (isNaN(i) || !draft.options[i]) return;
+      if (fld === 'price') draft.options[i].price = Number(e.target.value)||0;
+      else draft.options[i][fld] = e.target.value;
     });
-    persistAll();
-    if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
-    closeModuleManage();
   });
-  document.getElementById('__modMgrSave').addEventListener('click
+}
+
+function selectAll(flag){
+  const term = (document.getElementById(`${MODAL_ID}_search`)?.value || '').trim().toLowerCase();
+  (state.products||[]).forEach(p=>{
+    if (term && !(p.name||'').toLowerCase().includes(term)) return;
+    if (flag) draftSelected.add(p.id);
+    else draftSelected.delete(p.id);
+  });
+  renderModuleProductList();
+}
+
+export function openModuleManage(moduleId){
+  const mod = (state.modules||[]).find(m=>m.id===moduleId);
+  if (!mod){ alert('找不到模組'); return; }
+  targetModId = moduleId;
+  draft = {
+    name: mod.name||'',
+    rule: mod.rule || (mod.multi ? 'multi' : 'single'),
+    required: !!mod.required,
+    options: JSON.parse(JSON.stringify(mod.options||[]))
+  };
+  draftSelected = new Set(
+    (state.products||[]).filter(p => Array.isArray(p.modules) && p.modules.includes(moduleId)).map(p=>p.id)
+  );
+  const el = ensureModal();
+  el.querySelector(`#${MODAL_ID}_title`).textContent = `模組設定：${mod.name}`;
+  el.querySelector(`#${MODAL_ID}_name`).value = draft.name;
+  el.querySelector(`#${MODAL_ID}_rule`).value = draft.rule;
+  el.querySelector(`#${MODAL_ID}_required`).checked = draft.required;
+  el.querySelector(`#${MODAL_ID}_search`).value = '';
+  el.style.display = 'flex';
+  renderOptions();
+  renderModuleProductList();
+}
+
+export function closeModuleManage(){
+  const el = document.getElementById(MODAL_ID);
+  if (el) el.style.display = 'none';
+  targetModId = null; draft = null;
+}
+
+export function renderModuleManage(){ renderModuleProductList(); }
+
+function renderModuleProductList(){
+  const el = document.getElementById(MODAL_ID);
+  if (!el) return;
+  const term = (el.querySelector(`#${MODAL_ID}_search`).value || '').trim().toLowerCase();
+  const list = el.querySelector(`#${MODAL_ID}_list`);
+  const products = (state.products||[]).filter(p => !term || (p.name||'').toLowerCase().includes(term));
+  list.innerHTML = products.length ? products.map(p => `
+    <label class="product-pick-row">
+      <input type="checkbox" data-pid="${p.id}" ${draftSelected.has(p.id)?'checked':''}>
+      <span>${escapeHtml(p.name||'(未命名)')} <span class="muted">(${escapeHtml(p.category||'未分類')})</span></span>
+    </label>`).join('') : '<div class="muted" style="padding:12px;text-align:center;">沒有符合的商品</div>';
+
+  list.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
+    cb.addEventListener('change', (e)=>{
+      const pid = e.target.getAttribute('data-pid');
+      if (e.target.checked) draftSelected.add(pid);
+      else draftSelected.delete(pid);
+      el.querySelector(`#${MODAL_ID}_count`).textContent = `已選 ${draftSelected.size} 項`;
+    });
+  });
+  el.querySelector(`#${MODAL_ID}_count`).textContent = `已選 ${draftSelected.size} 項`;
+}
+
+export function saveModuleManage(){
+  if (!targetModId || !draft) return;
+  const mod = (state.modules||[]).find(m=>m.id===targetModId);
+  if (!mod) return;
+  const newName = (draft.name||'').trim();
+  if (!newName){ alert('模組名稱不可空白'); return; }
+  if (newName !== mod.name && (state.modules||[]).some(m=>m.name===newName)){
+    alert('已存在相同名稱的模組'); return;
+  }
+  // 過濾空白子選項
+  const cleanOpts = (draft.options||[])
+    .map(o => ({ id: o.id || rid(), name: (o.name||'').trim(), price: Number(o.price)||0 }))
+    .filter(o => o.name);
+  mod.name = newName;
+  mod.rule = draft.rule === 'multi' ? 'multi' : 'single';
+  mod.multi = mod.rule === 'multi'; // 兼容舊欄位
+  mod.required = !!draft.required;
+  mod.options = cleanOpts;
+
+  // 套用至商品：勾選=加入、未勾選=移除
+  (state.products||[]).forEach(p=>{
+    p.modules = Array.isArray(p.modules) ? p.modules.slice() : [];
+    const has = p.modules.includes(targetModId);
+    if (draftSelected.has(p.id) && !has) p.modules.push(targetModId);
+    else if (!draftSelected.has(p.id) && has) p.modules = p.modules.filter(x => x !== targetModId);
+  });
+  persistAll();
+  try { window.refreshPublicProducts && window.refreshPublicProducts(); } catch(e){}
+  try { window.refreshAllViews && window.refreshAllViews(); } catch(e){}
+  closeModuleManage();
+}
+
+export function deleteModuleManage(){
+  if (!targetModId) return;
+  const mod = (state.modules||[]).find(m=>m.id===targetModId);
+  if (!mod) return;
+  if (!confirm(`確定刪除模組「${mod.name}」？所有商品身上的此模組將被移除。`)) return;
+  (state.products||[]).forEach(p=>{
+    if (Array.isArray(p.modules)) p.modules = p.modules.filter(x => x !== targetModId);
+  });
+  state.modules = (state.modules||[]).filter(m => m.id !== targetModId);
+  persistAll();
+  try { window.refreshPublicProducts && window.refreshPublicProducts(); } catch(e){}
+  try { window.refreshAllViews && window.refreshAllViews(); } catch(e){}
+  closeModuleManage();
+}
