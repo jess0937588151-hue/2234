@@ -1,164 +1,164 @@
-/* 中文備註：分類設定浮窗（v2.1.26）
- * 整合「改名 / 刪除 / 勾選商品」於同一個浮窗。
- * 點分類卡片 → 開浮窗。
+/* 中文備註：分類管理動態彈窗（Batch 06.10/3）。
+ * 點分類卡 → 彈出可改名/刪除/勾選商品的設定窗。
  */
 import { state, persistAll } from '../core/store.js';
-import { escapeHtml, escapeAttr } from '../core/utils.js';
+import { escapeHtml } from '../core/utils.js';
 
 const MODAL_ID = '__categoryManageDynamicModal';
+let targetCatId = null;
+let draftName = '';
+let draftSelected = new Set();
 
 function ensureModal(){
-  let modal = document.getElementById(MODAL_ID);
-  if(modal) return modal;
-
-  modal = document.createElement('div');
-  modal.id = MODAL_ID;
-  modal.style.cssText = 'display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;padding:16px;';
-  modal.innerHTML = `
-    <div style="background:#fff;border-radius:12px;max-width:560px;width:100%;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;">
-      <div style="padding:14px 16px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
-        <h3 id="__catMgrTitle" style="margin:0;font-size:16px;">分類設定</h3>
-        <button id="__catMgrClose" style="background:none;border:none;font-size:20px;cursor:pointer;">✕</button>
+  let el = document.getElementById(MODAL_ID);
+  if (el) return el;
+  el = document.createElement('div');
+  el.id = MODAL_ID;
+  el.className = 'dyn-modal-backdrop';
+  el.style.display = 'none';
+  el.innerHTML = `
+    <div class="dyn-modal">
+      <div class="dyn-head">
+        <h3 id="${MODAL_ID}_title">分類設定</h3>
+        <button class="btn small" data-act="close">✕</button>
       </div>
-      <div style="padding:12px 16px;border-bottom:1px solid #f1f5f9;display:flex;flex-direction:column;gap:10px;">
-        <label style="font-size:13px;color:#475569;">分類名稱</label>
-        <div style="display:flex;gap:8px;">
-          <input id="__catMgrName" style="flex:1;padding:8px;border:1px solid #cbd5e1;border-radius:8px;">
-          <button id="__catMgrDelete" style="padding:8px 12px;border:1px solid #fecaca;background:#fef2f2;color:#b91c1c;border-radius:8px;cursor:pointer;">刪除分類</button>
+      <div class="dyn-body">
+        <div class="form-row">
+          <label>分類名稱</label>
+          <input type="text" class="input" id="${MODAL_ID}_name">
         </div>
-        <input id="__catMgrSearch" placeholder="🔍 搜尋商品名稱或別名" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;">
-        <div style="display:flex;gap:6px;font-size:12px;color:#64748b;">
-          <button id="__catMgrSelectAll" style="padding:4px 8px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;cursor:pointer;">全選</button>
-          <button id="__catMgrSelectNone" style="padding:4px 8px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;cursor:pointer;">全不選</button>
-          <span id="__catMgrCheckedCount" style="margin-left:auto;align-self:center;"></span>
+        <div class="form-row">
+          <label>搜尋商品</label>
+          <input type="search" class="input" id="${MODAL_ID}_search" placeholder="輸入商品名…">
         </div>
+        <div class="pick-tools">
+          <button class="btn small" data-act="all">全選</button>
+          <button class="btn small" data-act="none">全不選</button>
+          <span class="muted" id="${MODAL_ID}_count"></span>
+        </div>
+        <div class="product-pick-list" id="${MODAL_ID}_list"></div>
       </div>
-      <div id="__catMgrBody" style="flex:1;overflow:auto;padding:8px 16px;"></div>
-      <div style="padding:12px 16px;border-top:1px solid #e2e8f0;display:flex;gap:8px;justify-content:flex-end;">
-        <button id="__catMgrCancel" style="padding:8px 16px;border:1px solid #cbd5e1;background:#fff;border-radius:8px;cursor:pointer;">取消</button>
-        <button id="__catMgrSave" style="padding:8px 16px;border:none;background:#2563eb;color:#fff;border-radius:8px;cursor:pointer;">儲存</button>
+      <div class="dyn-foot">
+        <button class="btn danger" data-act="delete">刪除分類</button>
+        <span style="flex:1"></span>
+        <button class="btn" data-act="close">取消</button>
+        <button class="btn primary" data-act="save">儲存</button>
       </div>
-    </div>
-  `;
-  document.body.appendChild(modal);
+    </div>`;
+  document.body.appendChild(el);
 
-  modal.addEventListener('click', (e)=>{ if(e.target === modal) closeCategoryManage(); });
-  document.getElementById('__catMgrClose').addEventListener('click', closeCategoryManage);
-  document.getElementById('__catMgrCancel').addEventListener('click', closeCategoryManage);
-  document.getElementById('__catMgrSearch').addEventListener('input', renderCategoryManage);
-  document.getElementById('__catMgrSelectAll').addEventListener('click', ()=>{
-    (state.products || []).forEach(p => state.categoryManageDraft.add(p.id));
-    renderCategoryManage();
+  el.addEventListener('click', (e)=>{
+    if (e.target === el){ closeCategoryManage(); return; }
+    const act = e.target.getAttribute('data-act');
+    if (!act) return;
+    if (act === 'close') closeCategoryManage();
+    else if (act === 'save') saveCategoryManage();
+    else if (act === 'delete') deleteCategoryManage();
+    else if (act === 'all') selectAll(true);
+    else if (act === 'none') selectAll(false);
   });
-  document.getElementById('__catMgrSelectNone').addEventListener('click', ()=>{
-    state.categoryManageDraft.clear();
-    renderCategoryManage();
-  });
-  document.getElementById('__catMgrDelete').addEventListener('click', ()=>{
-    const cat = state.categoryManageTarget;
-    if(!cat) return;
-    if(cat === '未分類'){ alert('「未分類」為系統預設，不可刪除'); return; }
-    if(!confirm(`確定刪除分類「${cat}」？\n此分類下的商品會自動歸入「未分類」`)) return;
-    state.categories = (state.categories || []).filter(c => c !== cat);
-    (state.products || []).forEach(p=>{ if(p.category === cat) p.category = '未分類'; });
-    if(state.settings && state.settings.selectedCategory === cat) state.settings.selectedCategory = '全部';
-    persistAll();
-    if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
-    closeCategoryManage();
-  });
-  document.getElementById('__catMgrSave').addEventListener('click', ()=>{
-    saveCategoryManage();
-    persistAll();
-    if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
-  });
-  return modal;
+
+  el.querySelector(`#${MODAL_ID}_search`).addEventListener('input', renderCategoryManage);
+  el.querySelector(`#${MODAL_ID}_name`).addEventListener('input', (e)=>{ draftName = e.target.value; });
+
+  return el;
 }
 
-export function openCategoryManage(category){
-  if(!category) return;
-  state.categoryManageTarget = category;
-  state.categoryManageDraft = new Set(
-    (state.products || []).filter(p => p.category === category).map(p => p.id)
+function selectAll(flag){
+  const term = (document.getElementById(`${MODAL_ID}_search`)?.value || '').trim().toLowerCase();
+  (state.products||[]).forEach(p=>{
+    if (term && !(p.name||'').toLowerCase().includes(term)) return;
+    if (flag) draftSelected.add(p.id);
+    else draftSelected.delete(p.id);
+  });
+  renderCategoryManage();
+}
+
+export function openCategoryManage(categoryId){
+  const cat = (state.categories||[]).find(c=>c.id===categoryId);
+  if (!cat){ alert('找不到分類'); return; }
+  targetCatId = categoryId;
+  draftName = cat.name || '';
+  draftSelected = new Set(
+    (state.products||[]).filter(p => p.category === cat.name).map(p=>p.id)
   );
-  const modal = ensureModal();
-  const titleEl = document.getElementById('__catMgrTitle');
-  if(titleEl) titleEl.textContent = `分類設定：${category}`;
-  const nameEl = document.getElementById('__catMgrName');
-  if(nameEl) nameEl.value = category;
-  const searchEl = document.getElementById('__catMgrSearch');
-  if(searchEl) searchEl.value = '';
-  const delBtn = document.getElementById('__catMgrDelete');
-  if(delBtn) delBtn.style.display = (category === '未分類') ? 'none' : '';
-  modal.style.display = 'flex';
+  const el = ensureModal();
+  el.querySelector(`#${MODAL_ID}_title`).textContent = `分類設定：${cat.name}`;
+  el.querySelector(`#${MODAL_ID}_name`).value = draftName;
+  el.querySelector(`#${MODAL_ID}_search`).value = '';
+  // 「未分類」不可改名 / 不可刪除
+  const isProtected = cat.name === '未分類';
+  el.querySelector(`#${MODAL_ID}_name`).disabled = isProtected;
+  el.querySelector('[data-act="delete"]').style.display = isProtected ? 'none' : '';
+  el.style.display = 'flex';
   renderCategoryManage();
 }
 
 export function closeCategoryManage(){
-  const modal = document.getElementById(MODAL_ID);
-  if(modal) modal.style.display = 'none';
-  state.categoryManageTarget = null;
+  const el = document.getElementById(MODAL_ID);
+  if (el) el.style.display = 'none';
+  targetCatId = null;
 }
 
 export function renderCategoryManage(){
-  const body = document.getElementById('__catMgrBody');
-  if(!body) return;
-  if(!state.categoryManageDraft) state.categoryManageDraft = new Set();
-  const search = (document.getElementById('__catMgrSearch')?.value || '').trim();
-  const list = (state.products || []).filter(p=>{
-    if(!search) return true;
-    const hay = (p.name || '') + ' ' + (p.aliases || []).join(' ');
-    return hay.includes(search);
-  });
+  const el = document.getElementById(MODAL_ID);
+  if (!el) return;
+  const term = (el.querySelector(`#${MODAL_ID}_search`).value || '').trim().toLowerCase();
+  const list = el.querySelector(`#${MODAL_ID}_list`);
+  const products = (state.products||[]).filter(p => !term || (p.name||'').toLowerCase().includes(term));
+  list.innerHTML = products.length ? products.map(p => `
+    <label class="product-pick-row">
+      <input type="checkbox" data-pid="${p.id}" ${draftSelected.has(p.id)?'checked':''}>
+      <span>${escapeHtml(p.name||'(未命名)')} <span class="muted">(${escapeHtml(p.category||'未分類')})</span></span>
+    </label>`).join('') : '<div class="muted" style="padding:12px;text-align:center;">沒有符合的商品</div>';
 
-  const countEl = document.getElementById('__catMgrCheckedCount');
-  if(countEl) countEl.textContent = `已選 ${state.categoryManageDraft.size} / ${(state.products || []).length}`;
-
-  if(!list.length){
-    body.innerHTML = '<div style="color:#94a3b8;padding:20px;text-align:center;">沒有符合商品</div>';
-    return;
-  }
-  body.innerHTML = list.map(p => `
-    <label style="display:flex;align-items:center;gap:10px;padding:8px;border-bottom:1px solid #f1f5f9;cursor:pointer;">
-      <input type="checkbox" data-product-id="${escapeAttr(p.id)}" ${state.categoryManageDraft.has(p.id) ? 'checked' : ''} style="width:18px;height:18px;">
-      <div style="flex:1;">
-        <div style="font-weight:600;">${escapeHtml(p.name)}</div>
-        <div style="font-size:12px;color:#64748b;">$${Number(p.price || 0)} ・ 目前分類：${escapeHtml(p.category || '未分類')}</div>
-      </div>
-    </label>
-  `).join('');
-  body.querySelectorAll('input[type="checkbox"]').forEach(chk=>{
-    chk.addEventListener('change', ()=>{
-      const pid = chk.dataset.productId;
-      if(chk.checked) state.categoryManageDraft.add(pid);
-      else state.categoryManageDraft.delete(pid);
-      const c = document.getElementById('__catMgrCheckedCount');
-      if(c) c.textContent = `已選 ${state.categoryManageDraft.size} / ${(state.products || []).length}`;
+  list.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
+    cb.addEventListener('change', (e)=>{
+      const pid = e.target.getAttribute('data-pid');
+      if (e.target.checked) draftSelected.add(pid);
+      else draftSelected.delete(pid);
+      el.querySelector(`#${MODAL_ID}_count`).textContent = `已選 ${draftSelected.size} 項`;
     });
   });
+  el.querySelector(`#${MODAL_ID}_count`).textContent = `已選 ${draftSelected.size} 項`;
 }
 
 export function saveCategoryManage(){
-  const oldCat = state.categoryManageTarget;
-  if(!oldCat) return;
-  // 1) 更名
-  const newNameRaw = document.getElementById('__catMgrName')?.value || '';
-  const newName = newNameRaw.trim();
-  let finalCat = oldCat;
-  if(newName && newName !== oldCat){
-    if(oldCat === '未分類'){ alert('「未分類」不可改名'); }
-    else if((state.categories || []).includes(newName)){ alert('分類名稱重複，僅儲存勾選商品變更'); }
-    else {
-      state.categories = (state.categories || []).map(c => c === oldCat ? newName : c);
-      (state.products || []).forEach(p=>{ if(p.category === oldCat) p.category = newName; });
-      finalCat = newName;
-      if(state.settings && state.settings.selectedCategory === oldCat) state.settings.selectedCategory = newName;
+  if (!targetCatId) return;
+  const cat = (state.categories||[]).find(c=>c.id===targetCatId);
+  if (!cat) return;
+  const oldName = cat.name;
+  const newName = (draftName || '').trim();
+  if (oldName !== '未分類'){
+    if (!newName){ alert('分類名稱不可空白'); return; }
+    if (newName !== oldName && (state.categories||[]).some(c=>c.name===newName)){
+      alert('已存在相同名稱的分類'); return;
     }
+    cat.name = newName;
   }
-  // 2) 套用勾選
-  if(!state.categoryManageDraft) state.categoryManageDraft = new Set();
-  (state.products || []).forEach(p=>{
-    if(state.categoryManageDraft.has(p.id)) p.category = finalCat;
-    else if(p.category === finalCat) p.category = '未分類';
+  // 套用商品歸屬：選中=屬於此分類；未選且原本屬於此分類=改為「未分類」
+  (state.products||[]).forEach(p=>{
+    if (draftSelected.has(p.id)) p.category = cat.name;
+    else if (p.category === oldName) p.category = '未分類';
+    // 若舊分類改名，原本掛此分類但未選的商品已在上一行被改成「未分類」
   });
+  // 若改名，順便把其他原本掛 oldName 的商品（沒在草稿裡的）已處理為「未分類」
+  persistAll();
+  try { window.refreshPublicProducts && window.refreshPublicProducts(); } catch(e){}
+  try { window.refreshAllViews && window.refreshAllViews(); } catch(e){}
+  closeCategoryManage();
+}
+
+export function deleteCategoryManage(){
+  if (!targetCatId) return;
+  const cat = (state.categories||[]).find(c=>c.id===targetCatId);
+  if (!cat) return;
+  if (cat.name === '未分類'){ alert('「未分類」為系統分類，無法刪除'); return; }
+  if (!confirm(`確定刪除分類「${cat.name}」？此分類下所有商品將改為「未分類」。`)) return;
+  (state.products||[]).forEach(p=>{ if (p.category === cat.name) p.category = '未分類'; });
+  state.categories = (state.categories||[]).filter(c => c.id !== targetCatId);
+  persistAll();
+  try { window.refreshPublicProducts && window.refreshPublicProducts(); } catch(e){}
+  try { window.refreshAllViews && window.refreshAllViews(); } catch(e){}
   closeCategoryManage();
 }
