@@ -127,7 +127,7 @@
 .card-list .card .card-meta{ font-size:12px; color:#6b7280; margin-top:2px; }
 .card-list .card .card-actions{ display:flex; gap:6px; }
 
-@media (max-width: 900px){
+@media (max-width: 768px){
   .products-grid-2col{ grid-template-columns: 1fr; }
   .products-left-pane,.products-right-pane{ overflow:visible; }
   .panel-block{ min-height:200px; }
