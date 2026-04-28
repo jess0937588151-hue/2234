@@ -81,7 +81,8 @@
 /* 隱藏時優先（hidden 屬性 / .view 預設） */
 #productsView[hidden]{ display:none !important; }
 /* 顯示時的 flex 容器版型 */
-#productsView:not([hidden]){ display:flex; flex-direction:column; height:calc(100vh - 80px); padding:12px; gap:12px; box-sizing:border-box; }
+#productsView:not(.active){ display:none !important; }
+#productsView.active{ display:flex; flex-direction:column; height:calc(100vh - 80px); padding:12px; gap:12px; box-sizing:border-box; }
 
 .products-topbar{
   display:flex; justify-content:space-between; align-items:center;
