@@ -171,7 +171,7 @@
 
 
 /* 響應式：螢幕窄時改成上下排 */
-@media (max-width: 900px){
+@media (max-width: 768px){
   .products-grid-2col{
     grid-template-columns: 1fr;
     height: auto;
