@@ -76,3 +76,111 @@
   .product-modal{max-width:95%;padding:16px}
 }
 
+/* ============================================================
+   v2.1.26 商品管理頁兩欄佈局
+   ============================================================ */
+.products-grid-2col{
+  display:grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(380px, 1.6fr);
+  gap:14px;
+  padding:12px 14px;
+  height: calc(100vh - 64px);
+  box-sizing:border-box;
+  overflow:hidden;
+}
+
+.products-left-pane{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  overflow:auto;
+  padding-right:4px;
+}
+.products-right-pane{
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+
+.panel-block{
+  background:#fff;
+  border:1px solid #e2e8f0;
+  border-radius:10px;
+  padding:10px 12px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.panel-block-fill{
+  flex:1;
+  overflow:hidden;
+}
+.panel-block-fill > #productsTable{
+  flex:1;
+  overflow:auto;
+  align-content:flex-start;
+}
+.panel-block-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.panel-block-head h2{
+  margin:0;
+  font-size:15px;
+}
+
+.entity-cards-grid{
+  display:grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap:6px;
+  max-height:220px;
+  overflow:auto;
+}
+.entity-cards-grid .entity-card,
+.entity-cards-grid .module-card{
+  background:#f8fafc;
+  border:1px solid #e2e8f0;
+  border-radius:8px;
+  padding:8px;
+  font-size:13px;
+  cursor:pointer;
+  transition:all 0.15s;
+}
+.entity-cards-grid .entity-card:hover,
+.entity-cards-grid .module-card:hover{
+  border-color:#2563eb;
+  background:#eff6ff;
+}
+.entity-cards-grid .entity-card.warning{
+  border-color:#fbbf24;
+  background:#fffbeb;
+}
+.entity-cards-grid .entity-card strong,
+.entity-cards-grid .module-card strong{
+  font-size:13px;
+}
+.entity-cards-grid .meta{
+  font-size:11px;
+  color:#64748b;
+  margin-top:2px;
+}
+
+/* 響應式：螢幕窄時改成上下排 */
+@media (max-width: 900px){
+  .products-grid-2col{
+    grid-template-columns: 1fr;
+    height: auto;
+    overflow:visible;
+  }
+  .products-left-pane,
+  .products-right-pane{
+    overflow:visible;
+  }
+  .entity-cards-grid{
+    max-height:none;
+  }
+}
+
