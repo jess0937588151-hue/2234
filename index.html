@@ -166,64 +166,66 @@
       </section>
     </section>
 
-       <!-- ===== 商品管理頁（v2.1.26 重排：左半分類+模組，右半商品列表） ===== -->
-<section id="productsView" class="view">
-  <header class="topbar">
-    <h1>商品管理</h1>
-    <div class="topbar-actions">
-      <input id="productMgrSearch" placeholder="搜尋商品名稱／別名" style="min-width:160px">
-      <button id="addProductBtn" class="primary-btn">新增商品</button>
-      <button id="excelTemplateBtn" class="secondary-btn small-btn">範本</button>
-      <button id="excelImportBtn" class="secondary-btn small-btn">Excel匯入</button>
-      <input id="excelImportInput" type="file" accept=".xlsx,.xls,.csv" hidden>
-      <button id="syncMenuToCloudBtn" class="secondary-btn small-btn">同步雲端</button>
+      <!-- ===== 商品管理頁 ===== -->
+<section id="productsView" class="view" hidden>
+  <!-- 頂部工具列：搜尋 / 新增 / Excel / 雲端 -->
+  <div class="products-topbar">
+    <div class="topbar-left">
+      <input type="search" id="productSearchTop" class="input" placeholder="搜尋商品名稱…">
     </div>
-  </header>
+    <div class="topbar-right">
+      <button id="addProductBtnTop" class="btn primary">＋ 新增商品</button>
+      <button id="excelTemplateBtn" class="btn">下載範本</button>
+      <label class="btn file-btn">匯入 Excel
+        <input type="file" id="excelImportInput" accept=".xlsx,.xls" hidden>
+      </label>
+      <button id="syncMenuBtn" class="btn">☁ 同步菜單</button>
+    </div>
+  </div>
 
+  <!-- 主體：左欄 (分類 + 模組) / 右欄 (商品列表) -->
   <div class="products-grid-2col">
-    <!-- 左半：分類 + 模組 + 待處理菜單 -->
+    <!-- 左欄 -->
     <aside class="products-left-pane">
-      <section class="panel-block">
-        <div class="panel-block-head">
-          <h2>分類管理</h2>
-          <div class="row gap">
-            <input id="newCategoryInput" placeholder="新增分類" style="flex:1;min-width:80px">
-            <button id="addCategoryBtn" class="secondary-btn small-btn">新增</button>
-          </div>
+      <div class="panel-block">
+        <div class="panel-head">
+          <h3>分類管理</h3>
+          <button id="addCategoryBtn" class="btn small">＋ 新增分類</button>
         </div>
-        <div id="categoryList" class="entity-cards-grid"></div>
-      </section>
+        <div id="categoryList" class="card-list"></div>
+      </div>
 
-      <section class="panel-block">
-        <div class="panel-block-head">
-          <h2>模組管理</h2>
-          <div class="row gap">
-            <input id="newModuleInput" placeholder="新增模組名稱" style="flex:1;min-width:80px">
-            <button id="addModuleBtn" class="secondary-btn small-btn">新增</button>
-          </div>
+      <div class="panel-block">
+        <div class="panel-head">
+          <h3>模組管理</h3>
+          <button id="addModuleBtn" class="btn small">＋ 新增模組</button>
         </div>
-        <div id="moduleLibraryList" class="entity-cards-grid"></div>
-      </section>
-
-      <section class="panel-block">
-        <div class="panel-block-head">
-          <h2>待處理菜單</h2>
-        </div>
-        <div id="pendingMenuList"></div>
-      </section>
+        <div id="moduleLibrary" class="card-list"></div>
+      </div>
     </aside>
 
-    <!-- 右半：商品列表 -->
+    <!-- 右欄 -->
     <main class="products-right-pane">
-      <section class="panel-block panel-block-fill">
-        <div class="panel-block-head">
-          <h2>商品列表</h2>
-          <span id="productMgrCount" class="muted">0 筆</span>
+      <div class="panel-block">
+        <div class="panel-head">
+          <h3>商品列表</h3>
+          <span id="productCountLabel" class="muted"></span>
         </div>
-        <div id="productsTable" class="product-grid"></div>
-      </section>
+        <div id="productTable" class="product-table"></div>
+      </div>
+
+      <div class="panel-block" id="pendingMenuPanel" hidden>
+        <div class="panel-head">
+          <h3>待上架商品</h3>
+          <button id="applyPendingMenuBtn" class="btn small primary">套用</button>
+          <button id="discardPendingMenuBtn" class="btn small">捨棄</button>
+        </div>
+        <div id="pendingMenuList" class="card-list"></div>
+      </div>
     </main>
   </div>
+</section>
+
 
   <!-- 商品編輯浮窗 -->
   <div id="productEditModal" class="product-modal-backdrop" style="display:none">
