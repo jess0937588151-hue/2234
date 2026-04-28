@@ -1,13 +1,14 @@
-/* 中文備註：模組管理動態彈窗（Batch 06.10/4）。
- * 點模組卡 → 彈出可改名/規則/必選/子選項/刪除/勾選商品的設定窗。
+/* 中文備註：模組管理動態彈窗（Batch 06.10/4-fix - product.modules 是名稱字串陣列）。
  */
 import { state, persistAll } from '../core/store.js';
-import { escapeHtml, rid } from '../core/utils.js';
+import { escapeHtml } from '../core/utils.js';
+
+function rid(){ return Math.random().toString(36).slice(2,10); }
 
 const MODAL_ID = '__moduleManageDynamicModal';
 let targetModId = null;
-let draft = null;            // { name, rule:'single'|'multi', required:bool, options:[{id,name,price}] }
-let draftSelected = new Set();// product ids attached
+let draft = null;
+let draftSelected = new Set();
 
 function ensureModal(){
   let el = document.getElementById(MODAL_ID);
@@ -74,14 +75,14 @@ function ensureModal(){
     else if (act === 'none') selectAll(false);
     else if (act === 'rmOpt'){
       const i = parseInt(e.target.getAttribute('data-i'),10);
-      if (!isNaN(i)){ draft.options.splice(i,1); renderOptions(); }
+      if (!isNaN(i) && draft){ draft.options.splice(i,1); renderOptions(); }
     }
   });
 
   el.querySelector(`#${MODAL_ID}_search`).addEventListener('input', renderModuleProductList);
-  el.querySelector(`#${MODAL_ID}_name`).addEventListener('input', e=>{ draft.name = e.target.value; });
-  el.querySelector(`#${MODAL_ID}_rule`).addEventListener('change', e=>{ draft.rule = e.target.value; });
-  el.querySelector(`#${MODAL_ID}_required`).addEventListener('change', e=>{ draft.required = e.target.checked; });
+  el.querySelector(`#${MODAL_ID}_name`).addEventListener('input', e=>{ if(draft) draft.name = e.target.value; });
+  el.querySelector(`#${MODAL_ID}_rule`).addEventListener('change', e=>{ if(draft) draft.rule = e.target.value; });
+  el.querySelector(`#${MODAL_ID}_required`).addEventListener('change', e=>{ if(draft) draft.required = e.target.checked; });
 
   return el;
 }
@@ -129,12 +130,13 @@ export function openModuleManage(moduleId){
   targetModId = moduleId;
   draft = {
     name: mod.name||'',
-    rule: mod.rule || (mod.multi ? 'multi' : 'single'),
+    rule: mod.rule || (mod.multi || mod.selection==='multi' ? 'multi' : 'single'),
     required: !!mod.required,
     options: JSON.parse(JSON.stringify(mod.options||[]))
   };
+  // p.modules 是「名稱」字串陣列，用 mod.name 比對
   draftSelected = new Set(
-    (state.products||[]).filter(p => Array.isArray(p.modules) && p.modules.includes(moduleId)).map(p=>p.id)
+    (state.products||[]).filter(p => Array.isArray(p.modules) && p.modules.includes(mod.name)).map(p=>p.id)
   );
   const el = ensureModal();
   el.querySelector(`#${MODAL_ID}_title`).textContent = `模組設定：${mod.name}`;
@@ -182,31 +184,41 @@ export function saveModuleManage(){
   if (!targetModId || !draft) return;
   const mod = (state.modules||[]).find(m=>m.id===targetModId);
   if (!mod) return;
+  const oldName = mod.name;
   const newName = (draft.name||'').trim();
   if (!newName){ alert('模組名稱不可空白'); return; }
-  if (newName !== mod.name && (state.modules||[]).some(m=>m.name===newName)){
+  if (newName !== oldName && (state.modules||[]).some(m=>m.name===newName)){
     alert('已存在相同名稱的模組'); return;
   }
-  // 過濾空白子選項
   const cleanOpts = (draft.options||[])
     .map(o => ({ id: o.id || rid(), name: (o.name||'').trim(), price: Number(o.price)||0 }))
     .filter(o => o.name);
   mod.name = newName;
   mod.rule = draft.rule === 'multi' ? 'multi' : 'single';
-  mod.multi = mod.rule === 'multi'; // 兼容舊欄位
+  mod.multi = mod.rule === 'multi';
   mod.required = !!draft.required;
   mod.options = cleanOpts;
 
-  // 套用至商品：勾選=加入、未勾選=移除
+  // 同步：商品 modules 陣列裡若有 oldName，改成 newName
+  if (oldName !== newName){
+    (state.products||[]).forEach(p=>{
+      if (Array.isArray(p.modules)){
+        p.modules = p.modules.map(n => n === oldName ? newName : n);
+      }
+    });
+  }
+
+  // 套用至商品：勾選=加入 newName、未勾選=移除 newName
   (state.products||[]).forEach(p=>{
     p.modules = Array.isArray(p.modules) ? p.modules.slice() : [];
-    const has = p.modules.includes(targetModId);
-    if (draftSelected.has(p.id) && !has) p.modules.push(targetModId);
-    else if (!draftSelected.has(p.id) && has) p.modules = p.modules.filter(x => x !== targetModId);
+    const has = p.modules.includes(newName);
+    if (draftSelected.has(p.id) && !has) p.modules.push(newName);
+    else if (!draftSelected.has(p.id) && has) p.modules = p.modules.filter(n => n !== newName);
   });
+
   persistAll();
   try { window.refreshPublicProducts && window.refreshPublicProducts(); } catch(e){}
-  try { window.refreshAllViews && window.refreshAllViews(); } catch(e){}
+  try { window.refreshProductsPage && window.refreshProductsPage(); } catch(e){}
   closeModuleManage();
 }
 
@@ -215,12 +227,13 @@ export function deleteModuleManage(){
   const mod = (state.modules||[]).find(m=>m.id===targetModId);
   if (!mod) return;
   if (!confirm(`確定刪除模組「${mod.name}」？所有商品身上的此模組將被移除。`)) return;
+  const delName = mod.name;
   (state.products||[]).forEach(p=>{
-    if (Array.isArray(p.modules)) p.modules = p.modules.filter(x => x !== targetModId);
+    if (Array.isArray(p.modules)) p.modules = p.modules.filter(n => n !== delName);
   });
   state.modules = (state.modules||[]).filter(m => m.id !== targetModId);
   persistAll();
   try { window.refreshPublicProducts && window.refreshPublicProducts(); } catch(e){}
-  try { window.refreshAllViews && window.refreshAllViews(); } catch(e){}
+  try { window.refreshProductsPage && window.refreshProductsPage(); } catch(e){}
   closeModuleManage();
 }
