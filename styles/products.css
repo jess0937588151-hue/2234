@@ -190,3 +190,27 @@
   }
 }
 
+/* ===== Batch 06.11：兩欄佈局內的商品/分類/模組卡片微調 ===== */
+/* 商品列表的 product-grid 在 panel-block 裡填滿可用空間 */
+.products-right-pane .panel-block .product-table .product-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(160px, 1fr));
+  gap:8px;
+  padding:0;
+}
+/* 分類/模組卡片在 panel-block 內改成單列直排 */
+.products-left-pane .panel-block .card-list{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.products-left-pane .panel-block .card-list .entity-card,
+.products-left-pane .panel-block .card-list .module-card{
+  margin:0;
+}
+/* 待上架卡片間距 */
+#pendingMenuList .pending-card{ margin-bottom:8px; }
+#pendingMenuList .pending-card:last-child{ margin-bottom:0; }
+
+
+
