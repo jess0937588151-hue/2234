@@ -164,7 +164,7 @@ export function renderProducts(){
   const grid = document.getElementById('productGrid');
   const list = [...state.products].sort((a,b)=>a.sortOrder-b.sortOrder).filter(p=>{
     const catOk = state.settings.selectedCategory==='全部' || p.category===state.settings.selectedCategory;
-    const kwOk = !keyword || [p.name, p.category, ...(p.aliases||[])].join(' ').includes(keyword);
+    const kwOk = !keyword || [p.name, p.category].join(' ').includes(keyword);
     return catOk && kwOk;
   });
   grid.innerHTML = '';
