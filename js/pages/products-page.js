@@ -360,9 +360,8 @@ export function renderProductsTable(){
     card.className = 'product-card' + (p.enabled===false ? ' disabled' : '');
     const modNames = getProductModuleNames(p);
     card.innerHTML = `${p.image ? `<img class="card-thumb" src="${escapeAttr(p.image)}">` : '<div class="card-thumb-placeholder">📷</div>'}
-      <div class="card-name">${escapeHtml(p.name)}</div>
-      <div class="card-price">${money(p.price)}</div>
-      <div class="card-meta">${escapeHtml(p.category)}${modNames.length ? ' ・ ' + modNames.join('、') : ''}</div>
+      <div class="card-line1"><span class="card-name">${escapeHtml(p.name)}</span><span class="card-price">${money(p.price)}</span></div>
+      <div class="card-line2"><span class="card-cat">${escapeHtml(p.category)}</span>${modNames.length ? `<span class="card-mods">${escapeHtml(modNames.join('、'))}</span>` : ''}</div>
       <div class="card-status"><span class="status ${p.enabled===false?'off':'on'}">${p.enabled===false?'已下架':'上架中'}</span></div>
       <div class="card-actions">
         <button class="move-up">▲</button>
@@ -371,6 +370,7 @@ export function renderProductsTable(){
         <button class="toggle">${p.enabled===false?'上架':'下架'}</button>
         <button class="delete">刪除</button>
       </div>`;
+
     card.querySelector('.move-up').onclick = ()=> moveProduct(p.id, 'up');
     card.querySelector('.move-down').onclick = ()=> moveProduct(p.id, 'down');
     card.querySelector('.edit').onclick = ()=> openProductEditModal(p);
