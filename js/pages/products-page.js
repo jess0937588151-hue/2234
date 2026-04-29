@@ -616,11 +616,34 @@ function renderModuleListModal(){
   const body = document.getElementById('__moduleListBody');
   if(!body) return;
   body.innerHTML = '';
-  (state.modules||[]).forEach(mod=>{
+  const mods = state.modules || [];
+  mods.forEach((mod, idx)=>{
     const usedCount = (state.products||[]).filter(p=> (p.modules||[]).some(a=>a && a.moduleId===mod.id)).length;
+    const isFirst = idx === 0;
+    const isLast = idx === mods.length - 1;
     const card = document.createElement('div');
     card.className = 'module-card';
-    card.innerHTML = `<strong>${escapeHtml(mod.name)}</strong><div class="meta">${mod.selection==='multi'?'多選':'單選'} ・ ${mod.required?'必選':'非必選'} ・ ${usedCount} 商品</div><div class="card-actions"><button class="edit">編輯</button><button class="delete">刪除</button></div>`;
+    card.innerHTML = `
+      <strong>${escapeHtml(mod.name)}</strong>
+      <div class="meta">${mod.selection==='multi'?'多選':'單選'} ・ ${mod.required?'必選':'非必選'} ・ ${usedCount} 商品</div>
+      <div class="card-actions">
+        <button class="move up" ${isFirst?'disabled':''}>▲</button>
+        <button class="move down" ${isLast?'disabled':''}>▼</button>
+        <button class="edit">編輯</button>
+        <button class="delete">刪除</button>
+      </div>`;
+    const upBtn = card.querySelector('.move.up');
+    const downBtn = card.querySelector('.move.down');
+    if(upBtn && !isFirst) upBtn.onclick = ()=>{
+      const arr = state.modules;
+      [arr[idx-1], arr[idx]] = [arr[idx], arr[idx-1]];
+      persistAll(); renderModuleListModal(); window.refreshAllViews();
+    };
+    if(downBtn && !isLast) downBtn.onclick = ()=>{
+      const arr = state.modules;
+      [arr[idx+1], arr[idx]] = [arr[idx], arr[idx+1]];
+      persistAll(); renderModuleListModal(); window.refreshAllViews();
+    };
     card.querySelector('.edit').onclick = ()=>{
       document.getElementById('__moduleListDynamicModal').style.display='none';
       openModuleManage && openModuleManage(mod.id);
@@ -634,6 +657,7 @@ function renderModuleListModal(){
     body.appendChild(card);
   });
 }
+
 function openModuleListModal(){
   ensureModuleListModal();
   renderModuleListModal();
