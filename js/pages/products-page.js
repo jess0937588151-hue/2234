@@ -309,35 +309,23 @@ function moveProduct(productId, direction){
 export function renderPendingMenuList(){
   const wrap = document.getElementById('pendingMenuList');
   const panel = document.getElementById('pendingMenuPanel');
-  if(!wrap) return;
-  wrap.innerHTML = '';
-  const list = state.pendingProducts || [];
-  if(!list.length){
-    if(panel) panel.setAttribute('hidden', '');
-    return;
+  if(wrap){
+    wrap.innerHTML = '';
+    const list = state.pendingProducts || [];
+    if(!list.length){
+      if(panel) panel.setAttribute('hidden', '');
+    } else {
+      if(panel) panel.removeAttribute('hidden');
+      list.forEach(item=>{
+        const row = document.createElement('div');
+        row.className = 'pending-card';
+        row.innerHTML = `<div class="pending-main"><div class="row between wrap"><div><strong>${escapeHtml(item.name || '')}</strong><span class="tag">${escapeHtml(item.category || '未分類')}</span></div><span class="badge pending">待處理</span></div></div>`;
+        wrap.appendChild(row);
+      });
+    }
   }
-  if(panel) panel.removeAttribute('hidden');
-  list.forEach(item=>{
-    const row = document.createElement('div');
-    row.className = 'pending-card';
-    row.innerHTML = `<div class="pending-main"><div class="row between wrap"><div><strong>${escapeHtml(item.name || '')}</strong><span class="tag">${escapeHtml(item.category || '未分類')}</span></div><span class="badge pending">待處理</span></div><div class="grid2" style="margin-top:10px"><div><label>品項名稱</label><input class="pending-name" value="${escapeAttr(item.name || '')}"></div><div><label>價格</label><input class="pending-price" type="number" min="0" value="${Number(item.price || 0)}"></div></div></div><div class="row gap wrap" style="margin-top:12px"><button type="button" class="primary-btn small-btn approve-btn">確認加入菜單</button><button type="button" class="danger-btn small-btn delete-btn">刪除</button></div>`;
-    const nameInput = row.querySelector('.pending-name');
-    const priceInput = row.querySelector('.pending-price');
-    nameInput.addEventListener('input', ()=>{ item.name = nameInput.value; persistAll(); });
-    priceInput.addEventListener('input', ()=>{ item.price = Number(priceInput.value || 0); persistAll(); });
-    row.querySelector('.approve-btn').onclick = ()=>{
-      const name = (item.name || '').trim();
-      const price = Number(item.price || 0);
-      if(!name) return alert('請先輸入品項名稱');
-      if(!price || price <= 0) return alert('請先輸入正確價格');
-      state.products.push({id: item.id || id(), name, price, category: item.category || '未分類', enabled: true, image: item.image || '', modules: item.modules || [], sortOrder: state.products.length});
-      state.pendingProducts = state.pendingProducts.filter(x=>x.id !== item.id);
-      state.products.sort((a,b)=>a.sortOrder-b.sortOrder).forEach((p, i)=> p.sortOrder = i);
-      persistAll(); window.refreshAllViews();
-    };
-    row.querySelector('.delete-btn').onclick = ()=>{ state.pendingProducts = state.pendingProducts.filter(x=>x.id !== item.id); persistAll(); renderPendingMenuList(); };
-    wrap.appendChild(row);
-  });
+  // 同步更新頂部按鈕筆數
+  updatePendingCountLabel();
 }
 
 export function renderProductsTable(){
