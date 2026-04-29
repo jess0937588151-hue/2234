@@ -785,10 +785,14 @@ async function syncMenuHandler(btn){
 // 初始化
 // ============================================================
 export function initProductsPage(){
-  // 頂部工具列
+    // 頂部工具列
   document.getElementById('addProductBtnTop')?.addEventListener('click', ()=> openProductEditModal(null));
   document.getElementById('productSearchTop')?.addEventListener('input', renderProductsTable);
   document.getElementById('syncMenuBtn')?.addEventListener('click', (e)=> syncMenuHandler(e.currentTarget));
+  document.getElementById('openCategoryListBtn')?.addEventListener('click', openCategoryListModal);
+  document.getElementById('openModuleListBtn')?.addEventListener('click', openModuleListModal);
+  document.getElementById('openPendingBtn')?.addEventListener('click', openPendingModal);
+
 
   // 商品編輯 modal
   document.getElementById('closeProductEditModal')?.addEventListener('click', closeProductEditModal);
