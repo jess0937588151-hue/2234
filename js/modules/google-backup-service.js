@@ -12,11 +12,13 @@ let tokenClient = null;
 let accessToken = '';
 let profileEmail = '';
 
+const DEFAULT_CLIENT_ID = '203764995518-sct9k1tpf9fl6nrjh0h7kt8phsr47uas.apps.googleusercontent.com';
+
 function ensureGoogleDriveConfig(){
   if(!state.settings) state.settings = {};
   if(!state.settings.googleDriveBackup){
     state.settings.googleDriveBackup = {
-      clientId: '',
+      clientId: DEFAULT_CLIENT_ID,
       folderId: '',
       autoBackupEnabled: false,
       autoBackupMinutes: 60,
@@ -26,8 +28,12 @@ function ensureGoogleDriveConfig(){
       lastRestoreStatus: '尚未還原'
     };
   }
+  if(!state.settings.googleDriveBackup.clientId){
+    state.settings.googleDriveBackup.clientId = DEFAULT_CLIENT_ID;
+  }
   return state.settings.googleDriveBackup;
 }
+
 
 export function getGoogleBackupConfig(){
   return ensureGoogleDriveConfig();
