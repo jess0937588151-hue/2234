@@ -98,10 +98,13 @@ function addOption(){
 function renderOptions(){
   const wrap = document.getElementById(`${MODAL_ID}_options`);
   if (!wrap || !draft) return;
+  const len = (draft.options||[]).length;
   wrap.innerHTML = (draft.options||[]).map((opt, i) => `
     <div class="sub-option-row">
+      <button class="btn small" data-act="optUp" data-i="${i}" ${i===0?'disabled':''}>▲</button>
+      <button class="btn small" data-act="optDown" data-i="${i}" ${i===len-1?'disabled':''}>▼</button>
       <input class="input" data-fld="name" data-i="${i}" placeholder="子選項名稱" value="${escapeHtml(opt.name||'')}">
-      <input class="input" data-fld="price" data-i="${i}" type="number" step="1" placeholder="加價" value="${Number(opt.price||0)}" style="max-width:100px;">
+      <input class="input" data-fld="price" data-i="${i}" type="number" step="1" placeholder="加價" value="${Number(opt.price||0)}" style="max-width:90px;">
       <button class="btn small" data-act="rmOpt" data-i="${i}">移除</button>
     </div>`).join('');
   wrap.querySelectorAll('input[data-fld]').forEach(inp=>{
