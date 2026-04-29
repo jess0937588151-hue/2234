@@ -74,6 +74,22 @@ function ensureModal(){
     else if (act === 'addOpt') addOption();
     else if (act === 'all') selectAll(true);
     else if (act === 'none') selectAll(false);
+    else if (act === 'optUp'){
+      const i = parseInt(e.target.getAttribute('data-i'),10);
+      if (!isNaN(i) && i>0 && draft){
+        const arr = draft.options;
+        [arr[i-1], arr[i]] = [arr[i], arr[i-1]];
+        renderOptions();
+      }
+    }
+    else if (act === 'optDown'){
+      const i = parseInt(e.target.getAttribute('data-i'),10);
+      if (!isNaN(i) && draft && i < (draft.options||[]).length - 1){
+        const arr = draft.options;
+        [arr[i+1], arr[i]] = [arr[i], arr[i+1]];
+        renderOptions();
+      }
+    }
     else if (act === 'rmOpt'){
       const i = parseInt(e.target.getAttribute('data-i'),10);
       if (!isNaN(i) && draft){ draft.options.splice(i,1); renderOptions(); }
