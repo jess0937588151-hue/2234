@@ -168,64 +168,47 @@
 
       <!-- ===== 商品管理頁 ===== -->
 <section id="productsView" class="view">
-  <!-- 頂部工具列：搜尋 / 新增 / Excel / 雲端 -->
-  <div class="products-topbar">
-    <div class="topbar-left">
+  <!-- 頂部工具列：兩行（搜尋 / 動作按鈕） -->
+  <div class="products-topbar-v2">
+    <div class="products-topbar-row1">
       <input type="search" id="productSearchTop" class="input" placeholder="搜尋商品名稱…">
     </div>
-    <div class="topbar-right">
+    <div class="products-topbar-row2">
+      <button id="openCategoryListBtn" class="btn">分類</button>
+      <button id="openModuleListBtn" class="btn">模組</button>
       <button id="addProductBtnTop" class="btn primary">＋ 新增商品</button>
-      <button id="excelTemplateBtn" class="btn">下載範本</button>
-      <label class="btn file-btn">匯入 Excel
+      <button id="openPendingBtn" class="btn">待上架(<span id="pendingCountLabel">0</span>)</button>
+      <button id="excelTemplateBtn" class="btn">範本</button>
+      <label class="btn file-btn">匯入
         <input type="file" id="excelImportInput" accept=".xlsx,.xls" hidden>
       </label>
-      <button id="syncMenuBtn" class="btn">☁ 同步菜單</button>
+      <button id="syncMenuBtn" class="btn">☁同步</button>
     </div>
   </div>
 
-  <!-- 主體：左欄 (分類 + 模組) / 右欄 (商品列表) -->
-  <div class="products-grid-2col">
-    <!-- 左欄 -->
-    <aside class="products-left-pane">
-      <div class="panel-block">
-        <div class="panel-head">
-          <h3>分類管理</h3>
-          <button id="addCategoryBtn" class="btn small">＋ 新增分類</button>
-        </div>
-        <div id="categoryList" class="card-list"></div>
+  <!-- 主畫面：單欄商品列表 -->
+  <div class="products-main">
+    <div class="panel-block">
+      <div class="panel-head">
+        <h3>商品列表</h3>
+        <span id="productCountLabel" class="muted"></span>
       </div>
-
-      <div class="panel-block">
-        <div class="panel-head">
-          <h3>模組管理</h3>
-          <button id="addModuleBtn" class="btn small">＋ 新增模組</button>
-        </div>
-        <div id="moduleLibrary" class="card-list"></div>
-      </div>
-    </aside>
-
-    <!-- 右欄 -->
-    <main class="products-right-pane">
-      <div class="panel-block">
-        <div class="panel-head">
-          <h3>商品列表</h3>
-          <span id="productCountLabel" class="muted"></span>
-        </div>
-        <div id="productTable" class="product-table"></div>
-      </div>
-
-      <div class="panel-block" id="pendingMenuPanel" hidden>
-        <div class="panel-head">
-          <h3>待上架商品</h3>
-          <button id="applyPendingMenuBtn" class="btn small primary">套用</button>
-          <button id="discardPendingMenuBtn" class="btn small">捨棄</button>
-        </div>
-        <div id="pendingMenuList" class="card-list"></div>
-      </div>
-    </main>
+      <div id="productTable" class="product-table"></div>
+    </div>
   </div>
-</section>
 
+  <!-- 隱藏占位：保留舊 ID 給其他模組相容（不顯示） -->
+  <div style="display:none">
+    <div id="categoryList"></div>
+    <div id="moduleLibrary"></div>
+    <div id="pendingMenuPanel" hidden>
+      <button id="applyPendingMenuBtn"></button>
+      <button id="discardPendingMenuBtn"></button>
+      <div id="pendingMenuList"></div>
+    </div>
+    <button id="addCategoryBtn"></button>
+    <button id="addModuleBtn"></button>
+  </div>
 
   <!-- 商品編輯浮窗 -->
   <div id="productEditModal" class="product-modal-backdrop" style="display:none">
@@ -255,10 +238,6 @@
               <option value="false">停用</option>
             </select>
           </div>
-        </div>
-        <div class="form-row">
-          <label>商品別名（逗號分隔）</label>
-          <input id="productAliases" placeholder="香雞排, 大雞排">
         </div>
         <div class="form-row">
           <label>商品圖片</label>
