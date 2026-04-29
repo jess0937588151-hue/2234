@@ -476,6 +476,294 @@ function closeProductEditModal(){
 }
 
 // ============================================================
+// 分類列表彈窗（顯示全部分類，可改名/刪除/新增）
+// ============================================================
+function ensureCategoryListModal(){
+  let el = document.getElementById('__categoryListDynamicModal');
+  if(el) return el;
+  el = document.createElement('div');
+  el.id = '__categoryListDynamicModal';
+  el.className = 'dyn-modal-backdrop';
+  el.style.display = 'none';
+  el.innerHTML = `
+    <div class="dyn-modal">
+      <div class="dyn-head">
+        <h3>分類管理</h3>
+        <button class="btn small" data-act="close">✕</button>
+      </div>
+      <div class="dyn-body">
+        <div style="margin-bottom:10px"><button class="btn primary" data-act="add">＋ 新增分類</button></div>
+        <div id="__categoryListBody"></div>
+      </div>
+      <div class="dyn-foot">
+        <span style="flex:1"></span>
+        <button class="btn" data-act="close">關閉</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+  el.addEventListener('click', (e)=>{
+    if(e.target === el){ el.style.display='none'; return; }
+    const act = e.target.getAttribute('data-act');
+    if(!act) return;
+    if(act === 'close') el.style.display='none';
+    else if(act === 'add'){
+      const name = prompt('請輸入新分類名稱');
+      if(!name) return;
+      const t = name.trim();
+      if(!t) return;
+      if(state.categories.includes(t)) return alert('分類已存在');
+      state.categories.push(t);
+      persistAll(); renderCategoryListModal(); window.refreshAllViews();
+    }
+  });
+  return el;
+}
+function renderCategoryListModal(){
+  const body = document.getElementById('__categoryListBody');
+  if(!body) return;
+  body.innerHTML = '';
+  (state.categories||[]).forEach(cat=>{
+    const count = (state.products||[]).filter(p=>p.category===cat).length;
+    const card = document.createElement('div');
+    card.className = 'entity-card' + (cat==='未分類' ? ' warning' : '');
+    card.innerHTML = `<strong>${escapeHtml(cat)}</strong><div class="meta">${count} 筆商品</div><div class="card-actions"><button class="manage">編輯</button>${cat!=='未分類'?'<button class="rename">改名</button><button class="delete">刪除</button>':''}</div>`;
+    card.querySelector('.manage').onclick = ()=>{
+      document.getElementById('__categoryListDynamicModal').style.display='none';
+      openCategoryManage && openCategoryManage(cat);
+    };
+    if(cat!=='未分類'){
+      card.querySelector('.rename').onclick = ()=>{
+        const nv = prompt('輸入新分類名稱', cat);
+        if(!nv || nv.trim()===cat) return;
+        const t = nv.trim();
+        if(!t) return;
+        if(state.categories.includes(t)) return alert('分類已存在');
+        state.categories = state.categories.map(c=> c===cat ? t : c);
+        state.products.forEach(p=>{ if(p.category===cat) p.category = t; });
+        persistAll(); renderCategoryListModal(); window.refreshAllViews();
+      };
+      card.querySelector('.delete').onclick = ()=>{
+        if(!confirm(`確定刪除分類「${cat}」？此分類下商品將改為未分類`)) return;
+        state.categories = state.categories.filter(c=>c!==cat);
+        state.products.forEach(p=>{ if(p.category===cat) p.category = '未分類'; });
+        persistAll(); renderCategoryListModal(); window.refreshAllViews();
+      };
+    }
+    body.appendChild(card);
+  });
+}
+function openCategoryListModal(){
+  ensureCategoryListModal();
+  renderCategoryListModal();
+  document.getElementById('__categoryListDynamicModal').style.display='flex';
+}
+
+// ============================================================
+// 模組列表彈窗
+// ============================================================
+function ensureModuleListModal(){
+  let el = document.getElementById('__moduleListDynamicModal');
+  if(el) return el;
+  el = document.createElement('div');
+  el.id = '__moduleListDynamicModal';
+  el.className = 'dyn-modal-backdrop';
+  el.style.display = 'none';
+  el.innerHTML = `
+    <div class="dyn-modal">
+      <div class="dyn-head">
+        <h3>模組管理</h3>
+        <button class="btn small" data-act="close">✕</button>
+      </div>
+      <div class="dyn-body">
+        <div style="margin-bottom:10px"><button class="btn primary" data-act="add">＋ 新增模組</button></div>
+        <div id="__moduleListBody"></div>
+      </div>
+      <div class="dyn-foot">
+        <span style="flex:1"></span>
+        <button class="btn" data-act="close">關閉</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+  el.addEventListener('click', (e)=>{
+    if(e.target === el){ el.style.display='none'; return; }
+    const act = e.target.getAttribute('data-act');
+    if(!act) return;
+    if(act === 'close') el.style.display='none';
+    else if(act === 'add'){
+      const name = prompt('請輸入新模組名稱（例如：甜度、冰量）');
+      if(!name) return;
+      const t = name.trim();
+      if(!t) return;
+      state.modules.push({id:id(), name:t, selection:'single', required:true, options:[]});
+      persistAll(); renderModuleListModal(); window.refreshAllViews();
+    }
+  });
+  return el;
+}
+function renderModuleListModal(){
+  const body = document.getElementById('__moduleListBody');
+  if(!body) return;
+  body.innerHTML = '';
+  (state.modules||[]).forEach(mod=>{
+    const usedCount = (state.products||[]).filter(p=> (p.modules||[]).some(a=>a && a.moduleId===mod.id)).length;
+    const card = document.createElement('div');
+    card.className = 'module-card';
+    card.innerHTML = `<strong>${escapeHtml(mod.name)}</strong><div class="meta">${mod.selection==='multi'?'多選':'單選'} ・ ${mod.required?'必選':'非必選'} ・ ${usedCount} 商品</div><div class="card-actions"><button class="edit">編輯</button><button class="delete">刪除</button></div>`;
+    card.querySelector('.edit').onclick = ()=>{
+      document.getElementById('__moduleListDynamicModal').style.display='none';
+      openModuleManage && openModuleManage(mod.id);
+    };
+    card.querySelector('.delete').onclick = ()=>{
+      if(!confirm(`確定刪除模組「${mod.name}」？所有商品身上的此模組將被移除`)) return;
+      state.modules = state.modules.filter(m=>m.id!==mod.id);
+      state.products.forEach(p=> p.modules = (p.modules||[]).filter(a=>a && a.moduleId!==mod.id));
+      persistAll(); renderModuleListModal(); window.refreshAllViews();
+    };
+    body.appendChild(card);
+  });
+}
+function openModuleListModal(){
+  ensureModuleListModal();
+  renderModuleListModal();
+  document.getElementById('__moduleListDynamicModal').style.display='flex';
+}
+
+// ============================================================
+// 待上架商品彈窗
+// ============================================================
+function ensurePendingModal(){
+  let el = document.getElementById('__pendingDynamicModal');
+  if(el) return el;
+  el = document.createElement('div');
+  el.id = '__pendingDynamicModal';
+  el.className = 'dyn-modal-backdrop';
+  el.style.display = 'none';
+  el.innerHTML = `
+    <div class="dyn-modal">
+      <div class="dyn-head">
+        <h3>待上架商品</h3>
+        <button class="btn small" data-act="close">✕</button>
+      </div>
+      <div class="dyn-body" id="__pendingDynamicBody"></div>
+      <div class="dyn-foot">
+        <button class="btn danger" data-act="discard">捨棄全部</button>
+        <span style="flex:1"></span>
+        <button class="btn" data-act="close">關閉</button>
+        <button class="btn primary" data-act="apply">套用全部</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+  el.addEventListener('click', (e)=>{
+    if(e.target === el){ el.style.display='none'; return; }
+    const act = e.target.getAttribute('data-act');
+    if(!act) return;
+    if(act === 'close') el.style.display='none';
+    else if(act === 'apply'){
+      const list = state.pendingProducts || [];
+      if(!list.length) return alert('沒有待上架商品');
+      let applied = 0;
+      list.slice().forEach(item=>{
+        const name = (item.name||'').trim();
+        const price = Number(item.price||0);
+        if(!name || !(price > 0)) return;
+        state.products.push({
+          id:item.id||id(), name, price,
+          category:item.category||'未分類',
+          enabled:item.enabled!==false,
+          image:item.image||'',
+          modules:item.modules||[],
+          sortOrder:state.products.length
+        });
+        state.pendingProducts = state.pendingProducts.filter(x=>x.id !== item.id);
+        applied++;
+      });
+      state.products.sort((a,b)=>a.sortOrder-b.sortOrder).forEach((p,i)=> p.sortOrder = i);
+      persistAll(); window.refreshAllViews();
+      alert(`已套用 ${applied} 筆`);
+      renderPendingModal();
+      updatePendingCountLabel();
+    }
+    else if(act === 'discard'){
+      if(!(state.pendingProducts||[]).length) return;
+      if(!confirm('確定捨棄全部待上架商品？')) return;
+      state.pendingProducts = [];
+      persistAll(); window.refreshAllViews();
+      renderPendingModal();
+      updatePendingCountLabel();
+    }
+  });
+  return el;
+}
+function renderPendingModal(){
+  const body = document.getElementById('__pendingDynamicBody');
+  if(!body) return;
+  const list = state.pendingProducts || [];
+  if(!list.length){
+    body.innerHTML = '<div class="muted" style="padding:20px;text-align:center">目前沒有待上架商品</div>';
+    return;
+  }
+  body.innerHTML = '';
+  list.forEach(item=>{
+    const row = document.createElement('div');
+    row.className = 'pending-card';
+    row.innerHTML = `
+      <div class="row"><strong>${escapeHtml(item.name||'')}</strong><span class="tag">${escapeHtml(item.category||'未分類')}</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+        <div><label>品項名稱</label><input class="pending-name" value="${escapeAttr(item.name||'')}"></div>
+        <div><label>價格</label><input class="pending-price" type="number" min="0" value="${Number(item.price||0)}"></div>
+      </div>
+      <div class="row gap wrap" style="margin-top:10px">
+        <button type="button" class="btn primary approve-btn">確認加入菜單</button>
+        <button type="button" class="btn danger delete-btn">刪除</button>
+      </div>`;
+    const nameInput = row.querySelector('.pending-name');
+    const priceInput = row.querySelector('.pending-price');
+    nameInput.addEventListener('input', ()=>{ item.name = nameInput.value; persistAll(); });
+    priceInput.addEventListener('input', ()=>{ item.price = Number(priceInput.value||0); persistAll(); });
+    row.querySelector('.approve-btn').onclick = ()=>{
+      const name = (item.name||'').trim();
+      const price = Number(item.price||0);
+      if(!name) return alert('請先輸入品項名稱');
+      if(!price || price <= 0) return alert('請先輸入正確價格');
+      state.products.push({
+        id:item.id||id(), name, price,
+        category:item.category||'未分類',
+        enabled:true, image:item.image||'',
+        modules:item.modules||[],
+        sortOrder:state.products.length
+      });
+      state.pendingProducts = state.pendingProducts.filter(x=>x.id !== item.id);
+      state.products.sort((a,b)=>a.sortOrder-b.sortOrder).forEach((p,i)=> p.sortOrder = i);
+      persistAll(); window.refreshAllViews();
+      renderPendingModal();
+      updatePendingCountLabel();
+    };
+    row.querySelector('.delete-btn').onclick = ()=>{
+      state.pendingProducts = state.pendingProducts.filter(x=>x.id !== item.id);
+      persistAll(); renderPendingModal(); updatePendingCountLabel();
+      window.refreshAllViews();
+    };
+    body.appendChild(row);
+  });
+}
+function openPendingModal(){
+  ensurePendingModal();
+  renderPendingModal();
+  document.getElementById('__pendingDynamicModal').style.display='flex';
+}
+function updatePendingCountLabel(){
+  const lbl = document.getElementById('pendingCountLabel');
+  const btn = document.getElementById('openPendingBtn');
+  const count = (state.pendingProducts||[]).length;
+  if(lbl) lbl.textContent = count;
+  if(btn){
+    btn.disabled = count === 0;
+    btn.style.opacity = count === 0 ? '0.5' : '1';
+  }
+}
+
+
+// ============================================================
 // 雲端同步菜單（頂部按鈕用）
 // ============================================================
 async function syncMenuHandler(btn){
