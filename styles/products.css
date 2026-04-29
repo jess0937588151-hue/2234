@@ -213,4 +213,64 @@
 #pendingMenuList .pending-card:last-child{ margin-bottom:0; }
 
 
+/* ===== Batch 06.12：兩行工具列 + 單欄商品列表 ===== */
+.products-topbar-v2{
+  display:flex; flex-direction:column; gap:8px;
+  background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:10px 12px;
+}
+.products-topbar-v2 .products-topbar-row1{ display:flex; gap:8px; }
+.products-topbar-v2 .products-topbar-row1 .input{
+  flex:1; padding:8px 12px; border:1px solid #d1d5db; border-radius:8px;
+}
+.products-topbar-v2 .products-topbar-row2{
+  display:flex; gap:6px; flex-wrap:wrap;
+}
+.products-topbar-v2 .products-topbar-row2 .btn{
+  padding:6px 10px; font-size:13px; border-radius:8px; border:1px solid #d1d5db;
+  background:#fff; cursor:pointer;
+}
+.products-topbar-v2 .products-topbar-row2 .btn.primary{
+  background:#2563eb; color:#fff; border-color:#2563eb;
+}
+.products-topbar-v2 .products-topbar-row2 .file-btn{ display:inline-flex; align-items:center; }
+
+/* 橫向（≥1024）放在一行（非必要：可保留兩行更穩） */
+@media (min-width: 1024px){
+  .products-topbar-v2{ flex-direction:row; align-items:center; }
+  .products-topbar-v2 .products-topbar-row1{ flex:1; min-width:200px; max-width:380px; }
+  .products-topbar-v2 .products-topbar-row2{ flex:none; }
+}
+
+.products-main{ flex:1; min-height:0; display:flex; flex-direction:column; }
+.products-main .panel-block{
+  flex:1; min-height:0; display:flex; flex-direction:column;
+  background:#fff; border:1px solid #e5e7eb; border-radius:10px; overflow:hidden;
+}
+.products-main .panel-block .panel-head{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:10px 12px; border-bottom:1px solid #e5e7eb; background:#f9fafb;
+}
+.products-main .panel-block .panel-head h3{ margin:0; font-size:15px; font-weight:600; }
+.products-main .panel-block .product-table{
+  flex:1; overflow-y:auto; padding:10px;
+}
+.products-main .panel-block .product-table .product-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(170px, 1fr));
+  gap:10px;
+}
+
+/* 待上架彈窗的卡片 */
+#__pendingDynamicModal .pending-card{
+  border:1px solid #e5e7eb; border-radius:10px; padding:10px; margin-bottom:8px; background:#fff;
+}
+#__pendingDynamicModal .pending-card:last-child{ margin-bottom:0; }
+#__pendingDynamicModal .pending-card .row{ display:flex; justify-content:space-between; align-items:center; gap:8px; }
+#__pendingDynamicModal .pending-card label{ font-size:12px; color:#6b7280; }
+#__pendingDynamicModal .pending-card input{ width:100%; padding:6px 8px; border:1px solid #d1d5db; border-radius:6px; font-size:14px; }
+
+/* 分類/模組總覽彈窗的卡片列表 */
+#__categoryListDynamicModal .entity-card,
+#__moduleListDynamicModal .module-card{ margin-bottom:6px; }
+
 
