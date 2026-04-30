@@ -64,10 +64,11 @@ function ensureModal(){
     </div>`;
   document.body.appendChild(el);
 
-  el.addEventListener('click', (e)=>{
+    el.addEventListener('click', (e)=>{
     if (e.target === el){ closeModuleManage(); return; }
-    const act = e.target.getAttribute('data-act');
-    if (!act) return;
+    const btn = e.target.closest('[data-act]');
+    if (!btn) return;
+    const act = btn.getAttribute('data-act');
     if (act === 'close') closeModuleManage();
     else if (act === 'save') saveModuleManage();
     else if (act === 'delete') deleteModuleManage();
@@ -75,13 +76,30 @@ function ensureModal(){
     else if (act === 'all') selectAll(true);
     else if (act === 'none') selectAll(false);
     else if (act === 'optUp'){
-      const i = parseInt(e.target.getAttribute('data-i'),10);
-      if (!isNaN(i) && i>0 && draft){
+      const i = parseInt(btn.getAttribute('data-i'),10);
+      if (!isNaN(i) && i>0 && draft && draft.options){
         const arr = draft.options;
         [arr[i-1], arr[i]] = [arr[i], arr[i-1]];
         renderOptions();
       }
     }
+    else if (act === 'optDown'){
+      const i = parseInt(btn.getAttribute('data-i'),10);
+      if (!isNaN(i) && draft && draft.options && i < draft.options.length - 1){
+        const arr = draft.options;
+        [arr[i+1], arr[i]] = [arr[i], arr[i+1]];
+        renderOptions();
+      }
+    }
+    else if (act === 'rmOpt'){
+      const i = parseInt(btn.getAttribute('data-i'),10);
+      if (!isNaN(i) && draft && draft.options){
+        draft.options.splice(i,1);
+        renderOptions();
+      }
+    }
+  });
+
     else if (act === 'optDown'){
       const i = parseInt(e.target.getAttribute('data-i'),10);
       if (!isNaN(i) && draft && i < (draft.options||[]).length - 1){
@@ -117,11 +135,11 @@ function renderOptions(){
   const len = (draft.options||[]).length;
   wrap.innerHTML = (draft.options||[]).map((opt, i) => `
     <div class="sub-option-row">
-      <button class="btn small" data-act="optUp" data-i="${i}" ${i===0?'disabled':''}>▲</button>
-      <button class="btn small" data-act="optDown" data-i="${i}" ${i===len-1?'disabled':''}>▼</button>
+      <button type="button" class="btn small" data-act="optUp" data-i="${i}" ${i===0?'disabled':''} style="min-width:32px">▲</button>
+      <button type="button" class="btn small" data-act="optDown" data-i="${i}" ${i===len-1?'disabled':''} style="min-width:32px">▼</button>
       <input class="input" data-fld="name" data-i="${i}" placeholder="子選項名稱" value="${escapeHtml(opt.name||'')}">
       <input class="input" data-fld="price" data-i="${i}" type="number" step="1" placeholder="加價" value="${Number(opt.price||0)}" style="max-width:90px;">
-      <button class="btn small" data-act="rmOpt" data-i="${i}">移除</button>
+      <button type="button" class="btn small" data-act="rmOpt" data-i="${i}">移除</button>
     </div>`).join('');
   wrap.querySelectorAll('input[data-fld]').forEach(inp=>{
     inp.addEventListener('input', (e)=>{
