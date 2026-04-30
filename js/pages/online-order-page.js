@@ -113,10 +113,10 @@ function renderProducts(){
       ${p.image ? `<div class="online-product-image"><img src="${escapeHtml(p.image)}" alt="${escapeHtml(p.name)}"></div>` : '<div class="online-product-image"></div>'}
       <div class="online-product-body">
         <div class="online-product-name">${escapeHtml(p.name)}</div>
-        <div class="online-product-price">${money(p.price)}</div>
-        <div class="online-product-meta">${escapeHtml(p.category)}${moduleNames.length ? '・' + escapeHtml(moduleNames.join('/')) : ''}</div>
-        <div class="online-product-footer"><button class="primary-btn full">加入購物車</button></div>
-      </div>
+${p.description ? `<div class="online-product-desc">${escapeHtml(p.description)}</div>` : ''}
+<div class="online-product-price">${money(p.price)}</div>
+<div class="online-product-meta">${escapeHtml(p.category)}${moduleNames.length ? '・' + escapeHtml(moduleNames.join('/')) : ''}</div>
+
     `;
     card.querySelector('button').onclick = ()=> openProductConfigForNew(p.id);
     grid.appendChild(card);
