@@ -132,7 +132,7 @@ function updateItemPricePreview(product){
 }
 
 function renderProductConfig(product){
-  document.getElementById('onlineModalTitle').textContent = product.name + ' - 設定';
+  document.getElementById('onlineModalTitle').textContent = product.name;
   const imageWrap = document.getElementById('onlineModalImageWrap');
     imageWrap.innerHTML = '';
     imageWrap.classList.add('hidden');
