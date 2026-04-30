@@ -511,18 +511,15 @@ function renderCategoryListModal(){
   if(!body) return;
   body.innerHTML = '';
   const cats = state.categories || [];
-  cats.forEach((cat, idx)=>{
+  cats.forEach((cat)=>{
     const count = (state.products||[]).filter(p=>p.category===cat).length;
     const card = document.createElement('div');
     card.className = 'entity-card' + (cat==='未分類' ? ' warning' : '');
     const isUncat = cat === '未分類';
-    const isFirst = idx === 0;
-    const isLast = idx === cats.length - 1;
     card.innerHTML = `
       <strong>${escapeHtml(cat)}</strong>
       <div class="meta">${count} 筆商品</div>
       <div class="card-actions">
-        ${!isUncat ? `<button class="move up" ${isFirst?'disabled':''}>▲</button><button class="move down" ${isLast?'disabled':''}>▼</button>` : ''}
         <button class="manage">編輯</button>
         ${!isUncat ? '<button class="rename">改名</button><button class="delete">刪除</button>' : ''}
       </div>`;
@@ -531,18 +528,6 @@ function renderCategoryListModal(){
       openCategoryManage && openCategoryManage(cat);
     };
     if(!isUncat){
-      const upBtn = card.querySelector('.move.up');
-      const downBtn = card.querySelector('.move.down');
-      if(upBtn && !isFirst) upBtn.onclick = ()=>{
-        const arr = state.categories;
-        [arr[idx-1], arr[idx]] = [arr[idx], arr[idx-1]];
-        persistAll(); renderCategoryListModal(); window.refreshAllViews();
-      };
-      if(downBtn && !isLast) downBtn.onclick = ()=>{
-        const arr = state.categories;
-        [arr[idx+1], arr[idx]] = [arr[idx], arr[idx+1]];
-        persistAll(); renderCategoryListModal(); window.refreshAllViews();
-      };
       card.querySelector('.rename').onclick = ()=>{
         const nv = prompt('輸入新分類名稱', cat);
         if(!nv || nv.trim()===cat) return;
