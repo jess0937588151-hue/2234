@@ -857,8 +857,9 @@ async function fetchMenuHandler(btn){
 export function initProductsPage(){
   document.getElementById('addProductBtnTop')?.addEventListener('click', ()=> openProductEditModal(null));
   document.getElementById('productSearchTop')?.addEventListener('input', renderProductsTable);
-  document.getElementById('syncMenuBtn')?.addEventListener('click', (e)=> syncMenuHandler(e.currentTarget));
-  document.getElementById('fetchMenuBtn')?.addEventListener('click', (e)=> fetchMenuHandler(e.currentTarget));
+  document.getElementById('syncMenuBtnProducts')?.addEventListener('click', (e)=> syncMenuHandler(e.currentTarget));
+  document.getElementById('fetchMenuBtnProducts')?.addEventListener('click', (e)=> fetchMenuHandler(e.currentTarget));
+
   applyProductsRoleLock();
 
   document.getElementById('openCategoryListBtn')?.addEventListener('click', openCategoryListModal);
