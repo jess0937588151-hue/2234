@@ -1,7 +1,7 @@
 /* 中文備註：線上點餐頁邏輯，顧客送單後會等待 POS 確認，確認後才完成訂購。 */
 import { state } from '../core/store.js';
 import { escapeHtml, id, money } from '../core/utils.js';
-import { getRealtimeConfig, pushOnlineOrder, watchCustomerOrder, fetchMenuFromFirebase, watchMenuFromFirebase } from '../modules/realtime-order-service.js';
+import { getRealtimeConfig, pushOnlineOrder, watchCustomerOrder, fetchMenuFromFirebase, startMenuAutoWatch } from '../modules/realtime-order-service.js';
 
 const onlineState = {
   selectedCategory: '全部',
@@ -347,15 +347,16 @@ async function submitOnlineOrder(){
 async function init(){
   document.getElementById('onlineStoreName').textContent = getStoreName();
   document.getElementById('onlineStoreMeta').textContent = getStoreMeta();
-  try {
+    try {
     await fetchMenuFromFirebase();
-    watchMenuFromFirebase(() => {
+    await startMenuAutoWatch(() => {
       renderCategoryTabs();
       renderProducts();
     });
   } catch(err) {
     console.error('讀取雲端菜單失敗：', err);
   }
+
 
   
   renderCategoryTabs();
