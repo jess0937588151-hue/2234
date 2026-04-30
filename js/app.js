@@ -191,17 +191,41 @@ window.posGoogleLogout = async function(){
 };
 
 // ============================================================
-// 同步菜單到雲端
+// 同步菜單到雲端（含 loading 與成功/失敗提示）
 // ============================================================
-window.syncMenuToCloud = async function(){
+window.syncMenuToCloud = async function(triggerBtn){
+  const btn = triggerBtn || document.getElementById('syncMenuToCloudBtn') || document.getElementById('syncMenuBtn');
+  const originalText = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = '同步中...'; }
   try{
     await syncMenuToFirebase();
     window.refreshRealtimeOrderPanel();
+    if(btn){ btn.textContent = '✓ 同步成功'; setTimeout(()=>{ btn.textContent = originalText; btn.disabled = false; }, 2000); }
+    else alert('菜單同步成功');
   }catch(err){
-    alert('同步菜單失敗：' + err.message);
-    throw err;
+    if(btn){ btn.textContent = originalText; btn.disabled = false; }
+    alert('同步菜單失敗：' + (err.message || err));
   }
 };
+
+// 讀取雲端菜單（merge：雲端覆蓋同 id 項目，本地獨有項目保留）
+window.fetchMenuFromCloud = async function(triggerBtn){
+  const btn = triggerBtn || document.getElementById('fetchMenuFromCloudBtn');
+  const originalText = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = '讀取中...'; }
+  try{
+    const mod = await import('./modules/realtime-order-service.js');
+    const result = await mod.fetchAndMergeMenuFromFirebase();
+    window.refreshAllViews();
+    window.refreshRealtimeOrderPanel();
+    if(btn){ btn.textContent = `✓ 讀取成功（雲端 ${result.cloudCount} / 本地保留 ${result.localKeptCount}）`; setTimeout(()=>{ btn.textContent = originalText; btn.disabled = false; }, 2500); }
+    else alert(`讀取成功，雲端 ${result.cloudCount} 筆 / 本地獨有保留 ${result.localKeptCount} 筆`);
+  }catch(err){
+    if(btn){ btn.textContent = originalText; btn.disabled = false; }
+    alert('讀取菜單失敗：' + (err.message || err));
+  }
+};
+
 
 // ============================================================
 // 即時接單重新初始化（儲存設定後呼叫）
