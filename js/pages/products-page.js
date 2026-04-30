@@ -4,6 +4,17 @@ import { state, persistAll } from '../core/store.js';
 import { escapeHtml, escapeAttr, money, id, deepCopy } from '../core/utils.js';
 import { openCategoryManage, closeCategoryManage, renderCategoryManage, saveCategoryManage } from '../modules/product-category-manager.js';
 import { openModuleManage, closeModuleManage, renderModuleManage, saveModuleManage } from '../modules/product-module-manager.js';
+import { syncMenuToFirebase, getRealtimeConfig } from '../modules/realtime-order-service.js';
+
+// 主機自動推送雲端：從機呼叫不會丟錯，只 console
+function autoPushIfMaster(){
+  try{
+    const cfg = getRealtimeConfig();
+    if(cfg.deviceRole !== 'master') return;
+    if(!cfg.enabled) return;
+    syncMenuToFirebase().catch(err => console.warn('autoPush 失敗：', err.message));
+  }catch(e){ console.warn('autoPush exception:', e); }
+}
 
 function getProductModuleNames(product){
   return (product.modules||[]).map(a=> state.modules.find(m=>m.id===a.moduleId)?.name).filter(Boolean);
@@ -336,33 +347,47 @@ export function renderProductsTable(){
     const card = document.createElement('div');
     card.className = 'product-card' + (p.enabled===false ? ' disabled' : '');
     const modNames = getProductModuleNames(p);
-    card.innerHTML = `${p.image ? `<img class="card-thumb" src="${escapeAttr(p.image)}">` : '<div class="card-thumb-placeholder">📷</div>'}
+        card.innerHTML = `${p.image ? `<img class="card-thumb" src="${escapeAttr(p.image)}">` : '<div class="card-thumb-placeholder">📷</div>'}
       <div class="card-line1"><span class="card-name">${escapeHtml(p.name)}</span><span class="card-price">${money(p.price)}</span></div>
       <div class="card-line2"><span class="card-cat">${escapeHtml(p.category)}</span>${modNames.length ? `<span class="card-mods">${escapeHtml(modNames.join('、'))}</span>` : ''}</div>
-      <div class="card-status"><span class="status ${p.enabled===false?'off':'on'}">${p.enabled===false?'已下架':'上架中'}</span></div>
+      <div class="card-status">
+        <span class="status ${p.enabled===false?'off':'on'}">${p.enabled===false?'已下架':'上架中'}</span>
+        ${p.soldOut===true ? '<span class="status off" style="background:#dc2626;color:#fff;margin-left:6px">售完</span>' : ''}
+      </div>
       <div class="card-actions">
         <button class="move-up">▲</button>
         <button class="move-down">▼</button>
         <button class="edit">編輯</button>
         <button class="toggle">${p.enabled===false?'上架':'下架'}</button>
+        <button class="soldout" style="${p.soldOut===true?'background:#dc2626;color:#fff':''}">${p.soldOut===true?'恢復':'售完'}</button>
         <button class="delete">刪除</button>
       </div>`;
 
-    card.querySelector('.move-up').onclick = ()=> moveProduct(p.id, 'up');
-    card.querySelector('.move-down').onclick = ()=> moveProduct(p.id, 'down');
+
+        card.querySelector('.move-up').onclick = ()=> { moveProduct(p.id, 'up'); autoPushIfMaster(); };
+    card.querySelector('.move-down').onclick = ()=> { moveProduct(p.id, 'down'); autoPushIfMaster(); };
     card.querySelector('.edit').onclick = ()=> openProductEditModal(p);
     card.querySelector('.toggle').onclick = ()=>{
       p.enabled = !(p.enabled!==false);
       persistAll(); renderProductsTable();
       if(window.refreshPublicProducts) window.refreshPublicProducts();
+      autoPushIfMaster();
+    };
+    card.querySelector('.soldout').onclick = ()=>{
+      p.soldOut = !(p.soldOut===true);
+      persistAll(); renderProductsTable();
+      if(window.refreshPublicProducts) window.refreshPublicProducts();
+      autoPushIfMaster();
     };
     card.querySelector('.delete').onclick = ()=>{
       if(!confirm(`確定刪除「${p.name}」？`)) return;
       state.products = state.products.filter(x=>x.id!==p.id);
       persistAll(); renderProductsTable();
       if(window.refreshPublicProducts) window.refreshPublicProducts();
+      autoPushIfMaster();
     };
     grid.appendChild(card);
+
   });
 }
 
