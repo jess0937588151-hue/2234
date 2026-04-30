@@ -613,3 +613,25 @@
   white-space:nowrap;
 }
 .dyn-modal .product-pick-row .muted{ font-size:12px; color:#6b7280; }
+
+/* Batch 06.13/C：匯入 label 按鈕對齊其他 .btn */
+.products-topbar-row2 .btn,
+.products-topbar-v2 .btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  height:36px;
+  padding:0 14px;
+  box-sizing:border-box;
+  line-height:1;
+  font-size:14px;
+  vertical-align:middle;
+  margin:0;
+}
+.products-topbar-row2 label.btn,
+.products-topbar-v2 label.btn{
+  cursor:pointer;
+}
+
+
+
