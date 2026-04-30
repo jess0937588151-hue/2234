@@ -16,6 +16,17 @@ import { state, persistAll } from '../core/store.js';
 import { escapeHtml, escapeAttr, money, id, deepCopy } from '../core/utils.js';
 import { openCategoryManage, closeCategoryManage, renderCategoryManage, saveCategoryManage } from '../modules/product-category-manager.js';
 import { openModuleManage, closeModuleManage, renderModuleManage, saveModuleManage } from '../modules/product-module-manager.js';
+import { syncMenuToFirebase, getRealtimeConfig } from '../modules/realtime-order-service.js';
+
+// 主機自動推送（從機呼叫會被 service 拒絕，這裡先檢查角色避免無謂的網路請求）
+function autoPushIfMaster(){
+  try {
+    const cfg = getRealtimeConfig();
+    if(cfg.deviceRole !== 'master') return;
+    if(!cfg.enabled) return;
+    syncMenuToFirebase().catch(err => console.warn('autoPush failed:', err.message));
+  } catch(e) { /* 靜默 */ }
+}
 
 function getProductModuleNames(product){
   return (product.modules||[]).map(a=> state.modules.find(m=>m.id===a.moduleId)?.name).filter(Boolean);
