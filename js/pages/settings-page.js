@@ -149,10 +149,26 @@ function loadRealtimeSettingsToForm() {
   if (el('firebaseMeasurementId')) el('firebaseMeasurementId').value = rt.measurementId || '';
   if (el('onlineStoreTitle')) el('onlineStoreTitle').value = rt.onlineStoreTitle || '';
   if (el('onlineStoreSubtitle')) el('onlineStoreSubtitle').value = rt.onlineStoreSubtitle || '';
-  if (el('onlineConfirmAutoPrintKitchen')) el('onlineConfirmAutoPrintKitchen').checked = !!rt.autoPrintKitchenOnConfirm;
+   if (el('onlineConfirmAutoPrintKitchen')) el('onlineConfirmAutoPrintKitchen').checked = !!rt.autoPrintKitchenOnConfirm;
   if (el('onlineConfirmAutoPrintReceipt')) el('onlineConfirmAutoPrintReceipt').checked = !!rt.autoPrintReceiptOnConfirm;
   if (el('onlineIncomingSoundEnabled')) el('onlineIncomingSoundEnabled').checked = rt.incomingSoundEnabled !== false;
+
+  // 從機鎖定上傳按鈕：deviceRole === 'slave' 時 disable
+  applyDeviceRoleLock();
 }
+
+function applyDeviceRoleLock(){
+  var role = state.settings?.realtimeOrder?.deviceRole || 'master';
+  var isSlave = role === 'slave';
+  var syncBtn = document.getElementById('syncMenuBtn');
+  if (syncBtn){
+    syncBtn.disabled = isSlave;
+    syncBtn.style.opacity = isSlave ? '0.45' : '1';
+    syncBtn.title = isSlave ? '從機僅可讀取，不可上傳菜單' : '';
+    syncBtn.textContent = isSlave ? '⬆ 從機僅讀取' : '⬆ 上傳菜單到雲端';
+  }
+}
+
 
 
 // ── Google 備份：讀取欄位 ──
@@ -437,15 +453,35 @@ export function initSettingsPage() {
   });
 
 
-  // 同步菜單到雲端
+    // 上傳菜單到雲端（主機才可用）
   document.getElementById('syncMenuBtn')?.addEventListener('click', async function() {
+    var role = state.settings?.realtimeOrder?.deviceRole || 'master';
+    if (role === 'slave'){ alert('從機僅可讀取，不可上傳菜單'); return; }
     if (typeof window.syncMenuToCloud === 'function') {
-      await window.syncMenuToCloud();
-      alert('菜單已同步至雲端');
+      await window.syncMenuToCloud(this);
     } else {
       alert('同步模組未載入');
     }
   });
+
+  // 從雲端讀取菜單（主機與從機都可用）
+  document.getElementById('fetchMenuBtn')?.addEventListener('click', async function() {
+    if (typeof window.fetchMenuFromCloud === 'function') {
+      await window.fetchMenuFromCloud(this);
+      if (typeof window.refreshAllViews === 'function') window.refreshAllViews();
+    } else {
+      alert('讀取模組未載入');
+    }
+  });
+
+  // deviceRole 變動時即時鎖定按鈕
+  document.getElementById('deviceRole')?.addEventListener('change', function(){
+    if (!state.settings) state.settings = {};
+    if (!state.settings.realtimeOrder) state.settings.realtimeOrder = {};
+    state.settings.realtimeOrder.deviceRole = this.value;
+    applyDeviceRoleLock();
+  });
+
 
   // POS Google 登入/登出
   document.getElementById('posGoogleLoginBtn')?.addEventListener('click', function() {
