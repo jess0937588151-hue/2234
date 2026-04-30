@@ -961,6 +961,7 @@ export function initProductsPage(){
       category: document.getElementById('productCategory').value || '未分類',
       enabled: document.getElementById('productEnabled').value === 'true',
       image: document.getElementById('productImageData')?.value || '',
+      description: (document.getElementById('productDescription')?.value || '').trim().slice(0, 60),
       modules: deepCopy(state.editModules || []),
       sortOrder: idEl?.value ? (state.products.find(p=>p.id===idEl.value)?.sortOrder ?? state.products.length) : state.products.length,
     };
