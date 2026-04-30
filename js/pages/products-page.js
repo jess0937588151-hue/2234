@@ -802,22 +802,53 @@ function updatePendingCountLabel(){
 }
 
 // ============================================================
-// 雲端同步菜單
+// 雲端同步菜單（與設定頁一致：上傳 + 讀取 + 從機鎖）
 // ============================================================
-async function syncMenuHandler(btn){
-  if(!btn) return;
-  const original = btn.textContent;
-  try{
-    btn.disabled = true; btn.textContent = '同步中...';
-    const mod = await import('../modules/realtime-order-service.js');
-    await mod.syncMenuToFirebase();
-    btn.textContent = '同步完成！';
-    setTimeout(()=>{ btn.textContent = original; btn.disabled = false; }, 2000);
-  }catch(err){
-    alert('同步失敗：' + (err.message || err));
-    btn.textContent = original; btn.disabled = false;
+function applyProductsRoleLock(){
+  const cfg = (typeof getRealtimeConfig === 'function') ? getRealtimeConfig() : {};
+  const isSlave = cfg.deviceRole === 'slave';
+  const upBtn = document.getElementById('syncMenuBtn');
+  if(upBtn){
+    upBtn.disabled = isSlave;
+    upBtn.style.opacity = isSlave ? '0.5' : '1';
+    upBtn.style.cursor = isSlave ? 'not-allowed' : 'pointer';
+    upBtn.title = isSlave ? '從機僅能讀取，無法上傳' : '';
+    upBtn.textContent = isSlave ? '⬆ 從機僅讀取' : '⬆ 上傳';
   }
 }
+
+async function syncMenuHandler(btn){
+  const cfg = (typeof getRealtimeConfig === 'function') ? getRealtimeConfig() : {};
+  if(cfg.deviceRole === 'slave'){
+    alert('此裝置為從機，無法上傳菜單');
+    return;
+  }
+  if(typeof window.syncMenuToCloud === 'function'){
+    await window.syncMenuToCloud(btn);
+  } else {
+    // fallback：保留舊邏輯
+    const original = btn.textContent;
+    try{
+      btn.disabled = true; btn.textContent = '同步中...';
+      await syncMenuToFirebase();
+      btn.textContent = '✓ 同步成功';
+      setTimeout(()=>{ btn.textContent = original; btn.disabled = false; }, 2000);
+    }catch(err){
+      alert('同步失敗：' + (err.message || err));
+      btn.textContent = original; btn.disabled = false;
+    }
+  }
+}
+
+async function fetchMenuHandler(btn){
+  if(typeof window.fetchMenuFromCloud === 'function'){
+    await window.fetchMenuFromCloud(btn);
+    if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
+  } else {
+    alert('讀取功能尚未載入，請重新整理頁面');
+  }
+}
+
 
 // ============================================================
 // 初始化
