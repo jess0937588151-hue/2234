@@ -569,11 +569,17 @@ export function buildRealtimeOrderForPOS(remote){
 // ============================================================
 export async function syncMenuToFirebase(){
   await loadFirebaseModules();
+  const cfg = ensureRealtimeConfig();
+
+  // 角色檢查：只有 master 可上傳
+  if(cfg.deviceRole !== 'master'){
+    throw new Error('此裝置設定為「從機」，無上傳菜單權限。請改為主機角色或改按「讀取雲端菜單」。');
+  }
+
   const user = authInstance.currentUser || await waitForAuthReady();
   if(!user) throw new Error('請先使用 POS Google 登入');
   await verifyPOSAccess();
 
-  const cfg = ensureRealtimeConfig();
   const storeId = cfg.projectId || 'default';
   const menuData = {
     categories: state.categories || [],
@@ -585,7 +591,9 @@ export async function syncMenuToFirebase(){
         category: p.category,
         image: p.image || '',
         modules: p.modules || [],
-        sortOrder: p.sortOrder || 0
+        sortOrder: p.sortOrder || 0,
+        enabled: p.enabled !== false,
+        soldOut: p.soldOut === true
       };
     }),
     modules: state.modules || [],
@@ -598,6 +606,7 @@ export async function syncMenuToFirebase(){
   cfg.lastSyncTime = new Date().toISOString();
   persistAll();
 }
+
 
 export async function fetchMenuFromFirebase(){
   await loadFirebaseModules();
@@ -617,6 +626,164 @@ export async function fetchMenuFromFirebase(){
     state.categories = data.categories;
   }
   return data;
+}
+/**
+ * 讀取雲端菜單並 merge 到本地：
+ * - 分類：聯集（雲端優先順序，本地獨有附在後面）
+ * - 模組：用 id 比對；雲端有的覆蓋本地，本地獨有保留
+ * - 商品：用 id 比對；雲端有的覆蓋本地（但本地的 enabled / soldOut 優先保留），本地獨有保留
+ */
+export async function fetchAndMergeMenuFromFirebase(){
+  await loadFirebaseModules();
+  const cfg = ensureRealtimeConfig();
+  const storeId = cfg.projectId || 'default';
+  const menuRef = await getRef('menu/' + storeId);
+  const snapshot = await dbApi.get(menuRef);
+  const data = snapshot.val();
+  if(!data) throw new Error('雲端尚無菜單資料，請先在主機按「上傳菜單」');
+
+  let cloudCount = 0;
+  let localKeptCount = 0;
+
+  // 分類：聯集
+  if(Array.isArray(data.categories)){
+    const localCats = state.categories || [];
+    const merged = [...data.categories];
+    localCats.forEach(c => { if(!merged.includes(c)) merged.push(c); });
+    if(!merged.includes('未分類')) merged.unshift('未分類');
+    state.categories = merged;
+  }
+
+  // 模組：雲端覆蓋同 id，本地獨有保留
+  if(Array.isArray(data.modules)){
+    const cloudMap = {};
+    data.modules.forEach(m => { if(m && m.id) cloudMap[m.id] = m; });
+    const localMods = state.modules || [];
+    const merged = [];
+    const usedIds = new Set();
+    data.modules.forEach(m => { if(m && m.id){ merged.push(m); usedIds.add(m.id); }});
+    localMods.forEach(m => { if(m && m.id && !usedIds.has(m.id)){ merged.push(m); localKeptCount++; }});
+    state.modules = merged;
+  }
+
+  // 商品：雲端覆蓋同 id（但 enabled / soldOut 用本地優先），本地獨有保留
+  if(Array.isArray(data.products)){
+    const localProds = state.products || [];
+    const localMap = {};
+    localProds.forEach(p => { if(p && p.id) localMap[p.id] = p; });
+    const merged = [];
+    const usedIds = new Set();
+    data.products.forEach(cp => {
+      if(!cp || !cp.id) return;
+      const lp = localMap[cp.id];
+      const enabled = lp ? (lp.enabled !== false) : (cp.enabled !== false);
+      const soldOut = lp ? (lp.soldOut === true) : (cp.soldOut === true);
+      merged.push({
+        id: cp.id,
+        name: cp.name || '',
+        price: Number(cp.price || 0),
+        category: cp.category || '未分類',
+        image: cp.image || '',
+        modules: Array.isArray(cp.modules) ? cp.modules : [],
+        sortOrder: Number(cp.sortOrder || 0),
+        enabled,
+        soldOut
+      });
+      usedIds.add(cp.id);
+      cloudCount++;
+    });
+    localProds.forEach(p => { if(p && p.id && !usedIds.has(p.id)){ merged.push(p); localKeptCount++; }});
+    state.products = merged;
+  }
+
+  cfg.lastSyncStatus = `讀取成功：雲端 ${cloudCount} / 本地獨有保留 ${localKeptCount}`;
+  cfg.lastSyncTime = new Date().toISOString();
+  persistAll();
+  return { cloudCount, localKeptCount };
+}
+
+/**
+ * 從機/顧客頁啟動：訂閱雲端菜單變更 + 30 秒 fallback polling
+ */
+let menuWatchUnsub = null;
+let menuPollTimer = null;
+export async function startMenuAutoWatch(onUpdate){
+  await loadFirebaseModules();
+  const cfg = ensureRealtimeConfig();
+  const storeId = cfg.projectId || 'default';
+  const menuRef = await getRef('menu/' + storeId);
+
+  // 取消舊監聽
+  if(menuWatchUnsub){ try{ menuWatchUnsub(); }catch(e){} menuWatchUnsub = null; }
+  if(menuPollTimer){ clearInterval(menuPollTimer); menuPollTimer = null; }
+
+  const handler = (snapshot) => {
+    const data = snapshot.val();
+    if(!data) return;
+    try {
+      // 從機：用 merge 規則（保留本地獨有 + enabled/soldOut 本地優先）
+      applyCloudMenu(data);
+      if(typeof onUpdate === 'function') onUpdate();
+    } catch(e){ console.warn('menu watch handler failed:', e); }
+  };
+  dbApi.onValue(menuRef, handler);
+  menuWatchUnsub = ()=> dbApi.off(menuRef, 'value', handler);
+
+  // 30 秒 fallback
+  menuPollTimer = setInterval(async ()=>{
+    try{
+      const snap = await dbApi.get(menuRef);
+      const data = snap.val();
+      if(data){ applyCloudMenu(data); if(typeof onUpdate === 'function') onUpdate(); }
+    }catch(e){ /* 靜默 */ }
+  }, 30000);
+}
+
+function applyCloudMenu(data){
+  // 與 fetchAndMergeMenuFromFirebase 同邏輯但不更新 lastSyncStatus
+  if(Array.isArray(data.categories)){
+    const localCats = state.categories || [];
+    const merged = [...data.categories];
+    localCats.forEach(c => { if(!merged.includes(c)) merged.push(c); });
+    if(!merged.includes('未分類')) merged.unshift('未分類');
+    state.categories = merged;
+  }
+  if(Array.isArray(data.modules)){
+    const localMods = state.modules || [];
+    const merged = [];
+    const usedIds = new Set();
+    data.modules.forEach(m => { if(m && m.id){ merged.push(m); usedIds.add(m.id); }});
+    localMods.forEach(m => { if(m && m.id && !usedIds.has(m.id)) merged.push(m); });
+    state.modules = merged;
+  }
+  if(Array.isArray(data.products)){
+    const localProds = state.products || [];
+    const localMap = {};
+    localProds.forEach(p => { if(p && p.id) localMap[p.id] = p; });
+    const merged = [];
+    const usedIds = new Set();
+    data.products.forEach(cp => {
+      if(!cp || !cp.id) return;
+      const lp = localMap[cp.id];
+      const enabled = lp ? (lp.enabled !== false) : (cp.enabled !== false);
+      const soldOut = lp ? (lp.soldOut === true) : (cp.soldOut === true);
+      merged.push({
+        id: cp.id, name: cp.name || '', price: Number(cp.price || 0),
+        category: cp.category || '未分類', image: cp.image || '',
+        modules: Array.isArray(cp.modules) ? cp.modules : [],
+        sortOrder: Number(cp.sortOrder || 0), enabled, soldOut
+      });
+      usedIds.add(cp.id);
+    });
+    localProds.forEach(p => { if(p && p.id && !usedIds.has(p.id)) merged.push(p); });
+    state.products = merged;
+  }
+  persistAll();
+}
+
+export function stopMenuAutoWatch(){
+  if(menuWatchUnsub){ try{ menuWatchUnsub(); }catch(e){} menuWatchUnsub = null; }
+  if(menuPollTimer){ clearInterval(menuPollTimer); menuPollTimer = null; }
 }
 
 export async function watchMenuFromFirebase(callback){
