@@ -315,7 +315,9 @@ function moveProduct(productId, direction){
   state.products.sort((x,y)=>x.sortOrder-y.sortOrder);
   persistAll(); renderProductsTable();
   if(window.refreshPublicProducts) window.refreshPublicProducts();
+  autoPushIfMaster();
 }
+
 
 export function renderPendingMenuList(){
   const wrap = document.getElementById('pendingMenuList');
