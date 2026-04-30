@@ -807,7 +807,8 @@ function updatePendingCountLabel(){
 function applyProductsRoleLock(){
   const cfg = (typeof getRealtimeConfig === 'function') ? getRealtimeConfig() : {};
   const isSlave = cfg.deviceRole === 'slave';
-  const upBtn = document.getElementById('syncMenuBtn');
+  const upBtn = document.getElementById('syncMenuBtnProducts');
+
   if(upBtn){
     upBtn.disabled = isSlave;
     upBtn.style.opacity = isSlave ? '0.5' : '1';
