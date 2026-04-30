@@ -861,6 +861,8 @@ export function initProductsPage(){
   document.getElementById('fetchMenuBtnProducts')?.addEventListener('click', (e)=> fetchMenuHandler(e.currentTarget));
 
   applyProductsRoleLock();
+  document.getElementById('deviceRole')?.addEventListener('change', applyProductsRoleLock);
+
 
   document.getElementById('openCategoryListBtn')?.addEventListener('click', openCategoryListModal);
   document.getElementById('openModuleListBtn')?.addEventListener('click', openModuleListModal);
