@@ -36,9 +36,9 @@ const DEFAULT_MODULES = [
 ];
 
 const DEFAULT_PRODUCTS = [
-  { name:'雞排', price:70, category:'炸物', modules:['辣度','灑粉'] },
-  { name:'薯條', price:50, category:'炸物', modules:['灑粉'] },
-  { name:'紅茶', price:30, category:'飲料', modules:['甜度','冰量'] }
+  { name:'雞排', price:70, category:'炸物', _modNames:['辣度','灑粉'] },
+  { name:'薯條', price:50, category:'炸物', _modNames:['灑粉'] },
+  { name:'紅茶', price:30, category:'飲料', _modNames:['甜度','冰量'] }
 ];
 
 // ── 列印欄位預設（顧客單／廚房單／標籤各自獨立）──
@@ -173,26 +173,32 @@ function loadPersisted(){
 
 function buildDefaultState(){
   const modules = normalizeModules(DEFAULT_MODULES);
-  const products = normalizeProducts(DEFAULT_PRODUCTS, modules);
+  const nameToId = {};
+  modules.forEach(m => { nameToId[m.name] = m.id; });
+  const productsRaw = DEFAULT_PRODUCTS.map(p => ({
+    ...p,
+    modules: (p._modNames||[]).map(n => nameToId[n]).filter(Boolean).map(mid => ({moduleId: mid, requiredOverride: null}))
+  }));
+  const products = normalizeProducts(productsRaw, modules);
   return {
     categories: [...DEFAULT_CATEGORIES],
     modules,
     products,
     pendingProducts: [],
-        cart: [],
+    cart: [],
     orders: [],
     onlineIncomingOrders: [],
-    customers: {},                    // 新增：顧客主檔
-    customerLookupRateLimit: {},      // 新增：自助查單節流（記憶體用，不持久化）
+    customers: {},
+    customerLookupRateLimit: {},
     editingOrderId: null,
     viewReportOrders: null,
-    editModules: [],                  // 修補：商品編輯時的暫存模組
+    editModules: [],
     settings: {
       printConfig: JSON.parse(JSON.stringify(DEFAULT_PRINT_CONFIG)),
       discountType: 'amount',
-      selectedCategory: '全部',        // 修補：預設分類
+      selectedCategory: '全部',
       showProductImages: true,
-      lastCleanupAt: '',              // 新增：90 天清理節流
+      lastCleanupAt: '',
       realtimeOrder: {
         enabled: true,
         deviceRole: 'master',
@@ -201,8 +207,8 @@ function buildDefaultState(){
         messagingSenderId: '', appId: '', measurementId: '',
         onlineStoreTitle: '',
         onlineStoreSubtitle: '',
-        autoPrintKitchenOnConfirm: true,    // 預設開
-        autoPrintReceiptOnConfirm: true,    // 預設開
+        autoPrintKitchenOnConfirm: true,
+        autoPrintReceiptOnConfirm: true,
         incomingSoundEnabled: true,
         lastSyncStatus: '尚未啟用',
         lastOrderAt: '',
@@ -226,6 +232,7 @@ function buildDefaultState(){
     }
   };
 }
+
 // ── 建立 state（先 export 空物件，再用 try/catch 填內容，避免 IIFE 在 Safari 失敗時整個 state 變 undefined） ──
 export const state = buildDefaultState();
 
