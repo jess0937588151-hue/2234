@@ -512,16 +512,25 @@ function renderCategoryListModal(){
   const body = document.getElementById('__categoryListBody');
   if(!body) return;
   body.innerHTML = '';
-  const cats = state.categories || [];
+  // 未分類永遠置頂、不參與排序
+  const others = (state.categories || []).filter(c => c !== '未分類');
+  const cats = ['未分類', ...others];
+
   cats.forEach((cat)=>{
     const count = (state.products||[]).filter(p=>p.category===cat).length;
-    const card = document.createElement('div');
-    card.className = 'entity-card' + (cat==='未分類' ? ' warning' : '');
     const isUncat = cat === '未分類';
+    // others 內的索引（用於 ▲▼ 排序，未分類用不到）
+    const otherIdx = isUncat ? -1 : others.indexOf(cat);
+    const isFirst = otherIdx === 0;
+    const isLast  = otherIdx === others.length - 1;
+
+    const card = document.createElement('div');
+    card.className = 'entity-card' + (isUncat ? ' warning' : '');
     card.innerHTML = `
       <strong>${escapeHtml(cat)}</strong>
       <div class="meta">${count} 筆商品</div>
       <div class="card-actions">
+        ${isUncat ? '' : `<button class="move up" ${isFirst?'disabled':''}>▲</button><button class="move down" ${isLast?'disabled':''}>▼</button>`}
         <button class="manage">編輯</button>
         ${!isUncat ? '<button class="rename">改名</button><button class="delete">刪除</button>' : ''}
       </div>`;
@@ -530,6 +539,23 @@ function renderCategoryListModal(){
       openCategoryManage && openCategoryManage(cat);
     };
     if(!isUncat){
+      const upBtn = card.querySelector('.move.up');
+      const downBtn = card.querySelector('.move.down');
+      if(upBtn && !isFirst) upBtn.onclick = ()=>{
+        // 在 others 裡交換，再寫回 state.categories（未分類保留在原位）
+        [others[otherIdx-1], others[otherIdx]] = [others[otherIdx], others[otherIdx-1]];
+        state.categories = (state.categories.includes('未分類'))
+          ? ['未分類', ...others]
+          : others.slice();
+        persistAll(); renderCategoryListModal(); window.refreshAllViews();
+      };
+      if(downBtn && !isLast) downBtn.onclick = ()=>{
+        [others[otherIdx+1], others[otherIdx]] = [others[otherIdx], others[otherIdx+1]];
+        state.categories = (state.categories.includes('未分類'))
+          ? ['未分類', ...others]
+          : others.slice();
+        persistAll(); renderCategoryListModal(); window.refreshAllViews();
+      };
       card.querySelector('.rename').onclick = ()=>{
         const nv = prompt('輸入新分類名稱', cat);
         if(!nv || nv.trim()===cat) return;
