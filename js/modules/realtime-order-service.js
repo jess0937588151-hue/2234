@@ -584,19 +584,20 @@ export async function syncMenuToFirebase(){
   const menuData = {
     categories: state.categories || [],
     products: (state.products || []).map(function(p){
-      return {
-        id: p.id,
-        name: p.name,
-        price: p.price,
-        category: p.category,
-        image: p.image || '',
-        description: p.description || '',
-        modules: p.modules || [],
-        sortOrder: p.sortOrder || 0,
-        enabled: p.enabled !== false,
-        soldOut: p.soldOut === true
-      };
-    }),
+  return {
+    id: p.id,
+    name: p.name,
+    price: p.price,
+    category: p.category,
+    image: p.image || '',
+    description: p.description || '',
+    modules: p.modules || [],
+    sortOrder: p.sortOrder || 0,
+    enabled: p.enabled !== false,
+    soldOut: p.soldOut === true
+  };
+}),
+
     modules: state.modules || [],
     updatedAt: new Date().toISOString()
   };
@@ -680,16 +681,18 @@ export async function fetchAndMergeMenuFromFirebase(){
       const enabled = lp ? (lp.enabled !== false) : (cp.enabled !== false);
       const soldOut = lp ? (lp.soldOut === true) : (cp.soldOut === true);
       merged.push({
-        id: cp.id,
-        name: cp.name || '',
-        price: Number(cp.price || 0),
-        category: cp.category || '未分類',
-        image: cp.image || '',
-        modules: Array.isArray(cp.modules) ? cp.modules : [],
-        sortOrder: Number(cp.sortOrder || 0),
-        enabled,
-        soldOut
-      });
+  id: cp.id,
+  name: cp.name || '',
+  price: Number(cp.price || 0),
+  category: cp.category || '未分類',
+  image: cp.image || '',
+  description: cp.description || '',
+  modules: Array.isArray(cp.modules) ? cp.modules : [],
+  sortOrder: Number(cp.sortOrder || 0),
+  enabled,
+  soldOut
+});
+
       usedIds.add(cp.id);
       cloudCount++;
     });
@@ -769,11 +772,13 @@ function applyCloudMenu(data){
       const enabled = lp ? (lp.enabled !== false) : (cp.enabled !== false);
       const soldOut = lp ? (lp.soldOut === true) : (cp.soldOut === true);
       merged.push({
-        id: cp.id, name: cp.name || '', price: Number(cp.price || 0),
-        category: cp.category || '未分類', image: cp.image || '',
-        modules: Array.isArray(cp.modules) ? cp.modules : [],
-        sortOrder: Number(cp.sortOrder || 0), enabled, soldOut
-      });
+  id: cp.id, name: cp.name || '', price: Number(cp.price || 0),
+  category: cp.category || '未分類', image: cp.image || '',
+  description: cp.description || '',
+  modules: Array.isArray(cp.modules) ? cp.modules : [],
+  sortOrder: Number(cp.sortOrder || 0), enabled, soldOut
+});
+
       usedIds.add(cp.id);
     });
     localProds.forEach(p => { if(p && p.id && !usedIds.has(p.id)) merged.push(p); });
