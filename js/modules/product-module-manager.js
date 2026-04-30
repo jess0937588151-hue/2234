@@ -1,4 +1,4 @@
-/* 中文備註：模組管理動態彈窗（Batch 06.12 - product.modules 是 [{moduleId, requiredOverride}] 物件陣列）。
+/* 中文備註：模組管理動態彈窗（Batch 06.13/B - product.modules 是 [{moduleId, requiredOverride}] 物件陣列）。
  * 對齊 store.js 預設、pos-page.js、products-page.js 的實作。
  */
 import { state, persistAll } from '../core/store.js';
@@ -64,7 +64,7 @@ function ensureModal(){
     </div>`;
   document.body.appendChild(el);
 
-    el.addEventListener('click', (e)=>{
+  el.addEventListener('click', (e)=>{
     if (e.target === el){ closeModuleManage(); return; }
     const btn = e.target.closest('[data-act]');
     if (!btn) return;
@@ -99,8 +99,6 @@ function ensureModal(){
       }
     }
   });
-
-  
 
   el.querySelector(`#${MODAL_ID}_search`).addEventListener('input', renderModuleProductList);
   el.querySelector(`#${MODAL_ID}_name`).addEventListener('input', e=>{ if(draft) draft.name = e.target.value; });
@@ -160,7 +158,6 @@ export function openModuleManage(moduleId){
     required: !!mod.required,
     options: JSON.parse(JSON.stringify(mod.options||[]))
   };
-  // 物件陣列：用 moduleId 比對
   draftSelected = new Set(
     (state.products||[]).filter(p =>
       Array.isArray(p.modules) && p.modules.some(a => a && a.moduleId === moduleId)
@@ -228,7 +225,6 @@ export function saveModuleManage(){
   // 套用至商品：勾選=加入物件 {moduleId, requiredOverride:null}；未勾選=移除
   (state.products||[]).forEach(p=>{
     p.modules = Array.isArray(p.modules) ? p.modules.slice() : [];
-    // 清掉非物件型（如歷史壞資料的字串）
     p.modules = p.modules.filter(a => a && typeof a === 'object' && a.moduleId);
     const has = p.modules.some(a => a.moduleId === targetModId);
     if (draftSelected.has(p.id) && !has){
