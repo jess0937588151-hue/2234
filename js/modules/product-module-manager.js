@@ -100,19 +100,7 @@ function ensureModal(){
     }
   });
 
-    else if (act === 'optDown'){
-      const i = parseInt(e.target.getAttribute('data-i'),10);
-      if (!isNaN(i) && draft && i < (draft.options||[]).length - 1){
-        const arr = draft.options;
-        [arr[i+1], arr[i]] = [arr[i], arr[i+1]];
-        renderOptions();
-      }
-    }
-    else if (act === 'rmOpt'){
-      const i = parseInt(e.target.getAttribute('data-i'),10);
-      if (!isNaN(i) && draft){ draft.options.splice(i,1); renderOptions(); }
-    }
-  });
+  
 
   el.querySelector(`#${MODAL_ID}_search`).addEventListener('input', renderModuleProductList);
   el.querySelector(`#${MODAL_ID}_name`).addEventListener('input', e=>{ if(draft) draft.name = e.target.value; });
