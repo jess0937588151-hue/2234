@@ -90,30 +90,58 @@ function normalizeModules(modules){
   return (modules || []).map(m => ({
     id: m.id || rid(),
     name: m.name || '未命名模組',
+    selection: m.selection === 'multi' ? 'multi' : 'single',
+    required: !!m.required,
     options: (m.options || []).map(o => ({
       id: o.id || rid(),
       name: o.name || '',
-      price: Number(o.price || 0)
+      price: Number(o.price || 0),
+      enabled: o.enabled !== false
     }))
   }));
 }
 
 function normalizeProducts(products, modulesRef){
-  return (products || []).map(p => ({
-    id: p.id || rid(),
-    name: p.name || '',
-    price: Number(p.price || 0),
-    category: p.category || '未分類',
-    image: p.image || '',
-    aliases: Array.isArray(p.aliases) ? p.aliases : [],
-    enabled: p.enabled !== false,
-    sortOrder: Number(p.sortOrder || 0),
-    modules: (p.modules || []).map(name => {
-      // 商品上的 modules 是用「模組名稱字串」對應到 modulesRef
-      if (typeof name === 'string') return name;
-      return name.name || '';
-    }).filter(Boolean)
-  }));
+  const modulesArr = Array.isArray(modulesRef) ? modulesRef : [];
+  // 名稱 → id 的 fallback map（給舊資料用：modules:['辣度','灑粉']）
+  const nameToId = {};
+  modulesArr.forEach(m => { if (m && m.name) nameToId[m.name] = m.id; });
+
+  return (products || []).map(p => {
+    // modules 標準化：物件陣列 [{moduleId, requiredOverride}]
+    let mods = [];
+    if (Array.isArray(p.modules)) {
+      p.modules.forEach(item => {
+        if (!item) return;
+        if (typeof item === 'string') {
+          // 舊資料：模組名稱字串 → 找 id
+          const mid = nameToId[item];
+          if (mid) mods.push({ moduleId: mid, requiredOverride: null });
+        } else if (typeof item === 'object') {
+          if (item.moduleId) {
+            mods.push({
+              moduleId: item.moduleId,
+              requiredOverride: typeof item.requiredOverride === 'boolean' ? item.requiredOverride : null
+            });
+          } else if (item.name) {
+            const mid = nameToId[item.name];
+            if (mid) mods.push({ moduleId: mid, requiredOverride: null });
+          }
+        }
+      });
+    }
+    return {
+      id: p.id || rid(),
+      name: p.name || '',
+      price: Number(p.price || 0),
+      category: p.category || '未分類',
+      image: p.image || '',
+      enabled: p.enabled !== false,
+      soldOut: p.soldOut === true,                // 新欄位：賣完
+      sortOrder: Number(p.sortOrder || 0),
+      modules: mods
+    };
+  });
 }
 
 function deepMerge(target, source){
