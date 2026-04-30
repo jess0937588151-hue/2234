@@ -396,6 +396,9 @@ export function resetProductForm(){
   if(idEl) idEl.value = '';
   if(nameEl) nameEl.value = '';
   if(priceEl) priceEl.value = '';
+  const descEl = document.getElementById('productDescription');
+  if(descEl) descEl.value = '';
+
   if(imgDataEl) imgDataEl.value = '';
   if(imgInputEl) imgInputEl.value = '';
   if(enabledEl) enabledEl.value = 'true';
@@ -423,6 +426,9 @@ function openProductForm(product){
   idEl.value = product.id;
   document.getElementById('productName').value = product.name;
   document.getElementById('productPrice').value = product.price;
+  const descEl2 = document.getElementById('productDescription');
+  if(descEl2) descEl2.value = product.description || '';
+
   const imgData = document.getElementById('productImageData');
   if(imgData) imgData.value = product.image || '';
   const imgInput = document.getElementById('productImageInput');
