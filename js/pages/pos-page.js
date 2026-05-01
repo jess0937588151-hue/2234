@@ -7,6 +7,101 @@ import { getDiscountResult, getDiscountType, setDiscountType, handleDiscountInpu
 import { createOrUpdateOrder, markPendingOrderPaid } from '../modules/order-service.js';
 import { buildCartPreviewOrder, getPrintSettings, printOrderLabels, printOrderReceipt, printKitchenCopies, openCashDrawer, getReceiptHtml } from '../modules/print-service.js';
 
+// ── 預約功能（POS 端） ──
+const POS_WEEKDAY_MAP = ['sun','mon','tue','wed','thu','fri','sat'];
+
+function posGetBusinessHours(){
+  const bh = (state.settings && state.settings.businessHours) || {};
+  ['mon','tue','wed','thu','fri','sat','sun'].forEach(k => { if(!Array.isArray(bh[k])) bh[k] = []; });
+  return bh;
+}
+
+function posPad2(n){ return String(n).padStart(2,'0'); }
+
+function posCeilToQuarter(date){
+  const d = new Date(date);
+  d.setSeconds(0, 0);
+  const m = d.getMinutes();
+  const next = Math.ceil(m / 15) * 15;
+  if(next === m){
+    d.setMinutes(m + 15);
+  } else if(next >= 60){
+    d.setHours(d.getHours() + 1);
+    d.setMinutes(0);
+  } else {
+    d.setMinutes(next);
+  }
+  return d;
+}
+
+function posBuildReservationSlots(){
+  const bh = posGetBusinessHours();
+  const now = new Date();
+  const earliest = new Date(now.getTime() + 60 * 60 * 1000);
+  const start = posCeilToQuarter(earliest);
+  const slots = [];
+  for(let dayOffset = 0; dayOffset < 2; dayOffset++){
+    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset);
+    const wkKey = POS_WEEKDAY_MAP[day.getDay()];
+    const segments = bh[wkKey] || [];
+    if(!segments.length) continue;
+    segments.forEach(seg => {
+      const [sH, sM] = seg.start.split(':').map(Number);
+      const [eH, eM] = seg.end.split(':').map(Number);
+      const segStart = new Date(day);
+      segStart.setHours(sH, sM, 0, 0);
+      const segEnd = new Date(day);
+      segEnd.setHours(eH, eM, 0, 0);
+      if(segEnd <= segStart) segEnd.setDate(segEnd.getDate() + 1);
+      let cursor = new Date(segStart);
+      while(cursor < segEnd){
+        if(cursor >= start) slots.push(new Date(cursor));
+        cursor.setMinutes(cursor.getMinutes() + 15);
+      }
+    });
+  }
+  return slots;
+}
+
+function posFormatSlotLabel(date){
+  const today = new Date();
+  const isToday = date.getFullYear()===today.getFullYear() && date.getMonth()===today.getMonth() && date.getDate()===today.getDate();
+  const tmr = new Date(today);
+  tmr.setDate(tmr.getDate()+1);
+  const isTmr = date.getFullYear()===tmr.getFullYear() && date.getMonth()===tmr.getMonth() && date.getDate()===tmr.getDate();
+  const prefix = isToday ? '今天' : (isTmr ? '明天' : `${date.getMonth()+1}/${date.getDate()}`);
+  return `${prefix} ${posPad2(date.getHours())}:${posPad2(date.getMinutes())}`;
+}
+
+function posRenderReservationSlots(){
+  const sel = document.getElementById('posReservationSlot');
+  if(!sel) return;
+  const slots = posBuildReservationSlots();
+  sel.innerHTML = '';
+  if(!slots.length){
+    sel.innerHTML = '<option value="">目前無可預約時段</option>';
+    return;
+  }
+  sel.innerHTML = '<option value="">請選擇預約時段</option>' + slots.map(d => {
+    const iso = `${d.getFullYear()}-${posPad2(d.getMonth()+1)}-${posPad2(d.getDate())}T${posPad2(d.getHours())}:${posPad2(d.getMinutes())}:00`;
+    return `<option value="${iso}">${posFormatSlotLabel(d)}</option>`;
+  }).join('');
+}
+
+function posTogglePosReservationBlock(){
+  const type = document.getElementById('orderType').value;
+  const sel = document.getElementById('posReservationSlot');
+  if(!sel) return;
+  if(type === '預約'){
+    sel.style.display = 'inline-block';
+    posRenderReservationSlots();
+  } else {
+    sel.style.display = 'none';
+    sel.value = '';
+  }
+}
+
+window.posTogglePosReservationBlock = posTogglePosReservationBlock;
 
 function createConfigState(product){
   const selections = {};
