@@ -292,11 +292,104 @@ function buildConfirmedMessage(remote, orderId){
   if(remote.replyMessage) parts.push(remote.replyMessage);
   return parts.join('，');
 }
-function buildConfirmedMessage(remote, orderId){
-  const parts = [`訂單編號：${remote.orderNo || orderId}`];
-  ...
-  return parts.join('，');
+// ── 預約功能 ──
+const WEEKDAY_MAP = ['sun','mon','tue','wed','thu','fri','sat'];
+
+function getBusinessHoursConfig(){
+  const bh = (state.settings && state.settings.businessHours) || {};
+  ['mon','tue','wed','thu','fri','sat','sun'].forEach(k => { if(!Array.isArray(bh[k])) bh[k] = []; });
+  return bh;
 }
+
+function pad2(n){ return String(n).padStart(2,'0'); }
+
+function ceilToQuarter(date){
+  const d = new Date(date);
+  d.setSeconds(0, 0);
+  const m = d.getMinutes();
+  const next = Math.ceil(m / 15) * 15;
+  if(next === m){
+    d.setMinutes(m + 15);
+  } else if(next >= 60){
+    d.setHours(d.getHours() + 1);
+    d.setMinutes(0);
+  } else {
+    d.setMinutes(next);
+  }
+  return d;
+}
+
+function buildReservationSlots(){
+  const bh = getBusinessHoursConfig();
+  const now = new Date();
+  const earliest = new Date(now.getTime() + 60 * 60 * 1000); // +1 小時
+  const start = ceilToQuarter(earliest);
+
+  const slots = [];
+  for(let dayOffset = 0; dayOffset < 2; dayOffset++){
+    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset);
+    const wkKey = WEEKDAY_MAP[day.getDay()];
+    const segments = bh[wkKey] || [];
+    if(!segments.length) continue; // 公休不顯示
+
+    segments.forEach(seg => {
+      const [sH, sM] = seg.start.split(':').map(Number);
+      const [eH, eM] = seg.end.split(':').map(Number);
+      const segStart = new Date(day);
+      segStart.setHours(sH, sM, 0, 0);
+      const segEnd = new Date(day);
+      segEnd.setHours(eH, eM, 0, 0);
+      if(segEnd <= segStart) segEnd.setDate(segEnd.getDate() + 1); // 跨日
+
+      let cursor = new Date(segStart);
+      while(cursor < segEnd){
+        if(cursor >= start){
+          slots.push(new Date(cursor));
+        }
+        cursor.setMinutes(cursor.getMinutes() + 15);
+      }
+    });
+  }
+  return slots;
+}
+
+function formatSlotLabel(date){
+  const today = new Date();
+  const isToday = date.getFullYear()===today.getFullYear() && date.getMonth()===today.getMonth() && date.getDate()===today.getDate();
+  const tmr = new Date(today);
+  tmr.setDate(tmr.getDate()+1);
+  const isTmr = date.getFullYear()===tmr.getFullYear() && date.getMonth()===tmr.getMonth() && date.getDate()===tmr.getDate();
+  const prefix = isToday ? '今天' : (isTmr ? '明天' : `${date.getMonth()+1}/${date.getDate()}`);
+  return `${prefix} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
+
+function renderReservationSlots(){
+  const sel = document.getElementById('onlineReservationSlot');
+  if(!sel) return;
+  const slots = buildReservationSlots();
+  sel.innerHTML = '';
+  if(!slots.length){
+    sel.innerHTML = '<option value="">目前無可預約時段（公休或已過營業時間）</option>';
+    return;
+  }
+  sel.innerHTML = '<option value="">請選擇時段</option>' + slots.map(d => {
+    const iso = `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}:00`;
+    return `<option value="${iso}">${formatSlotLabel(d)}</option>`;
+  }).join('');
+}
+
+function toggleReservationBlock(){
+  const type = document.getElementById('onlineOrderType').value;
+  const block = document.getElementById('onlineReservationBlock');
+  if(!block) return;
+  if(type === '預約'){
+    block.style.display = 'block';
+    renderReservationSlots();
+  } else {
+    block.style.display = 'none';
+  }
+}
+
 
 async function submitOnlineOrder(){
   if(!onlineState.cart.length) return alert('請先加入商品');
