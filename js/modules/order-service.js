@@ -16,6 +16,9 @@ const total = subtotal;
     status: paymentMethod === '待付款' ? 'pending' : 'completed',
     paymentMethod,
     orderType: document.getElementById('orderType').value,
+    reservationAt: (document.getElementById('orderType').value === '預約' && document.getElementById('posReservationSlot')) ? document.getElementById('posReservationSlot').value : '',
+    reservationReminded: false,
+
     tableNo: document.getElementById('tableNo').value.trim(),
         discountType: 'amount',
     discountValue: 0,
