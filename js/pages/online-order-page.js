@@ -302,6 +302,13 @@ async function submitOnlineOrder(){
   if(!name) return alert('請輸入姓名');
   if(!phone) return alert('請輸入電話');
 
+  // 預約類型必須選時段
+  let reservationAt = '';
+  if(orderType === '預約'){
+    reservationAt = document.getElementById('onlineReservationSlot').value;
+    if(!reservationAt) return alert('請選擇預約取餐時段');
+  }
+
   const realtimeCfg = getRealtimeConfig();
   if(!realtimeCfg.enabled) return alert('店家尚未啟用即時接單');
 
@@ -312,6 +319,8 @@ async function submitOnlineOrder(){
     customerPhone: phone,
     customerNote,
     orderType: '線上點餐-' + orderType,
+    reservationAt,
+    reservationReminded: false,
     items: JSON.parse(JSON.stringify(onlineState.cart)),
     subtotal,
     total: subtotal
@@ -347,6 +356,7 @@ async function submitOnlineOrder(){
     alert(err.message || '送出訂單失敗');
   }
 }
+
 
 async function init(){
   document.getElementById('onlineStoreName').textContent = getStoreName();
