@@ -481,12 +481,19 @@ export function initPOSPage(){
 
   document.getElementById('clearCartBtn').onclick = ()=>{ state.cart=[]; state.editingOrderId=null; renderCart(); };
   
-  document.getElementById('checkoutBtn').onclick = ()=>{
+    document.getElementById('checkoutBtn').onclick = ()=>{
     if(!state.cart.length) return alert('請先加入商品');
+    // 預約：必須選時段
+    const _ot = document.getElementById('orderType').value;
+    if(_ot === '預約'){
+      const _slot = document.getElementById('posReservationSlot').value;
+      if(!_slot) return alert('請選擇預約取餐時段');
+    }
     document.getElementById('paymentTargetMode').value = 'new';
     document.getElementById('paymentTargetOrderId').value = state.editingOrderId || '';
     document.getElementById('paymentModal').classList.remove('hidden');
   };
+
   document.getElementById('closePaymentModal').onclick = ()=> document.getElementById('paymentModal').classList.add('hidden');
   document.querySelector('#paymentModal .modal-backdrop').onclick = ()=> document.getElementById('paymentModal').classList.add('hidden');
   document.querySelectorAll('.pay-btn').forEach(btn=> btn.onclick = ()=> finalizeOrder(btn.dataset.payment));
