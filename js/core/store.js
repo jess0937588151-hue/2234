@@ -234,11 +234,9 @@ function buildDefaultState(){
         lastRestoreAt: '',
         lastBackupStatus: '尚未備份',
         lastRestoreStatus: '尚未還原'
-      }
-    },
+      },
       businessHours: JSON.parse(JSON.stringify(DEFAULT_BUSINESS_HOURS))
     },
-
     reports: {
       currentSession: null,
       sessions: [],
@@ -246,6 +244,7 @@ function buildDefaultState(){
     }
   };
 }
+
 
 // ── 建立 state（先 export 空物件，再用 try/catch 填內容，避免 IIFE 在 Safari 失敗時整個 state 變 undefined） ──
 export const state = buildDefaultState();
@@ -289,7 +288,14 @@ export const state = buildDefaultState();
               if (typeof state.settings.printConfig.fields[kind][f] === 'undefined') {
                 state.settings.printConfig.fields[kind][f] = DEFAULT_PRINT_FIELDS[kind][f];
               }
-                    // 補 businessHours 預設（舊資料沒有此 key 時）
+            });
+          }
+        });
+      }
+      if (typeof state.settings.printConfig.openDrawer === 'undefined') {
+        state.settings.printConfig.openDrawer = true;
+      }
+      // 補 businessHours 預設（舊資料沒有此 key 時）
       if (!state.settings.businessHours || typeof state.settings.businessHours !== 'object') {
         state.settings.businessHours = JSON.parse(JSON.stringify(DEFAULT_BUSINESS_HOURS));
       } else {
@@ -297,13 +303,7 @@ export const state = buildDefaultState();
           if (!Array.isArray(state.settings.businessHours[k])) {
             state.settings.businessHours[k] = [];
           }
-
-            });
-          }
         });
-      }
-      if (typeof state.settings.printConfig.openDrawer === 'undefined') {
-        state.settings.printConfig.openDrawer = true;
       }
     }
 
@@ -318,6 +318,7 @@ export const state = buildDefaultState();
     console.error('hydrateState failed, falling back to defaults:', e);
   }
 })();
+
 
 // ── 持久化 ──
 export function persistAll(){
