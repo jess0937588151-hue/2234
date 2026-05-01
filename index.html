@@ -317,6 +317,12 @@
       <span class="tile-label">進單提示音</span>
       <span class="tile-desc">自訂線上訂單提示音效</span>
     </div>
+        <div class="setting-tile" data-modal="modalBusinessHours">
+      <span class="tile-icon">🕐</span>
+      <span class="tile-label">營業時間</span>
+      <span class="tile-desc">每日營業時段，預約功能依據</span>
+    </div>
+
   </div>
 </section>
 
@@ -378,6 +384,27 @@
     </div>
   </div>
 </div>
+
+    <!-- ===== 營業時間 Modal ===== -->
+<div id="modalBusinessHours" class="settings-modal-backdrop">
+  <div class="settings-modal" style="max-width:680px">
+    <div class="settings-modal-header">
+      <h3>🕐 營業時間設定</h3>
+      <button class="close-modal-btn" data-close-modal="modalBusinessHours">✕</button>
+    </div>
+    <div class="settings-modal-body">
+      <div class="sm-info-box" style="margin-bottom:14px;font-size:13px;color:#475569">
+        每日最多可設 4 個時段，跨日請設結束時間小於開始時間（例：22:00 → 02:00）。勾「公休」即停用該日，預約頁不顯示。
+      </div>
+      <div id="businessHoursBody"></div>
+    </div>
+    <div class="settings-modal-footer">
+      <button id="saveBusinessHoursBtn" class="sm-btn primary">儲存營業時間</button>
+      <button class="sm-btn" data-close-modal="modalBusinessHours">關閉</button>
+    </div>
+  </div>
+</div>
+
 
 <!-- ===== Sunmi 印表機 Modal ===== -->
 <div id="modalSunmi" class="settings-modal-backdrop">
