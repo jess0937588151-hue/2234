@@ -31,12 +31,21 @@
 
         <section class="card stack">
           <h2>顧客資訊</h2>
-          <label>訂單類型
+                    <label>訂單類型
             <select id="onlineOrderType">
               <option value="外帶">外帶</option>
               <option value="內用">內用</option>
+              <option value="預約">預約</option>
             </select>
           </label>
+          <div id="onlineReservationBlock" style="display:none">
+            <label>選擇預約取餐時間</label>
+            <select id="onlineReservationSlot" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">
+              <option value="">請選擇時段</option>
+            </select>
+            <div id="onlineReservationHint" class="muted" style="font-size:12px;margin-top:4px">起始時間為 1 小時後，每 15 分鐘一個區間，可預約至 2 天內。</div>
+          </div>
+
           <div style="display:flex;gap:8px;">
             <label style="flex:1;">姓名
               <input id="onlineCustomerName" placeholder="請輸入姓名"></label>
