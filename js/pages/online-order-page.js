@@ -292,6 +292,11 @@ function buildConfirmedMessage(remote, orderId){
   if(remote.replyMessage) parts.push(remote.replyMessage);
   return parts.join('，');
 }
+function buildConfirmedMessage(remote, orderId){
+  const parts = [`訂單編號：${remote.orderNo || orderId}`];
+  ...
+  return parts.join('，');
+}
 
 async function submitOnlineOrder(){
   if(!onlineState.cart.length) return alert('請先加入商品');
