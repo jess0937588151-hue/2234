@@ -396,6 +396,11 @@ async function init(){
       document.body.appendChild(floatBtn);
     }
     updateFloatingCartBadge();
+  
+  // 訂單類型切換時更新預約區塊
+  document.getElementById('onlineOrderType').addEventListener('change', toggleReservationBlock);
+  toggleReservationBlock();
+
 
   document.getElementById('onlineSearchInput').addEventListener('input', renderProducts);
   document.getElementById('onlineItemQtyInput').addEventListener('input', ()=>{
