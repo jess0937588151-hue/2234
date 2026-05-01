@@ -41,6 +41,17 @@ const DEFAULT_PRODUCTS = [
   { name:'紅茶', price:30, category:'飲料', _modNames:['甜度','冰量'] }
 ];
 
+// ── 營業時間預設（mon~sun，每天最多 4 個時段，空陣列=公休）──
+const DEFAULT_BUSINESS_HOURS = {
+  mon: [{start:'11:00', end:'21:00'}],
+  tue: [{start:'11:00', end:'21:00'}],
+  wed: [{start:'11:00', end:'21:00'}],
+  thu: [{start:'11:00', end:'21:00'}],
+  fri: [{start:'11:00', end:'21:00'}],
+  sat: [{start:'11:00', end:'21:00'}],
+  sun: []
+};
+
 // ── 列印欄位預設（顧客單／廚房單／標籤各自獨立）──
 const DEFAULT_PRINT_FIELDS = {
   receipt: {
@@ -225,6 +236,9 @@ function buildDefaultState(){
         lastRestoreStatus: '尚未還原'
       }
     },
+      businessHours: JSON.parse(JSON.stringify(DEFAULT_BUSINESS_HOURS))
+    },
+
     reports: {
       currentSession: null,
       sessions: [],
