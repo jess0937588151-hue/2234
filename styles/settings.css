@@ -282,3 +282,32 @@
     max-height: 94vh;
   }
 }
+
+/* ============ 營業時間設定 ============ */
+.bh-day-card{
+  border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:10px;background:#fff;
+}
+.bh-day-head{
+  display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;
+}
+.bh-day-head strong{font-size:15px;color:#0f172a}
+.bh-closed-toggle{
+  display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#64748b;cursor:pointer;
+}
+.bh-closed-toggle input{width:16px;height:16px}
+.bh-slots{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
+.bh-slot-row{
+  display:flex;align-items:center;gap:8px;
+}
+.bh-slot-row input[type="time"]{
+  flex:1;padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;min-width:0;
+}
+.bh-slot-row span{color:#64748b;font-size:13px}
+.bh-slot-row .bh-remove{
+  background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;
+  border-radius:8px;width:32px;height:32px;font-size:14px;cursor:pointer;flex-shrink:0;
+}
+.bh-add-slot{
+  width:100%;font-size:13px;border:1px dashed #94a3b8;background:#f8fafc;color:#475569;
+}
+.bh-add-slot:disabled{opacity:0.4;cursor:not-allowed}
