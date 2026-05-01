@@ -289,6 +289,15 @@ export const state = buildDefaultState();
               if (typeof state.settings.printConfig.fields[kind][f] === 'undefined') {
                 state.settings.printConfig.fields[kind][f] = DEFAULT_PRINT_FIELDS[kind][f];
               }
+                    // 補 businessHours 預設（舊資料沒有此 key 時）
+      if (!state.settings.businessHours || typeof state.settings.businessHours !== 'object') {
+        state.settings.businessHours = JSON.parse(JSON.stringify(DEFAULT_BUSINESS_HOURS));
+      } else {
+        ['mon','tue','wed','thu','fri','sat','sun'].forEach(function(k){
+          if (!Array.isArray(state.settings.businessHours[k])) {
+            state.settings.businessHours[k] = [];
+          }
+
             });
           }
         });
