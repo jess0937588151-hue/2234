@@ -428,6 +428,11 @@ if(order && printConfig.autoPrintKitchen){
 
 
 export function initPOSPage(){
+    // 預約：訂單類型切換時切換時段選擇器
+  const _otSel = document.getElementById('orderType');
+  if(_otSel) _otSel.addEventListener('change', posTogglePosReservationBlock);
+  posTogglePosReservationBlock();
+
   document.getElementById('productSearch').addEventListener('input', renderProducts);
   document.getElementById('itemQtyInput').addEventListener('input', ()=>{
     const p = state.products.find(x=>x.id===state.configTarget?.productId);
