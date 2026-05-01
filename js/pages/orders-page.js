@@ -15,14 +15,17 @@ function renderIncomingOnlineOrders(){
     return;
   }
   list.forEach(o=>{
+    const isReservation = !!o.reservationAt;
+    const reservationText = isReservation ? String(o.reservationAt).replace('T',' ').slice(0,16) : '';
     const row = document.createElement('div');
-    row.className = 'order-card pending';
+    row.className = 'order-card pending' + (isReservation ? ' reservation' : '');
     row.innerHTML = `
       <div class="row between wrap">
         <div>
           <strong>${escapeHtml(o.orderNo || o.id)}</strong>
-          <span class="badge pending">待確認</span>
+          <span class="badge pending">${isReservation ? '預約待確認' : '待確認'}</span>
           <div class="muted">${String(o.createdAt || '').replace('T',' ').slice(0,16)} ・ ${escapeHtml(o.orderType || '線上點餐')}</div>
+          ${isReservation ? `<div style="color:#b45309;font-weight:600;margin-top:4px">📅 預約取餐：${escapeHtml(reservationText)}</div>` : ''}
           <div class="muted">${escapeHtml(o.customerName || '')}${o.customerPhone ? ' / ' + escapeHtml(o.customerPhone) : ''}</div>
           ${o.customerNote ? `<div class="muted">顧客備註：${escapeHtml(o.customerNote)}</div>` : ''}
         </div>
@@ -35,19 +38,22 @@ function renderIncomingOnlineOrders(){
         }).join('')}
       </div>
       <div class="stack small" style="margin-top:12px">
-        <label>備餐時間（分鐘）<input class="prep-minutes-input" type="number" min="1" max="240" value="20"></label>
-        <label>回覆顧客訊息<input class="reply-message-input" placeholder="例如：大約 20 分鐘後可取餐"></label>
+        <label>備餐時間（分鐘）<input class="prep-minutes-input" type="number" min="1" max="240" value="${isReservation ? 30 : 20}"></label>
+        <label>回覆顧客訊息<input class="reply-message-input" placeholder="${isReservation ? '例如：已收到預約，將於時段前備餐' : '例如：大約 20 分鐘後可取餐'}"></label>
       </div>
       <div class="row gap wrap" style="margin-top:12px">
-        <button class="primary-btn small-btn accept-btn">確認接單</button>
-        <button class="danger-btn small-btn reject-btn">拒絕訂單</button>
+        <button class="primary-btn small-btn accept-btn">${isReservation ? '✓ 確認預約' : '確認接單'}</button>
+        ${isReservation ? '' : '<button class="danger-btn small-btn reject-btn">拒絕訂單</button>'}
       </div>
     `;
     row.querySelector('.accept-btn').onclick = async ()=>{
       try{
         const prepMinutes = Math.max(0, Number(row.querySelector('.prep-minutes-input').value || 0));
         if(!prepMinutes) return alert('請先輸入備餐時間');
-        const replyMessage = row.querySelector('.reply-message-input').value.trim() || `預估 ${prepMinutes} 分鐘完成備餐`;
+        const defaultReply = isReservation
+          ? `已收到您的預約（${reservationText}），將於時段前備餐`
+          : `預估 ${prepMinutes} 分鐘完成備餐`;
+        const replyMessage = row.querySelector('.reply-message-input').value.trim() || defaultReply;
         const confirmedRemote = await confirmOnlineOrder(o.id, prepMinutes, replyMessage);
         const posOrder = buildRealtimeOrderForPOS({ id: o.id, ...confirmedRemote });
         if(!state.orders.some(x => x.id === posOrder.id)){
@@ -55,27 +61,36 @@ function renderIncomingOnlineOrders(){
         }
         persistAll();
         const realtimeCfg = getRealtimeConfig();
-        if(realtimeCfg.autoPrintKitchenOnConfirm) printKitchenCopies(posOrder);
-        if(realtimeCfg.autoPrintReceiptOnConfirm) printOrderReceipt(posOrder, 'customer');
+        // 預約單接單時不立即列印（要等 30 分鐘前再列印），一般單才立即列印
+        if(!isReservation){
+          if(realtimeCfg.autoPrintKitchenOnConfirm) printKitchenCopies(posOrder);
+          if(realtimeCfg.autoPrintReceiptOnConfirm) printOrderReceipt(posOrder, 'customer');
+        }
         window.refreshAllViews();
-        alert(`已確認接單，已回覆顧客備餐 ${prepMinutes} 分鐘`);
+        alert(isReservation
+          ? `已確認預約，30 分鐘前會再次提醒`
+          : `已確認接單，已回覆顧客備餐 ${prepMinutes} 分鐘`);
       }catch(err){
         alert(err.message || '確認接單失敗');
       }
     };
-    row.querySelector('.reject-btn').onclick = async ()=>{
-      try{
-        const replyMessage = row.querySelector('.reply-message-input').value.trim() || '店家目前無法接單，請稍後再試。';
-        await rejectOnlineOrder(o.id, replyMessage);
-        window.refreshAllViews();
-        alert('已拒絕訂單');
-      }catch(err){
-        alert(err.message || '拒絕訂單失敗');
-      }
-    };
+    const rejectBtn = row.querySelector('.reject-btn');
+    if(rejectBtn){
+      rejectBtn.onclick = async ()=>{
+        try{
+          const replyMessage = row.querySelector('.reply-message-input').value.trim() || '店家目前無法接單，請稍後再試。';
+          await rejectOnlineOrder(o.id, replyMessage);
+          window.refreshAllViews();
+          alert('已拒絕訂單');
+        }catch(err){
+          alert(err.message || '拒絕訂單失敗');
+        }
+      };
+    }
     wrap.appendChild(row);
   });
 }
+
 
 export function getFilteredOrders(){
   const kw = document.getElementById('orderItemSearch').value.trim();
