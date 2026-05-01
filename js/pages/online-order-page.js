@@ -393,16 +393,6 @@ function toggleReservationBlock(){
   }
 }
 
-function formatSlotLabel(date){
-  const today = new Date();
-  const isToday = date.getFullYear()===today.getFullYear() && date.getMonth()===today.getMonth() && date.getDate()===today.getDate();
-  const tmr = new Date(today);
-  tmr.setDate(tmr.getDate()+1);
-  const isTmr = date.getFullYear()===tmr.getFullYear() && date.getMonth()===tmr.getMonth() && date.getDate()===tmr.getDate();
-  const prefix = isToday ? '今天' : (isTmr ? '明天' : `${date.getMonth()+1}/${date.getDate()}`);
-  return `${prefix} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
-}
-
 function renderReservationSlots(){
   const sel = document.getElementById('onlineReservationSlot');
   if(!sel) return;
