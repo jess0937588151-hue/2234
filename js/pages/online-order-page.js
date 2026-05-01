@@ -322,7 +322,7 @@ function ceilToQuarter(date){
 function buildReservationSlots(){
   const bh = getBusinessHoursConfig();
   const now = new Date();
-  const earliest = new Date(now.getTime() + 60 * 60 * 1000); // +1 小時
+  const earliest = new Date(now.getTime() + 60 * 60 * 1000);
   const start = ceilToQuarter(earliest);
 
   const slots = [];
@@ -330,7 +330,7 @@ function buildReservationSlots(){
     const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset);
     const wkKey = WEEKDAY_MAP[day.getDay()];
     const segments = bh[wkKey] || [];
-    if(!segments.length) continue; // 公休不顯示
+    if(!segments.length) continue;
 
     segments.forEach(seg => {
       const [sH, sM] = seg.start.split(':').map(Number);
@@ -339,7 +339,7 @@ function buildReservationSlots(){
       segStart.setHours(sH, sM, 0, 0);
       const segEnd = new Date(day);
       segEnd.setHours(eH, eM, 0, 0);
-      if(segEnd <= segStart) segEnd.setDate(segEnd.getDate() + 1); // 跨日
+      if(segEnd <= segStart) segEnd.setDate(segEnd.getDate() + 1);
 
       let cursor = new Date(segStart);
       while(cursor < segEnd){
@@ -389,7 +389,6 @@ function toggleReservationBlock(){
     block.style.display = 'none';
   }
 }
-
 
 async function submitOnlineOrder(){
   if(!onlineState.cart.length) return alert('請先加入商品');
@@ -454,7 +453,6 @@ async function submitOnlineOrder(){
     alert(err.message || '送出訂單失敗');
   }
 }
-
 
 async function init(){
   document.getElementById('onlineStoreName').textContent = getStoreName();
