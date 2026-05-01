@@ -204,4 +204,9 @@ body{background:#f6f8fb}
   padding: 0 4px;
 }
 .online-product-desc{font-size:13px;color:#64748b;line-height:1.4;margin:-4px 0 4px}
+.online-product-title-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.online-product-title-row .online-product-name{font-size:18px;flex:1;min-width:0}
+.online-product-title-row .online-product-price{font-size:20px;white-space:nowrap;margin:0}
+
+
 
