@@ -191,6 +191,130 @@ function loadSoundStatus() {
   }
 }
 
+// ── 營業時間：常數與工具 ──
+var WEEKDAY_KEYS = ['mon','tue','wed','thu','fri','sat','sun'];
+var WEEKDAY_LABELS = {mon:'週一',tue:'週二',wed:'週三',thu:'週四',fri:'週五',sat:'週六',sun:'週日'};
+
+function getBusinessHours(){
+  var bh = (state.settings && state.settings.businessHours) || {};
+  WEEKDAY_KEYS.forEach(function(k){ if(!Array.isArray(bh[k])) bh[k] = []; });
+  return bh;
+}
+
+function renderBusinessHoursForm(){
+  var body = document.getElementById('businessHoursBody');
+  if(!body) return;
+  var bh = getBusinessHours();
+  body.innerHTML = '';
+  WEEKDAY_KEYS.forEach(function(key){
+    var slots = bh[key] || [];
+    var isClosed = slots.length === 0;
+    var card = document.createElement('div');
+    card.className = 'bh-day-card';
+    card.dataset.day = key;
+    card.innerHTML =
+      '<div class="bh-day-head">' +
+        '<strong>'+ WEEKDAY_LABELS[key] +'</strong>' +
+        '<label class="bh-closed-toggle">' +
+          '<input type="checkbox" class="bh-closed" '+ (isClosed?'checked':'') +'>' +
+          '<span>公休</span>' +
+        '</label>' +
+      '</div>' +
+      '<div class="bh-slots"></div>' +
+      '<button type="button" class="sm-btn bh-add-slot" '+ (slots.length>=4?'disabled':'') +'>＋ 新增時段</button>';
+    body.appendChild(card);
+    var slotsBox = card.querySelector('.bh-slots');
+    if(!isClosed){
+      slots.forEach(function(s, idx){
+        slotsBox.appendChild(buildSlotRow(s.start, s.end, idx));
+      });
+    }
+  });
+  bindBusinessHoursEvents();
+}
+
+function buildSlotRow(start, end, idx){
+  var row = document.createElement('div');
+  row.className = 'bh-slot-row';
+  row.innerHTML =
+    '<input type="time" class="bh-start" value="'+ (start||'11:00') +'">' +
+    '<span>～</span>' +
+    '<input type="time" class="bh-end" value="'+ (end||'21:00') +'">' +
+    '<button type="button" class="bh-remove" data-idx="'+ idx +'">✕</button>';
+  return row;
+}
+
+function bindBusinessHoursEvents(){
+  document.querySelectorAll('.bh-day-card').forEach(function(card){
+    var key = card.dataset.day;
+    card.querySelector('.bh-closed').onchange = function(e){
+      var bh = getBusinessHours();
+      if(e.target.checked){
+        bh[key] = [];
+      } else {
+        bh[key] = [{start:'11:00', end:'21:00'}];
+      }
+      state.settings.businessHours = bh;
+      renderBusinessHoursForm();
+    };
+    card.querySelector('.bh-add-slot').onclick = function(){
+      var bh = getBusinessHours();
+      if(bh[key].length >= 4) return;
+      collectDayFromUI(card, key, bh);
+      bh[key].push({start:'17:00', end:'21:00'});
+      state.settings.businessHours = bh;
+      renderBusinessHoursForm();
+    };
+    card.querySelectorAll('.bh-remove').forEach(function(btn){
+      btn.onclick = function(){
+        var bh = getBusinessHours();
+        collectDayFromUI(card, key, bh);
+        bh[key].splice(Number(btn.dataset.idx), 1);
+        state.settings.businessHours = bh;
+        renderBusinessHoursForm();
+      };
+    });
+  });
+}
+
+function collectDayFromUI(card, key, bh){
+  var rows = card.querySelectorAll('.bh-slot-row');
+  var arr = [];
+  rows.forEach(function(r){
+    var s = r.querySelector('.bh-start').value;
+    var e = r.querySelector('.bh-end').value;
+    if(s && e) arr.push({start:s, end:e});
+  });
+  bh[key] = arr;
+}
+
+function collectAllBusinessHours(){
+  var bh = getBusinessHours();
+  document.querySelectorAll('.bh-day-card').forEach(function(card){
+    var key = card.dataset.day;
+    var closed = card.querySelector('.bh-closed').checked;
+    if(closed){ bh[key] = []; return; }
+    collectDayFromUI(card, key, bh);
+  });
+  return bh;
+}
+
+function saveBusinessHours(){
+  var bh = collectAllBusinessHours();
+  var error = '';
+  WEEKDAY_KEYS.forEach(function(key){
+    (bh[key]||[]).forEach(function(s, i){
+      if(!s.start || !s.end){
+        error = WEEKDAY_LABELS[key] + ' 第'+(i+1)+'時段未填完整';
+      }
+    });
+  });
+  if(error){ alert('儲存失敗：' + error); return; }
+  state.settings.businessHours = bh;
+  persistAll();
+  alert('營業時間已儲存');
+}
+
 // ── 主函式 ──
 export function initSettingsPage() {
 
@@ -247,6 +371,14 @@ export function initSettingsPage() {
     loadSoundStatus();
     openModal('modalSound');
   });
+     // 營業時間
+  document.querySelector('[data-modal="modalBusinessHours"]')?.addEventListener('click', function() {
+    renderBusinessHoursForm();
+    openModal('modalBusinessHours');
+  });
+
+  document.getElementById('saveBusinessHoursBtn')?.addEventListener('click', saveBusinessHours);
+
 
   // ============================
   // 列印設定 — 儲存
