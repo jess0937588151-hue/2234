@@ -104,7 +104,7 @@ export function getFilteredOrders(){
   return state.orders.filter(o=>{
     const itemText = o.items.map(i=> [i.name, ...(i.selections||[]).map(s=>s.optionName), i.note||''].join(' ')).join(' ');
     const kwOk = !kw || itemText.includes(kw);
-    const d = o.createdAt.slice(0,10);
+    const d = fmtLocalDateTime(o.createdAt).slice(0,10);
     const dateOk = (!from || d >= from) && (!to || d <= to);
     const amtOk = o.total >= min && (max === null || o.total <= max);
     const paymentOk = !paymentMethod || o.paymentMethod === paymentMethod;
@@ -148,9 +148,11 @@ function renderOrdersSection(wrap, orders, isPending){
         <div>
           <strong>${escapeHtml(o.orderNo)}</strong>
           <span class="badge ${isPending ? 'pending' : 'done'}">${isPending ? '待付款' : '已完成'}</span>
-          <div class="muted">${o.createdAt.replace('T',' ').slice(0,16)} ・ ${escapeHtml(o.orderType)} ${o.tableNo ? '・' + escapeHtml(o.tableNo) : ''}${!isPending && o.paymentMethod ? ' ・ 付款：' + escapeHtml(o.paymentMethod) : ''}${prepMeta}${readyMeta}</div>
-          ${replyMeta}
-        </div>
+          <div class="muted">${escapeHtml(fmtLocalDateTime(o.createdAt))} ・ ${escapeHtml(o.orderType)} ${o.tableNo ? '・' + escapeHtml(o.tableNo) : ''}$
+            {!isPending && o.paymentMethod ? ' ・ 付款：' + escapeHtml(o.paymentMethod) : ''}$
+              {prepMeta}$
+                {readyMeta}
+                </div>>
         <div><strong>${money(o.total)}</strong></div>
       </div>
       <div class="stack small" style="margin-top:12px">
