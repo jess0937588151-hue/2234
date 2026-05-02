@@ -256,9 +256,11 @@ function confirmStartSession(){
     const staffId = document.getElementById('startStaffSelect').value;
     const cashDetail = getCashDetailFromGrid('startCash');
     startSession({ staffId, cashDetail });
-    document.getElementById('startSessionModal').classList.add('hidden');
+        document.getElementById('startSessionModal').classList.add('hidden');
     renderReports();
+    if(typeof window.refreshPosLockState === 'function') window.refreshPosLockState();
     if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
+
     alert(`已開始值班\n人員：${staffId}\n備用金：$${calcCashTotal(cashDetail)}`);
   }catch(err){
     alert('開班失敗：' + err.message);
@@ -321,9 +323,11 @@ function confirmEndSession(){
     const cashDetail = getCashDetailFromGrid('endCash');
     const note = document.getElementById('endSessionNote').value || '';
     const ended = endSession({ staffId, cashDetail, note });
-    document.getElementById('endSessionModal').classList.add('hidden');
+       document.getElementById('startSessionModal').classList.add('hidden');
     renderReports();
+    if(typeof window.refreshPosLockState === 'function') window.refreshPosLockState();
     if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
+
     const diff = Number(ended.cashDiff||0);
     let msg = `已結束值班\n營業額：${money(ended.stats.salesTotal)}\n訂單數：${ended.stats.orderCount}\n`;
     if(diff===0) msg += '現金平衡 ✓';
