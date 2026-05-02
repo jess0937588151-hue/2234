@@ -20,8 +20,10 @@ import {
   syncMenuToFirebase,
   verifyPOSAccess,
   getRealtimeAuthUser,
-  getRealtimeConfig
+  getRealtimeConfig,
+  startReservationReminderLoop
 } from './modules/realtime-order-service.js';
+
 import {
   signInGoogleDrive,
   signOutGoogleDrive,
@@ -345,4 +347,5 @@ window.refreshRealtimeOrderPanel();
 window.refreshGoogleBackupPanel();
 startGoogleAutoBackup();
 autoStartRealtimeListener();
+startReservationReminderLoop();
 setupPWA();
