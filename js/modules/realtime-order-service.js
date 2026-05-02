@@ -6,6 +6,8 @@
  *   4. 公開 _getRef / _dbApi 供 customer-service 使用
  */
 import { state, persistAll } from '../core/store.js';
+import { getCurrentSession } from './report-session.js';
+
 
 const FIREBASE_BASE = 'https://www.gstatic.com/firebasejs/10.12.2';
 const DEFAULT_FIREBASE_CONFIG = {
@@ -575,6 +577,7 @@ export function buildRealtimeOrderForPOS(remote){
     discountType: 'amount',
     discountValue: 0,
     discountAmount: 0,
+    sessionId: getCurrentSession()?.id || null,
     subtotal,
     total: subtotal,
     items
