@@ -2,6 +2,8 @@
 import { state } from '../core/store.js';
 import { deepCopy, id } from '../core/utils.js';
 //import { getDiscountResult, getDiscountType } from './cart-service.js';
+import { getCurrentSession } from './report-session.js';
+
 
 export function createOrUpdateOrder(paymentMethod){
   const subtotal = state.cart.reduce((s,x)=>s + (x.basePrice + x.extraPrice) * x.qty, 0);
@@ -18,6 +20,8 @@ const total = subtotal;
     orderType: document.getElementById('orderType').value,
     reservationAt: (document.getElementById('orderType').value === '預約' && document.getElementById('posReservationSlot')) ? document.getElementById('posReservationSlot').value : '',
     reservationReminded: false,
+    sessionId: existing?.sessionId || (getCurrentSession()?.id || null),
+
 
     tableNo: document.getElementById('tableNo').value.trim(),
         discountType: 'amount',
@@ -45,5 +49,11 @@ export function markPendingOrderPaid(orderId, paymentMethod){
   order.status = paymentMethod === '待付款' ? 'pending' : 'completed';
   order.paymentMethod = paymentMethod;
   order.updatedAt = new Date().toISOString();
+  // 06.16/4：補登當前班次
+  if(!order.sessionId){
+    const cur = getCurrentSession();
+    if(cur) order.sessionId = cur.id;
+  }
   return order;
+
 }
