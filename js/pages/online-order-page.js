@@ -2,6 +2,7 @@
 import { state } from '../core/store.js';
 import { escapeHtml, id, money } from '../core/utils.js';
 import { getRealtimeConfig, pushOnlineOrder, watchCustomerOrder, fetchMenuFromFirebase, startMenuAutoWatch } from '../modules/realtime-order-service.js';
+import { lookupOrdersByCustomer } from '../modules/customer-service.js';
 
 const onlineState = {
   selectedCategory: '全部',
@@ -555,6 +556,95 @@ function updateFloatingCartBadge() {
   const count = onlineState.cart.reduce((s, i) => s + i.qty, 0);
   badge.textContent = count;
   badge.style.display = count > 0 ? 'flex' : 'none';
+    // 我的訂單查詢
+  const myOrdersBtn = document.getElementById('openMyOrdersBtn');
+  if(myOrdersBtn){
+    myOrdersBtn.onclick = ()=>{
+      const modal = document.getElementById('myOrdersModal');
+      // 預填存過的姓名電話
+      try{
+        document.getElementById('myOrdersNameInput').value = localStorage.getItem('online_customer_name') || '';
+        document.getElementById('myOrdersPhoneInput').value = localStorage.getItem('online_customer_phone') || '';
+      }catch(e){}
+      document.getElementById('myOrdersResult').innerHTML = '';
+      modal.classList.remove('hidden');
+    };
+  }
+  const closeMyBtn = document.getElementById('closeMyOrdersBtn');
+  if(closeMyBtn){
+    closeMyBtn.onclick = ()=> document.getElementById('myOrdersModal').classList.add('hidden');
+  }
+  const searchMyBtn = document.getElementById('myOrdersSearchBtn');
+  if(searchMyBtn){
+    searchMyBtn.onclick = handleMyOrdersSearch;
+  }
+
+}
+async function handleMyOrdersSearch(){
+  const btn = document.getElementById('myOrdersSearchBtn');
+  const name = document.getElementById('myOrdersNameInput').value.trim();
+  const phone = document.getElementById('myOrdersPhoneInput').value.trim();
+  const result = document.getElementById('myOrdersResult');
+  if(!name || !phone){
+    result.innerHTML = '<div style="color:#ef4444">請輸入完整姓名與電話</div>';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = '查詢中…';
+  result.innerHTML = '<div class="muted">查詢中，請稍候…</div>';
+  try{
+    const list = await lookupOrdersByCustomer(phone, name);
+    renderMyOrdersList(list);
+    // 記住姓名電話，下次預填
+    try{
+      localStorage.setItem('online_customer_name', name);
+      localStorage.setItem('online_customer_phone', phone);
+    }catch(e){}
+  }catch(err){
+    result.innerHTML = `<div style="color:#ef4444">${err.message || '查詢失敗'}</div>`;
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '查詢我的訂單';
+  }
+}
+
+function renderMyOrdersList(list){
+  const result = document.getElementById('myOrdersResult');
+  if(!Array.isArray(list) || !list.length){
+    result.innerHTML = '<div class="muted">查無訂單。請確認姓名與電話與當時送單時填寫的一致。</div>';
+    return;
+  }
+  const statusMap = {
+    pending_confirm: { text: '待店家確認', color: '#f59e0b' },
+    confirmed:       { text: '已確認',     color: '#10b981' },
+    rejected:        { text: '已拒絕',     color: '#ef4444' },
+    completed:       { text: '已完成',     color: '#3b82f6' }
+  };
+  result.innerHTML = list.map(o => {
+    const s = statusMap[o.status] || { text: o.status || '處理中', color: '#64748b' };
+    const created = o.createdAt ? new Date(o.createdAt).toLocaleString('zh-TW') : '';
+    const resv = o.reservationAt ? `<div style="color:#10b981;font-size:13px">📅 預約取餐：${String(o.reservationAt).replace('T',' ').slice(0,16)}</div>` : '';
+    const itemsText = Array.isArray(o.items)
+      ? o.items.map(it => `${it.name} x${it.qty}`).join('、')
+      : '';
+    const reply = o.replyMessage ? `<div style="font-size:12px;color:#475569;margin-top:4px">店家訊息：${o.replyMessage}</div>` : '';
+    return `
+      <div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px;background:#fff">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong style="font-size:14px">${o.orderNo || o.id}</strong>
+          <span style="background:${s.color};color:#fff;font-size:12px;padding:2px 10px;border-radius:12px">${s.text}</span>
+        </div>
+        <div style="font-size:12px;color:#64748b;margin-bottom:4px">${created} · ${o.orderType || '線上點餐'}</div>
+        ${resv}
+        <div style="font-size:13px;color:#334155;margin-top:6px">${itemsText}</div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:13px">
+          <span class="muted">小計</span>
+          <strong style="color:#ef4444">$${o.total || o.subtotal || 0}</strong>
+        </div>
+        ${reply}
+      </div>
+    `;
+  }).join('');
 }
 
 init();
