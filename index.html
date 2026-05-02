@@ -132,46 +132,64 @@
       </div>
     </section>
 
-    <!-- ===== 報表頁 ===== -->
-    <section id="reportsView" class="view">
-      <header class="topbar">
-        <h1>報表</h1>
-        <div class="topbar-actions responsive-filters synced-filters">
-          <button id="reportStartBtn" class="primary-btn">開始</button>
-          <button id="reportEndBtn" class="danger-btn">結束</button>
-          <button id="reportBackLiveBtn" class="secondary-btn">返回目前</button>
-          <input id="reportDateFrom" type="date">
-          <input id="reportDateTo" type="date">
-          <button id="applyReportRangeBtn" class="secondary-btn">套用日期</button>
-          <button id="saveReportSnapshotBtn" class="secondary-btn">儲存報表</button>
-          <button id="exportTodayBtn" class="secondary-btn">匯出今日 CSV</button>
-          <button id="printReportBtn" class="primary-btn">列印報表</button>
-        </div>
-      </header>
-      <div id="reportCards" class="stats-grid"></div>
-      <div class="content-grid two">
-        <section class="card">
-          <h2>熱銷商品</h2>
-          <div id="topProducts" class="stack small"></div>
-        </section>
-        <section class="card">
-          <h2>付款方式統計</h2>
-          <div id="paymentStats" class="stack small"></div>
-        </section>
-        <section class="card">
-          <h2>商品販賣分析</h2>
-          <div id="productAnalysis" class="stack small"></div>
-        </section>
-        <section class="card">
-          <h2>時段販售狀況</h2>
-          <div id="hourAnalysis" class="stack small"></div>
-        </section>
+    <!-- ===== 報表頁（v2.1.26 班次主導）===== -->
+<section id="reportsView" class="view">
+  <header class="topbar">
+    <h1>報表</h1>
+  </header>
+
+  <!-- 班次狀態列 -->
+  <div id="sessionStatusBar" style="margin:10px 0;padding:14px;border-radius:10px;background:#f1f5f9;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+    <div id="sessionStatusText" style="font-size:15px">載入中…</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button id="startSessionBtn" class="primary-btn" style="background:#10b981;display:none">🟢 開始值班</button>
+      <button id="endSessionBtn" class="primary-btn" style="background:#ef4444;display:none">🔴 結束值班</button>
+    </div>
+  </div>
+
+  <!-- 當班即時數據 -->
+  <div id="currentSessionPanel" style="display:none">
+    <div id="reportCards" class="stat-grid"></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px">
+      <div class="card stack">
+        <h3 style="margin:0 0 8px">🍱 訂單類型</h3>
+        <div id="orderTypeStats"></div>
       </div>
-      <section class="card" style="margin-top:20px">
-        <h2>開始 / 結束紀錄</h2>
-        <div id="reportSessionList" class="stack"></div>
-      </section>
-    </section>
+      <div class="card stack">
+        <h3 style="margin:0 0 8px">💳 付款方式</h3>
+        <div id="paymentStats"></div>
+      </div>
+    </div>
+
+    <div class="card stack" style="margin-top:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h3 style="margin:0">🔥 熱銷 TOP10</h3>
+        <button id="toggleTopProductsBtn" class="ghost-btn" style="font-size:13px">詳細 ▾</button>
+      </div>
+      <div id="topProducts"></div>
+    </div>
+
+    <div class="card stack" style="margin-top:14px">
+      <h3 style="margin:0 0 8px">🕐 時段分布</h3>
+      <div id="hourAnalysis"></div>
+    </div>
+
+    <!-- 操作列 -->
+    <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+      <button id="reportPrintBtn" class="secondary-btn">🖨 列印報表</button>
+      <button id="reportExportBtn" class="secondary-btn">📥 匯出 Excel</button>
+      <button id="costManageBtn" class="secondary-btn">💰 成本管理</button>
+    </div>
+  </div>
+
+  <!-- 歷史班次 -->
+  <div class="card stack" style="margin-top:18px">
+    <h3 style="margin:0 0 10px">📋 歷史班次（30 天內）</h3>
+    <div id="reportSessionList"></div>
+  </div>
+</section>
+
 
       <!-- ===== 商品管理頁 ===== -->
 <section id="productsView" class="view">
@@ -690,6 +708,105 @@
       <button class="pay-btn" data-payment="其他">其他</button>
       <button class="pay-btn pending" data-payment="待付款">待付款</button>
     </div>
+  </div>
+</div>
+<!-- ===== 開始值班 Modal ===== -->
+<div id="startSessionModal" class="modal hidden">
+  <div class="modal-backdrop"></div>
+  <div class="modal-dialog" style="max-width:420px">
+    <div class="row between wrap">
+      <h2>🕐 開始值班</h2>
+      <button class="ghost-btn" onclick="document.getElementById('startSessionModal').classList.add('hidden')">✕</button>
+    </div>
+
+    <div style="margin-top:12px">
+      <label style="font-size:14px;font-weight:600">值班人員</label>
+      <select id="startStaffSelect" style="width:100%;padding:10px;margin-top:4px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px">
+        <option value="A1">A1</option>
+        <option value="A2">A2</option>
+        <option value="A3">A3</option>
+        <option value="A4">A4</option>
+      </select>
+    </div>
+
+    <div style="margin-top:14px">
+      <label style="font-size:14px;font-weight:600">💵 備用金清點</label>
+      <div id="startCashGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px"></div>
+      <div style="display:flex;justify-content:space-between;margin-top:10px;padding:10px;background:#f1f5f9;border-radius:8px">
+        <span>合計</span>
+        <strong id="startCashTotal" style="color:#10b981">$0</strong>
+      </div>
+    </div>
+
+    <div class="form-actions" style="margin-top:16px">
+      <button id="confirmStartSessionBtn" class="primary-btn" style="flex:1;background:#10b981">🟢 開始值班</button>
+      <button class="secondary-btn" onclick="document.getElementById('startSessionModal').classList.add('hidden')">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 結束值班 Modal ===== -->
+<div id="endSessionModal" class="modal hidden">
+  <div class="modal-backdrop"></div>
+  <div class="modal-dialog" style="max-width:480px;max-height:92vh;overflow-y:auto">
+    <div class="row between wrap">
+      <h2>🕐 結束值班</h2>
+      <button class="ghost-btn" onclick="document.getElementById('endSessionModal').classList.add('hidden')">✕</button>
+    </div>
+
+    <div id="endSessionInfo" style="font-size:13px;color:#64748b;margin-top:6px"></div>
+
+    <div style="margin-top:14px;padding:12px;background:#fef3c7;border-radius:8px;border:1px solid #fcd34d">
+      <div style="font-size:14px;font-weight:600;color:#78350f;margin-bottom:8px">💰 應收現金（系統計算）</div>
+      <div style="display:flex;justify-content:space-between;font-size:13px"><span>開班備用金</span><span id="endOpeningCash">$0</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:13px"><span>本班現金訂單</span><span id="endCashSales">$0</span></div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px;padding-top:6px;border-top:1px solid #fcd34d;font-weight:bold">
+        <span>應有現金</span><span id="endExpectedCash" style="color:#78350f">$0</span>
+      </div>
+    </div>
+
+    <div style="margin-top:14px">
+      <label style="font-size:14px;font-weight:600">💵 結束現金清點</label>
+      <div id="endCashGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px"></div>
+      <div style="display:flex;justify-content:space-between;margin-top:10px;padding:10px;background:#f1f5f9;border-radius:8px">
+        <span>實收現金</span>
+        <strong id="endClosingCash">$0</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:8px;padding:10px;border-radius:8px;background:#f0fdf4">
+        <span>誤差</span>
+        <strong id="endCashDiff" style="color:#10b981">$0 ✓</strong>
+      </div>
+    </div>
+
+    <div style="margin-top:14px">
+      <label style="font-size:14px;font-weight:600">結束人員</label>
+      <select id="endStaffSelect" style="width:100%;padding:10px;margin-top:4px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px">
+        <option value="A1">A1</option>
+        <option value="A2">A2</option>
+        <option value="A3">A3</option>
+        <option value="A4">A4</option>
+      </select>
+    </div>
+
+    <div style="margin-top:12px">
+      <label style="font-size:14px;font-weight:600">備註</label>
+      <input id="endSessionNote" placeholder="（可選）例如：誤差原因說明" style="width:100%;padding:10px;margin-top:4px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box">
+    </div>
+
+    <div class="form-actions" style="margin-top:16px">
+      <button id="confirmEndSessionBtn" class="primary-btn" style="flex:1;background:#ef4444">🔴 確認結束</button>
+      <button class="secondary-btn" onclick="document.getElementById('endSessionModal').classList.add('hidden')">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== POS 未開班遮罩 ===== -->
+<div id="posLockOverlay" style="display:none;position:absolute;inset:0;background:rgba(15,23,42,0.65);z-index:500;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:14px;padding:30px;max-width:380px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.3)">
+    <div style="font-size:48px;margin-bottom:8px">🔒</div>
+    <h2 style="margin:0 0 10px;color:#0f172a">尚未開始值班</h2>
+    <p style="color:#64748b;font-size:14px;margin:0 0 16px">請先到報表頁開始值班，才能進行點餐與結帳。<br>線上點餐與商品管理不受限。</p>
+    <button id="goToReportsBtn" class="primary-btn" style="background:#10b981;width:100%;padding:12px">📊 前往報表頁開班</button>
   </div>
 </div>
 
