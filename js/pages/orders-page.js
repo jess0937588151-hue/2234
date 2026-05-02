@@ -176,7 +176,7 @@ function renderOrdersSection(wrap, orders, isPending){
    btns[1].onclick = ()=>{
   if(!hasOpenSession()) return alert('🔒 尚未開始值班，請先到報表頁開班');
   if(!confirm(`確定刪除訂單「${o.orderNo}」？`)) return;
-};
+
       state.orders = state.orders.filter(x=>x.id!==o.id);
       persistAll();
       window.refreshAllViews();
