@@ -625,8 +625,8 @@ function renderMyOrdersList(list){
   };
   result.innerHTML = list.map(o => {
     const s = statusMap[o.status] || { text: o.status || '處理中', color: '#64748b' };
-    const created = o.createdAt ? new Date(o.createdAt).toLocaleString('zh-TW') : '';
-    const resv = o.reservationAt ? `<div style="color:#10b981;font-size:13px">📅 預約取餐：${String(o.reservationAt).replace('T',' ').slice(0,16)}</div>` : '';
+    const created = o.createdAt ? fmtLocalDateTime(o.createdAt) : '';
+    const resv = o.reservationAt ? `<div style="color:#10b981;font-size:13px">📅 預約取餐：${fmtLocalDateTime(o.reservationAt)}</div>` : '';
     const itemsText = Array.isArray(o.items)
       ? o.items.map(it => `${it.name} x${it.qty}`).join('、')
       : '';
