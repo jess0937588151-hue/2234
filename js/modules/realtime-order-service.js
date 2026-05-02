@@ -7,6 +7,7 @@
  */
 import { state, persistAll } from '../core/store.js';
 import { getCurrentSession } from './report-session.js';
+import { fmtLocalDateTime } from '../core/utils.js';
 
 
 const FIREBASE_BASE = 'https://www.gstatic.com/firebasejs/10.12.2';
@@ -159,14 +160,14 @@ function showOnlineOrderOverlay(orderId){
 
   const order = (state.onlineIncomingOrders || []).find(o => o.id === orderId);
   const isReservation = !!(order && order.reservationAt);
-  const reservationText = isReservation ? String(order.reservationAt).replace('T',' ').slice(0,16) : '';
+const reservationText = isReservation ? fmtLocalDateTime(order.reservationAt) : '';
 
   document.getElementById('overlayOrderNo').textContent = order ? (order.orderNo || order.id) : orderId;
   document.getElementById('overlayTotal').textContent = order
     ? `$${order.total || order.subtotal || order.totalAmount || 0}`
     : '';
-  const baseMeta = order
-    ? `${order.createdAt ? new Date(order.createdAt).toLocaleString('zh-TW') : ''} · ${order.orderType || '線上點餐'}`
+   const baseMeta = order
+    ? `${order.createdAt ? fmtLocalDateTime(order.createdAt) : ''} · ${order.orderType || '線上點餐'}`
     : '';
   document.getElementById('overlayMeta').textContent = isReservation
     ? `${baseMeta} · 📅 預約取餐：${reservationText}`
@@ -838,7 +839,7 @@ function showReservationReminderOverlay(order){
 
   document.getElementById('reminderOrderNo').textContent = order.orderNo || order.id;
   document.getElementById('reminderTotal').textContent = `$${order.total || order.subtotal || 0}`;
-  const resvText = order.reservationAt ? String(order.reservationAt).replace('T',' ').slice(0,16) : '';
+  const resvText = order.reservationAt ? fmtLocalDateTime(order.reservationAt) : '';
   document.getElementById('reminderMeta').textContent =
     `📅 預約取餐：${resvText} · ${order.orderType || ''}`;
   document.getElementById('reminderCustomer').textContent =
