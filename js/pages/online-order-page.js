@@ -556,7 +556,9 @@ function updateFloatingCartBadge() {
   const count = onlineState.cart.reduce((s, i) => s + i.qty, 0);
   badge.textContent = count;
   badge.style.display = count > 0 ? 'flex' : 'none';
-    // 我的訂單查詢
+}
+
+// 我的訂單查詢
   const myOrdersBtn = document.getElementById('openMyOrdersBtn');
   if(myOrdersBtn){
     myOrdersBtn.onclick = ()=>{
@@ -578,8 +580,6 @@ function updateFloatingCartBadge() {
   if(searchMyBtn){
     searchMyBtn.onclick = handleMyOrdersSearch;
   }
-
-}
 async function handleMyOrdersSearch(){
   const btn = document.getElementById('myOrdersSearchBtn');
   const name = document.getElementById('myOrdersNameInput').value.trim();
