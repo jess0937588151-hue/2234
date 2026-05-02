@@ -317,6 +317,17 @@ export const state = buildDefaultState();
   } catch (e) {
     console.error('hydrateState failed, falling back to defaults:', e);
   }
+  
+    // ── Batch 06.16/1：確保 reports 結構完整 ──
+    if (!state.reports || typeof state.reports !== 'object') {
+      state.reports = { currentSession: null, sessions: [], savedSnapshots: [] };
+    }
+    if (saved.reports && typeof saved.reports === 'object') {
+      if (saved.reports.currentSession) state.reports.currentSession = saved.reports.currentSession;
+      if (Array.isArray(saved.reports.sessions)) state.reports.sessions = saved.reports.sessions;
+      if (Array.isArray(saved.reports.savedSnapshots)) state.reports.savedSnapshots = saved.reports.savedSnapshots;
+    }
+
 })();
 
 
