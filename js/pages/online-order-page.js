@@ -1,6 +1,6 @@
 /* 中文備註：線上點餐頁邏輯，顧客送單後會等待 POS 確認，確認後才完成訂購。 */
 import { state } from '../core/store.js';
-import { escapeHtml, id, money } from '../core/utils.js';
+import { escapeHtml, id, money, fmtLocalDateTime} from '../core/utils.js';
 import { getRealtimeConfig, pushOnlineOrder, watchCustomerOrder, fetchMenuFromFirebase, startMenuAutoWatch } from '../modules/realtime-order-service.js';
 import { lookupOrdersByCustomer } from '../modules/customer-service.js';
 
