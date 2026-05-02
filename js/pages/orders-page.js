@@ -140,19 +140,15 @@ function renderOrdersSection(wrap, orders, isPending){
     row.className = 'order-card' + (isPending ? ' pending' : '');
     const prepMeta = o.prepTimeMinutes ? ` ・ 備餐 ${escapeHtml(String(o.prepTimeMinutes))} 分鐘` : '';
     const readyMeta = o.estimatedReadyAt ? ` ・ 預計完成 ${escapeHtml(fmtLocalDateTime(o.estimatedReadyAt))}` : '';
-<div class="muted">${escapeHtml(fmtLocalDateTime(o.createdAt))} ・ ${escapeHtml(o.orderType)}...
-
     const replyMeta = o.merchantReplyMessage ? `<div class="muted">店家回覆：${escapeHtml(o.merchantReplyMessage)}</div>` : '';
     row.innerHTML = `
       <div class="row between wrap">
         <div>
           <strong>${escapeHtml(o.orderNo)}</strong>
           <span class="badge ${isPending ? 'pending' : 'done'}">${isPending ? '待付款' : '已完成'}</span>
-          <div class="muted">${escapeHtml(fmtLocalDateTime(o.createdAt))} ・ ${escapeHtml(o.orderType)} ${o.tableNo ? '・' + escapeHtml(o.tableNo) : ''}$
-            {!isPending && o.paymentMethod ? ' ・ 付款：' + escapeHtml(o.paymentMethod) : ''}$
-              {prepMeta}$
-                {readyMeta}
-                </div>>
+          <div class="muted">${escapeHtml(fmtLocalDateTime(o.createdAt))} ・ ${escapeHtml(o.orderType)} ${o.tableNo ? '・' + escapeHtml(o.tableNo) : ''}${!isPending && o.paymentMethod ? ' ・ 付款：' + escapeHtml(o.paymentMethod) : ''}${prepMeta}${readyMeta}</div>
+          ${replyMeta}
+        </div>
         <div><strong>${money(o.total)}</strong></div>
       </div>
       <div class="stack small" style="margin-top:12px">
@@ -178,7 +174,7 @@ function renderOrdersSection(wrap, orders, isPending){
       persistAll();
       window.refreshAllViews();
     };
-        btns[2].onclick = ()=>{
+    btns[2].onclick = ()=>{
       previewInModal(getReceiptHtml(o, 'customer'));
     };
     btns[3].onclick = ()=>{
@@ -187,7 +183,6 @@ function renderOrdersSection(wrap, orders, isPending){
     btns[4].onclick = ()=>{
       previewInModal(getLabelHtml(o));
     };
-
     if(isPending && btns[5]){
       btns[5].onclick = ()=>{
         document.getElementById('paymentTargetMode').value = 'pending';
