@@ -156,14 +156,19 @@ function showOnlineOrderOverlay(orderId){
   if(!overlay) return;
 
   const order = (state.onlineIncomingOrders || []).find(o => o.id === orderId);
+  const isReservation = !!(order && order.reservationAt);
+  const reservationText = isReservation ? String(order.reservationAt).replace('T',' ').slice(0,16) : '';
 
   document.getElementById('overlayOrderNo').textContent = order ? (order.orderNo || order.id) : orderId;
   document.getElementById('overlayTotal').textContent = order
     ? `$${order.total || order.subtotal || order.totalAmount || 0}`
     : '';
-  document.getElementById('overlayMeta').textContent = order
-    ? `${order.createdAt ? new Date(order.createdAt).toLocaleString('zh-TW') : ''} · 線上點餐-${order.orderType === 'dineIn' ? '內用' : '外帶'}`
+  const baseMeta = order
+    ? `${order.createdAt ? new Date(order.createdAt).toLocaleString('zh-TW') : ''} · ${order.orderType || '線上點餐'}`
     : '';
+  document.getElementById('overlayMeta').textContent = isReservation
+    ? `${baseMeta} · 📅 預約取餐：${reservationText}`
+    : baseMeta;
   document.getElementById('overlayCustomer').textContent = order
     ? `${order.customerName || '匿名'} / ${order.customerPhone || ''}`
     : '';
@@ -177,7 +182,7 @@ function showOnlineOrderOverlay(orderId){
     itemsEl.innerHTML = '';
   }
 
-  document.getElementById('overlayPrepTime').value = 20;
+  document.getElementById('overlayPrepTime').value = isReservation ? 30 : 20;
   document.getElementById('overlayMessage').value = '';
 
   overlay.style.display = 'flex';
@@ -185,10 +190,13 @@ function showOnlineOrderOverlay(orderId){
   // 接受按鈕
   const acceptBtn = document.getElementById('overlayAcceptBtn');
   acceptBtn.disabled = false;
-  acceptBtn.textContent = '確認接單';
+  acceptBtn.textContent = isReservation ? '✓ 確認預約' : '確認接單';
   acceptBtn.onclick = async ()=>{
     const prepTime = parseInt(document.getElementById('overlayPrepTime').value) || 20;
-    const msg = document.getElementById('overlayMessage').value || `預計 ${prepTime} 分鐘後可取餐`;
+    const defaultMsg = isReservation
+      ? `已收到您的預約（${reservationText}），將於時段前備餐`
+      : `預計 ${prepTime} 分鐘後可取餐`;
+    const msg = document.getElementById('overlayMessage').value || defaultMsg;
     acceptBtn.disabled = true;
     acceptBtn.textContent = '處理中...';
     try{
@@ -200,50 +208,59 @@ function showOnlineOrderOverlay(orderId){
         state.orders.unshift(posOrder);
         persistAll();
 
-        // 更新顧客主檔（本機）
         try {
           const cust = await import('./customer-service.js');
           cust.upsertCustomerFromOrder(posOrder);
-          cust.syncCustomerToFirebase(posOrder);   // 不 await，背景跑
+          cust.syncCustomerToFirebase(posOrder);
         } catch (e) { console.warn('顧客主檔更新失敗：', e); }
 
-        // 自動列印（依勾選）
-        try{
-          const { printOrderReceipt, printKitchenCopies } = await import('./print-service.js');
-          const cfg2 = ensureRealtimeConfig();
-          if(cfg2.autoPrintKitchenOnConfirm) printKitchenCopies(posOrder);
-          if(cfg2.autoPrintReceiptOnConfirm) printOrderReceipt(posOrder, 'customer');
-        }catch(pe){ console.error('自動列印失敗：', pe); }
+        // 預約單接單時不立即列印（等 30 分鐘前再印）
+        if(!isReservation){
+          try{
+            const { printOrderReceipt, printKitchenCopies } = await import('./print-service.js');
+            const cfg2 = ensureRealtimeConfig();
+            if(cfg2.autoPrintKitchenOnConfirm) printKitchenCopies(posOrder);
+            if(cfg2.autoPrintReceiptOnConfirm) printOrderReceipt(posOrder, 'customer');
+          }catch(pe){ console.error('自動列印失敗：', pe); }
+        }
       }
       if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
       if(typeof window.refreshRealtimeOrderPanel === 'function') window.refreshRealtimeOrderPanel();
     }catch(err){
       alert('接單失敗：' + err.message);
       acceptBtn.disabled = false;
-      acceptBtn.textContent = '確認接單';
+      acceptBtn.textContent = isReservation ? '✓ 確認預約' : '確認接單';
     }
   };
 
-  // 拒絕按鈕
+  // 拒絕按鈕（預約單隱藏）
   const rejectBtn = document.getElementById('overlayRejectBtn');
-  rejectBtn.disabled = false;
-  rejectBtn.textContent = '拒絕訂單';
-  rejectBtn.onclick = async ()=>{
-    if(!confirm('確定拒絕此訂單？')) return;
-    rejectBtn.disabled = true;
-    rejectBtn.textContent = '處理中...';
-    try{
-      await rejectOnlineOrder(orderId, '店家拒絕接單');
-      stopAlarm();
-      if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
-      if(typeof window.refreshRealtimeOrderPanel === 'function') window.refreshRealtimeOrderPanel();
-    }catch(err){
-      alert('拒絕失敗：' + err.message);
+  if(rejectBtn){
+    if(isReservation){
+      rejectBtn.style.display = 'none';
+    } else {
+      rejectBtn.style.display = '';
       rejectBtn.disabled = false;
       rejectBtn.textContent = '拒絕訂單';
+      rejectBtn.onclick = async ()=>{
+        if(!confirm('確定拒絕此訂單？')) return;
+        rejectBtn.disabled = true;
+        rejectBtn.textContent = '處理中...';
+        try{
+          await rejectOnlineOrder(orderId, '店家拒絕接單');
+          stopAlarm();
+          if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
+          if(typeof window.refreshRealtimeOrderPanel === 'function') window.refreshRealtimeOrderPanel();
+        }catch(err){
+          alert('拒絕失敗：' + err.message);
+          rejectBtn.disabled = false;
+          rejectBtn.textContent = '拒絕訂單';
+        }
+      };
     }
-  };
+  }
 }
+
 
 function startAlarm(orderId){
   if(activeAlarmInterval){
