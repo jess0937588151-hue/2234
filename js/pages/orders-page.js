@@ -3,6 +3,7 @@ import { state, persistAll } from '../core/store.js';
 import { escapeHtml, deepCopy, money, fmtLocalDateTime } from '../core/utils.js';
 import { buildRealtimeOrderForPOS, confirmOnlineOrder, getRealtimeConfig, rejectOnlineOrder } from '../modules/realtime-order-service.js';
 import { printKitchenCopies, printOrderLabels, printOrderReceipt, getReceiptHtml, getLabelHtml, previewInModal } from '../modules/print-service.js';
+import { hasOpenSession } from '../modules/report-session.js';
 
 
 function renderIncomingOnlineOrders(){
@@ -47,6 +48,7 @@ function renderIncomingOnlineOrders(){
       </div>
     `;
     row.querySelector('.accept-btn').onclick = async ()=>{
+      if(!hasOpenSession()) return alert('🔒 尚未開始值班，請先到報表頁開班');
       try{
         const prepMinutes = Math.max(0, Number(row.querySelector('.prep-minutes-input').value || 0));
         if(!prepMinutes) return alert('請先輸入備餐時間');
@@ -77,6 +79,7 @@ function renderIncomingOnlineOrders(){
     const rejectBtn = row.querySelector('.reject-btn');
     if(rejectBtn){
       rejectBtn.onclick = async ()=>{
+        if(!hasOpenSession()) return alert('🔒 尚未開始值班，請先到報表頁開班');
         try{
           const replyMessage = row.querySelector('.reply-message-input').value.trim() || '店家目前無法接單，請稍後再試。';
           await rejectOnlineOrder(o.id, replyMessage);
@@ -113,9 +116,11 @@ export function getFilteredOrders(){
 }
 
 function loadOrderToCart(orderId){
+  if(!hasOpenSession()) return alert('🔒 尚未開始值班，請先到報表頁開班');
   const o = state.orders.find(x=>x.id===orderId);
   if(!o) return;
   state.cart = deepCopy(o.items);
+
   state.editingOrderId = o.id;
   document.getElementById('orderType').value = o.orderType || '內用';
   document.getElementById('tableNo').value = o.tableNo || '';
@@ -168,8 +173,11 @@ function renderOrdersSection(wrap, orders, isPending){
     `;
     const btns = row.querySelectorAll('button');
     btns[0].onclick = ()=> loadOrderToCart(o.id);
-    btns[1].onclick = ()=>{
-      if(!confirm(`確定刪除訂單「${o.orderNo}」？`)) return;
+   btns[1].onclick = ()=>{
+  if(!hasOpenSession()) return alert('🔒 尚未開始值班，請先到報表頁開班');
+  if(!confirm(`確定刪除訂單「${o.orderNo}」？`)) return;
+  ...
+};
       state.orders = state.orders.filter(x=>x.id!==o.id);
       persistAll();
       window.refreshAllViews();
@@ -185,7 +193,8 @@ function renderOrdersSection(wrap, orders, isPending){
     };
     if(isPending && btns[5]){
       btns[5].onclick = ()=>{
-        document.getElementById('paymentTargetMode').value = 'pending';
+        if(!hasOpenSession()) return alert('🔒 尚未開始值班，請先到報表頁開班');
+  document.getElementById('paymentTargetMode').value='pending';
         document.getElementById('paymentTargetOrderId').value = o.id;
         document.getElementById('paymentModal').classList.remove('hidden');
       };
@@ -195,11 +204,40 @@ function renderOrdersSection(wrap, orders, isPending){
 }
 
 export function renderOrders(){
+  renderSessionBanner();           // ← 新增
   renderIncomingOnlineOrders();
-  const list = getFilteredOrders();
-  renderOrdersSection(document.getElementById('pendingOrdersList'), list.filter(o=>o.status==='pending'), true);
-  renderOrdersSection(document.getElementById('completedOrdersList'), list.filter(o=>o.status!=='pending'), false);
+  const filtered = getFilteredOrders();
+  renderOrdersSection(document.getElementById('pendingOrdersList'),
+                      filtered.filter(o=>o.status==='pending'), true);
+  renderOrdersSection(document.getElementById('completedOrdersList'),
+                      filtered.filter(o=>o.status==='completed'), false);
 }
+function renderSessionBanner(){
+  let banner = document.getElementById('ordersSessionBanner');
+  const view = document.getElementById('ordersView');
+  if(!view) return;
+  if(hasOpenSession()){
+    if(banner) banner.remove();
+    return;
+  }
+  if(!banner){
+    banner = document.createElement('div');
+    banner.id = 'ordersSessionBanner';
+    banner.style.cssText = 'background:#fef3c7;border:1px solid #f59e0b;color:#92400e;padding:10px 14px;border-radius:8px;margin:8px 0;font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;';
+    banner.innerHTML = `
+      <span>⚠️ 尚未開班，僅能檢視/列印訂單，無法修改、刪除或處理線上單。</span>
+      <button class="primary-btn small-btn" id="ordersBannerGoReports">📊 前往報表頁開班</button>
+    `;
+    view.insertBefore(banner, view.firstChild);
+    document.getElementById('ordersBannerGoReports').onclick = ()=>{
+      document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelector('.nav-btn[data-view="reportsView"]')?.classList.add('active');
+      document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+      document.getElementById('reportsView')?.classList.add('active');
+    };
+  }
+}
+
 
 export function initOrdersPage(){
   ['orderItemSearch','orderDateFrom','orderDateTo','orderMinAmount','orderMaxAmount'].forEach(idv=>{
