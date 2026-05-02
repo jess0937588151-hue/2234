@@ -480,14 +480,8 @@ export function initPOSPage(){
   document.getElementById('cancelProductConfigBtn').onclick = closeProductConfig;
   document.querySelector('#productConfigModal .modal-backdrop').onclick = closeProductConfig;
 
-  document.getElementById('clearCartBtn').onclick = ()=>{ state.cart=[]; state.editingOrderId=null; renderCart(); };
       document.getElementById('checkoutBtn').onclick = ()=>{
     if(!hasOpenSession()) return alert('🔒 尚未開始值班，請先到報表頁開班');
-    if(!state.cart.length) return alert('請先加入商品');
-    // 預約：必須選時段
-    ...（保持原樣）
-
-    document.getElementById('checkoutBtn').onclick = ()=>{
     if(!state.cart.length) return alert('請先加入商品');
     // 預約：必須選時段
     const _ot = document.getElementById('orderType').value;
@@ -499,6 +493,7 @@ export function initPOSPage(){
     document.getElementById('paymentTargetOrderId').value = state.editingOrderId || '';
     document.getElementById('paymentModal').classList.remove('hidden');
   };
+
 
   document.getElementById('closePaymentModal').onclick = ()=> document.getElementById('paymentModal').classList.add('hidden');
   document.querySelector('#paymentModal .modal-backdrop').onclick = ()=> document.getElementById('paymentModal').classList.add('hidden');
