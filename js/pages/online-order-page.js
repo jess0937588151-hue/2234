@@ -571,6 +571,7 @@ async function init(){
   const searchMyBtn = document.getElementById('myOrdersSearchBtn');
   if(searchMyBtn){
     searchMyBtn.onclick = handleMyOrdersSearch;
+   }
   }
 async function handleMyOrdersSearch(){
   const btn = document.getElementById('myOrdersSearchBtn');
@@ -599,7 +600,7 @@ async function handleMyOrdersSearch(){
     btn.textContent = '查詢我的訂單';
   }
  }
-}
+
 function updateFloatingCartBadge() {
   const badge = document.getElementById('floatingCartBadge');
   if (!badge) return;
