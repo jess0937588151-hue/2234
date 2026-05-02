@@ -823,3 +823,97 @@ export async function watchMenuFromFirebase(callback){
     if(callback) callback(data);
   });
 }
+
+// ============================================================
+// 06.15/5-B 預約 30 分鐘前提醒
+// ============================================================
+let reservationReminderInterval = null;
+
+function showReservationReminderOverlay(order){
+  const overlay = document.getElementById('reservationReminderOverlay');
+  if(!overlay) return;
+
+  document.getElementById('reminderOrderNo').textContent = order.orderNo || order.id;
+  document.getElementById('reminderTotal').textContent = `$${order.total || order.subtotal || 0}`;
+  const resvText = order.reservationAt ? String(order.reservationAt).replace('T',' ').slice(0,16) : '';
+  document.getElementById('reminderMeta').textContent =
+    `📅 預約取餐：${resvText} · ${order.orderType || ''}`;
+  document.getElementById('reminderCustomer').textContent =
+    `${order.customerName || ''} / ${order.customerPhone || ''}`;
+  const itemsEl = document.getElementById('reminderItems');
+  if(Array.isArray(order.items)){
+    itemsEl.innerHTML = order.items.map(it =>
+      `<div style="padding:3px 0;">${it.name} x ${it.qty}</div>`
+    ).join('');
+  } else {
+    itemsEl.innerHTML = '';
+  }
+
+  overlay.style.display = 'flex';
+  try{ playOnce(); }catch(e){}
+
+  const startBtn = document.getElementById('reminderStartBtn');
+  const laterBtn = document.getElementById('reminderLaterBtn');
+
+  startBtn.onclick = async ()=>{
+    startBtn.disabled = true;
+    startBtn.textContent = '處理中...';
+    try{
+      const { printOrderReceipt, printKitchenCopies } = await import('./print-service.js');
+      try{ printKitchenCopies(order); }catch(e){ console.error('列印廚房單失敗：', e); }
+      try{ printOrderReceipt(order, 'customer'); }catch(e){ console.error('列印顧客單失敗：', e); }
+      order.reservationReminded = true;
+      persistAll();
+      overlay.style.display = 'none';
+      if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
+    }catch(err){
+      alert('列印失敗：' + err.message);
+    }finally{
+      startBtn.disabled = false;
+      startBtn.textContent = '🔔 開始備餐並列印廚房單';
+    }
+  };
+
+  laterBtn.onclick = ()=>{
+    order.reservationReminded = true;
+    persistAll();
+    overlay.style.display = 'none';
+  };
+}
+
+function checkReservationReminders(){
+  if(!Array.isArray(state.orders)) return;
+  const now = Date.now();
+  // 每次只彈一張（避免多張重疊）；若已有 overlay 顯示中就跳過
+  const overlay = document.getElementById('reservationReminderOverlay');
+  if(overlay && overlay.style.display === 'flex') return;
+
+  for(const o of state.orders){
+    if(!o || !o.reservationAt) continue;
+    if(o.reservationReminded === true) continue;
+    if(o.status === 'completed' || o.status === 'rejected' || o.status === 'cancelled') continue;
+    const resvMs = new Date(o.reservationAt).getTime();
+    if(isNaN(resvMs)) continue;
+    const diff = resvMs - now;
+    if(diff > 0 && diff <= 30 * 60 * 1000){
+      showReservationReminderOverlay(o);
+      break;
+    }
+  }
+}
+
+export function startReservationReminderLoop(){
+  if(reservationReminderInterval) return;
+  // 啟動立即跑一次，之後每 60 秒檢查
+  try{ checkReservationReminders(); }catch(e){ console.error(e); }
+  reservationReminderInterval = setInterval(()=>{
+    try{ checkReservationReminders(); }catch(e){ console.error('reservation reminder check failed:', e); }
+  }, 60000);
+}
+
+export function stopReservationReminderLoop(){
+  if(reservationReminderInterval){
+    clearInterval(reservationReminderInterval);
+    reservationReminderInterval = null;
+  }
+}
