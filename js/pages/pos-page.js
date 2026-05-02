@@ -6,6 +6,7 @@ import { escapeHtml, money, id } from '../core/utils.js';
 import { getDiscountResult, getDiscountType, setDiscountType, handleDiscountInput } from '../modules/cart-service.js';
 import { createOrUpdateOrder, markPendingOrderPaid } from '../modules/order-service.js';
 import { buildCartPreviewOrder, getPrintSettings, printOrderLabels, printOrderReceipt, printKitchenCopies, openCashDrawer, getReceiptHtml } from '../modules/print-service.js';
+import { hasOpenSession } from '../modules/report-session.js';
 
 // ── 預約功能（POS 端） ──
 const POS_WEEKDAY_MAP = ['sun','mon','tue','wed','thu','fri','sat'];
@@ -480,7 +481,12 @@ export function initPOSPage(){
   document.querySelector('#productConfigModal .modal-backdrop').onclick = closeProductConfig;
 
   document.getElementById('clearCartBtn').onclick = ()=>{ state.cart=[]; state.editingOrderId=null; renderCart(); };
-  
+      document.getElementById('checkoutBtn').onclick = ()=>{
+    if(!hasOpenSession()) return alert('🔒 尚未開始值班，請先到報表頁開班');
+    if(!state.cart.length) return alert('請先加入商品');
+    // 預約：必須選時段
+    ...（保持原樣）
+
     document.getElementById('checkoutBtn').onclick = ()=>{
     if(!state.cart.length) return alert('請先加入商品');
     // 預約：必須選時段
@@ -563,5 +569,25 @@ export function initPOSPage(){
     });
     renderCart();
   };
+  // ── 06.16/5：未開班鎖定 POS 頁 ──
+  refreshPosLockState();
+  // 切換到 POS 頁時刷新鎖定狀態
+  const posNavBtn = document.querySelector('[data-view="posView"]');
+  if(posNavBtn){
+    posNavBtn.addEventListener('click', refreshPosLockState);
+  }
+  // 開/結班後可呼叫 window.refreshPosLockState 以即時更新
+  window.refreshPosLockState = refreshPosLockState;
 
 }
+// ── 06.16/5：依班次狀態決定是否鎖定 POS 頁 ──
+function refreshPosLockState(){
+  const lock = document.getElementById('posLockOverlay');
+  if(!lock) return;
+  if(hasOpenSession()){
+    lock.style.display = 'none';
+  } else {
+    lock.style.display = 'flex';
+  }
+}
+
