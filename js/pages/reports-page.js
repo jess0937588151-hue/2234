@@ -256,20 +256,22 @@ function openStartSessionModal(){
 }
 
 function confirmStartSession(){
+  const modal = document.getElementById('startSessionModal');
   try{
     const staffId = document.getElementById('startStaffSelect').value;
     const cashDetail = getCashDetailFromGrid('startCash');
     startSession({ staffId, cashDetail });
-        document.getElementById('startSessionModal').classList.add('hidden');
+    if(modal) modal.classList.add('hidden');
     renderReports();
     if(typeof window.refreshPosLockState === 'function') window.refreshPosLockState();
     if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
-
     alert(`已開始值班\n人員：${staffId}\n備用金：$${calcCashTotal(cashDetail)}`);
   }catch(err){
+    if(modal) modal.classList.add('hidden');
     alert('開班失敗：' + err.message);
   }
 }
+
 
 function openEndSessionModal(){
   const cur = getCurrentSession();
@@ -322,14 +324,25 @@ function openEndSessionModal(){
 }
 
 function confirmEndSession(){
+  const modal = document.getElementById('endSessionModal');
+  // 先檢查 session 還在不在
+  if(!getCurrentSession()){
+    if(modal) modal.classList.add('hidden');
+    alert('目前沒有進行中的班次（可能已被結束）');
+    renderReports();
+    if(typeof window.refreshPosLockState === 'function') window.refreshPosLockState();
+    if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
+    return;
+  }
   try{
     const staffId = document.getElementById('endStaffSelect').value;
     const cashDetail = getCashDetailFromGrid('endCash');
     const note = document.getElementById('endSessionNote').value || '';
     const ended = endSession({ staffId, cashDetail, note });
-    document.getElementById('endSessionModal').classList.add('hidden');
-    renderReports();
 
+    // 不論成敗都先關 modal（避免殘影）
+    if(modal) modal.classList.add('hidden');
+    renderReports();
     if(typeof window.refreshPosLockState === 'function') window.refreshPosLockState();
     if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
 
@@ -340,9 +353,15 @@ function confirmEndSession(){
     else msg += `現金溢收 $${diff}`;
     alert(msg);
   }catch(err){
+    // 失敗時也關 modal
+    if(modal) modal.classList.add('hidden');
+    renderReports();
+    if(typeof window.refreshPosLockState === 'function') window.refreshPosLockState();
+    if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
     alert('結束值班失敗：' + err.message);
   }
 }
+
 
 // ──────────────────────────────────────────────
 // 列印 / 匯出（簡化版，06.16/8 會做選擇對話框）
