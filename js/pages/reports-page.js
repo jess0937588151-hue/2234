@@ -3,7 +3,7 @@
  * 依賴 report-session.js 的 startSession / endSession / 等 API。
  */
 import { state, persistAll } from '../core/store.js';
-import { escapeHtml, money, downloadFile } from '../core/utils.js';
+import { escapeHtml, money, downloadFile, fmtLocalDateTime } from '../core/utils.js';
 import {
   CASH_DENOMINATIONS,
   calcCashTotal,
@@ -169,8 +169,8 @@ function renderHistorySessions(){
     return;
   }
   el.innerHTML = list.map(s => {
-    const start = new Date(s.startedAt).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
-    const end = s.endedAt ? new Date(s.endedAt).toLocaleString('zh-TW',{hour:'2-digit',minute:'2-digit'}) : '進行中';
+    const start = fmtLocalDateTime(s.startedAt).slice(5);  // 顯示 MM-DD HH:mm
+    const end = s.endedAt ? fmtLocalDateTime(s.endedAt).slice(11) : '進行中';  // 只顯示 HH:mm
     const sales = s.stats ? money(s.stats.salesTotal) : money(0);
     const count = s.stats ? s.stats.orderCount : 0;
     const diffNum = Number(s.cashDiff||0);
@@ -282,7 +282,7 @@ function openEndSessionModal(){
 
   // 寫入應收欄位
   document.getElementById('endSessionInfo').textContent =
-    `班次 ${cur.staffId}　開班 ${new Date(cur.startedAt).toLocaleString('zh-TW')}　${orders.length} 筆訂單`;
+    `班次 ${cur.staffId}　開班 ${fmtLocalDateTime(cur.startedAt)}　${orders.length} 筆訂單`;
   document.getElementById('endOpeningCash').textContent = '$' + Number(cur.openingCash||0);
   document.getElementById('endCashSales').textContent = '$' + cashSales;
   document.getElementById('endExpectedCash').textContent = '$' + expected;
@@ -352,7 +352,7 @@ function printCurrentReport(){
     <style>body{font-family:sans-serif;padding:20px}h1{text-align:center}table{width:100%;border-collapse:collapse;margin-top:12px}td,th{border:1px solid #ccc;padding:6px}</style>
     </head><body>
     <h1>班次報表</h1>
-    <p>人員：${escapeHtml(cur.staffId)}　開班：${new Date(cur.startedAt).toLocaleString('zh-TW')}</p>
+    <p>人員：${escapeHtml(cur.staffId)}　開班：${escapeHtml(fmtLocalDateTime(cur.startedAt))}</p>
     <table><tr><td>營業額</td><td style="text-align:right">${money(sales)}</td></tr>
     <tr><td>訂單數</td><td style="text-align:right">${orders.length}</td></tr></table>
     </body></html>`;
@@ -368,9 +368,9 @@ function exportCurrentReportCsv(){
   if(!cur){ alert('尚未開班，無法匯出'); return; }
   const orders = getCurrentSessionOrders();
   const rows = [['訂單編號','時間','類型','付款','金額']];
-  orders.forEach(o => rows.push([
+    orders.forEach(o => rows.push([
     o.orderNo||o.id,
-    new Date(o.createdAt).toLocaleString('zh-TW'),
+    fmtLocalDateTime(o.createdAt),
     o.orderType||'',
     o.paymentMethod||'',
     Number(o.total||0)
