@@ -289,7 +289,7 @@ function openEndSessionModal(){
   document.getElementById('endStaffSelect').value = cur.staffId || 'A1';
   document.getElementById('endSessionNote').value = '';
 
-  renderCashGrid('endCash', 'endCash', detail => {
+  renderCashGrid('endCashGrid', 'endCash', detail => {
     const closing = calcCashTotal(detail);
     document.getElementById('endClosingCash').textContent = '$' + closing;
     const diff = closing - expected;
