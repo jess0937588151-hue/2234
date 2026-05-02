@@ -598,8 +598,8 @@ async function handleMyOrdersSearch(){
     btn.disabled = false;
     btn.textContent = '查詢我的訂單';
   }
+ }
 }
-
 function updateFloatingCartBadge() {
   const badge = document.getElementById('floatingCartBadge');
   if (!badge) return;
