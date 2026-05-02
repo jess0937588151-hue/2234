@@ -216,12 +216,15 @@ function renderCashGrid(containerId, prefix, onChange){
     <div style="display:flex;align-items:center;gap:6px;background:#fff;padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px">
       <span style="font-size:13px;width:50px">$${d}</span>
       <span style="font-size:12px;color:#94a3b8">×</span>
-      <input type="number" min="0" value="0" data-denom="${d}" id="${prefix}_${d}" style="flex:1;padding:6px;border:1px solid #cbd5e1;border-radius:4px;font-size:14px;text-align:right">
+      <input type="tel" inputmode="numeric" pattern="[0-9]*" value="0" data-denom="${d}" id="${prefix}_${d}" style="flex:1;padding:6px;border:1px solid #cbd5e1;border-radius:4px;font-size:14px;text-align:right;-webkit-appearance:none;appearance:none">
       <span style="font-size:12px;color:#64748b;width:60px;text-align:right" id="${prefix}_${d}_sub">$0</span>
     </div>
   `).join('');
-  el.querySelectorAll('input[data-denom]').forEach(input => {
+    el.querySelectorAll('input[data-denom]').forEach(input => {
+    input.addEventListener('focus', () => input.select());
     input.addEventListener('input', () => {
+      // 過濾非數字
+      input.value = input.value.replace(/[^0-9]/g, '');
       const d = Number(input.dataset.denom);
       const n = Math.max(0, Number(input.value)||0);
       const sub = document.getElementById(`${prefix}_${d}_sub`);
@@ -229,6 +232,7 @@ function renderCashGrid(containerId, prefix, onChange){
       if(onChange) onChange(getCashDetailFromGrid(prefix));
     });
   });
+
 }
 
 function getCashDetailFromGrid(prefix){
@@ -323,8 +327,9 @@ function confirmEndSession(){
     const cashDetail = getCashDetailFromGrid('endCash');
     const note = document.getElementById('endSessionNote').value || '';
     const ended = endSession({ staffId, cashDetail, note });
-       document.getElementById('startSessionModal').classList.add('hidden');
+    document.getElementById('endSessionModal').classList.add('hidden');
     renderReports();
+
     if(typeof window.refreshPosLockState === 'function') window.refreshPosLockState();
     if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
 
