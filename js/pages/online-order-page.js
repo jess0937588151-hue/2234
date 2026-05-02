@@ -549,16 +549,8 @@ async function init(){
 
   document.getElementById('submitOnlineOrderBtn').onclick = submitOnlineOrder;
   document.getElementById('closeOnlineStatusBtn').onclick = closeStatusOverlay;
-}
-function updateFloatingCartBadge() {
-  const badge = document.getElementById('floatingCartBadge');
-  if (!badge) return;
-  const count = onlineState.cart.reduce((s, i) => s + i.qty, 0);
-  badge.textContent = count;
-  badge.style.display = count > 0 ? 'flex' : 'none';
-}
 
-// 我的訂單查詢
+  // 我的訂單查詢
   const myOrdersBtn = document.getElementById('openMyOrdersBtn');
   if(myOrdersBtn){
     myOrdersBtn.onclick = ()=>{
@@ -607,6 +599,16 @@ async function handleMyOrdersSearch(){
     btn.textContent = '查詢我的訂單';
   }
 }
+}
+function updateFloatingCartBadge() {
+  const badge = document.getElementById('floatingCartBadge');
+  if (!badge) return;
+  const count = onlineState.cart.reduce((s, i) => s + i.qty, 0);
+  badge.textContent = count;
+  badge.style.display = count > 0 ? 'flex' : 'none';
+}
+
+
 
 function renderMyOrdersList(list){
   const result = document.getElementById('myOrdersResult');
