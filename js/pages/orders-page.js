@@ -1,6 +1,6 @@
 /* 中文備註：js/pages/orders-page.js，此檔已加入中文說明，方便後續維護。 */
 import { state, persistAll } from '../core/store.js';
-import { escapeHtml, deepCopy, money } from '../core/utils.js';
+import { escapeHtml, deepCopy, money, fmtLocalDateTime } from '../core/utils.js';
 import { buildRealtimeOrderForPOS, confirmOnlineOrder, getRealtimeConfig, rejectOnlineOrder } from '../modules/realtime-order-service.js';
 import { printKitchenCopies, printOrderLabels, printOrderReceipt, getReceiptHtml, getLabelHtml, previewInModal } from '../modules/print-service.js';
 
@@ -16,7 +16,7 @@ function renderIncomingOnlineOrders(){
   }
   list.forEach(o=>{
     const isReservation = !!o.reservationAt;
-    const reservationText = isReservation ? String(o.reservationAt).replace('T',' ').slice(0,16) : '';
+    const reservationText = isReservation ? fmtLocalDateTime(o.reservationAt) : '';
     const row = document.createElement('div');
     row.className = 'order-card pending' + (isReservation ? ' reservation' : '');
     row.innerHTML = `
@@ -24,7 +24,7 @@ function renderIncomingOnlineOrders(){
         <div>
           <strong>${escapeHtml(o.orderNo || o.id)}</strong>
           <span class="badge pending">${isReservation ? '預約待確認' : '待確認'}</span>
-          <div class="muted">${String(o.createdAt || '').replace('T',' ').slice(0,16)} ・ ${escapeHtml(o.orderType || '線上點餐')}</div>
+          <div class="muted">${escapeHtml(fmtLocalDateTime(o.createdAt))} ・ ${escapeHtml(o.orderType || '線上點餐')}</div>
           ${isReservation ? `<div style="color:#b45309;font-weight:600;margin-top:4px">📅 預約取餐：${escapeHtml(reservationText)}</div>` : ''}
           <div class="muted">${escapeHtml(o.customerName || '')}${o.customerPhone ? ' / ' + escapeHtml(o.customerPhone) : ''}</div>
           ${o.customerNote ? `<div class="muted">顧客備註：${escapeHtml(o.customerNote)}</div>` : ''}
@@ -139,7 +139,9 @@ function renderOrdersSection(wrap, orders, isPending){
     const row = document.createElement('div');
     row.className = 'order-card' + (isPending ? ' pending' : '');
     const prepMeta = o.prepTimeMinutes ? ` ・ 備餐 ${escapeHtml(String(o.prepTimeMinutes))} 分鐘` : '';
-    const readyMeta = o.estimatedReadyAt ? ` ・ 預計完成 ${escapeHtml(String(o.estimatedReadyAt).replace('T',' ').slice(0,16))}` : '';
+    const readyMeta = o.estimatedReadyAt ? ` ・ 預計完成 ${escapeHtml(fmtLocalDateTime(o.estimatedReadyAt))}` : '';
+<div class="muted">${escapeHtml(fmtLocalDateTime(o.createdAt))} ・ ${escapeHtml(o.orderType)}...
+
     const replyMeta = o.merchantReplyMessage ? `<div class="muted">店家回覆：${escapeHtml(o.merchantReplyMessage)}</div>` : '';
     row.innerHTML = `
       <div class="row between wrap">
