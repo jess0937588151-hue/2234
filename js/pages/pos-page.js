@@ -381,7 +381,7 @@ function finalizeOrder(paymentMethod){
         window.refreshAllViews();
 
         // 開錢箱（依設定 openDrawer，且僅結帳時）
-      if(order && paymentMethod !== '待付款' && printConfig.openDrawer){
+     if(order && paymentMethod === '現金' && printConfig.openDrawer){
     try { openCashDrawer(); } catch(e) { console.error('開錢箱失敗:', e); }
 }
 
