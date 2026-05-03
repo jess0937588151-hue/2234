@@ -556,6 +556,8 @@ function openPrintOptions(session){
 if(summaryModal) summaryModal.classList.remove('hidden');
 
 printSessionReport(_pendingPrintSession, opts, null);
+};  
+}     
 
 function buildSessionReportHtml(session, opts){
   opts = opts || { summary:true, orderTypes:true, payments:true, topProducts:true, hourly:true, orderList:false, paperSize:'A4' };
