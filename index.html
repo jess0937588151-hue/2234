@@ -847,6 +847,52 @@
 
   </div>
 </div>
+<!-- 班次列印選項 -->
+<div id="printOptionsModal" class="modal hidden">
+  <div class="modal-content" style="max-width:480px;max-height:90vh;overflow-y:auto">
+    <div class="row between wrap">
+      <h2>🖨 列印選項</h2>
+      <button class="ghost-btn" onclick="document.getElementById('printOptionsModal').classList.add('hidden')">✕</button>
+    </div>
+
+    <div style="margin-top:14px">
+      <h3 style="margin:0 0 8px;font-size:15px">📋 列印內容</h3>
+      <label style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px;cursor:pointer">
+        <input type="checkbox" id="optSummary" checked> <span>💰 班次總覽（營業額／現金差異）</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px;cursor:pointer">
+        <input type="checkbox" id="optOrderTypes" checked> <span>🍱 訂單類型統計</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px;cursor:pointer">
+        <input type="checkbox" id="optPayments" checked> <span>💳 付款方式統計</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px;cursor:pointer">
+        <input type="checkbox" id="optTopProducts" checked> <span>🔥 熱銷 TOP10</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px;cursor:pointer">
+        <input type="checkbox" id="optHourly" checked> <span>🕐 時段分布</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px;cursor:pointer">
+        <input type="checkbox" id="optOrderList"> <span>📝 訂單明細清單</span>
+      </label>
+    </div>
+
+    <div style="margin-top:14px">
+      <h3 style="margin:0 0 8px;font-size:15px">📄 紙張格式</h3>
+      <label style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px;cursor:pointer">
+        <input type="radio" name="paperSize" value="A4" checked> <span>A4（標準）</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px;cursor:pointer">
+        <input type="radio" name="paperSize" value="80mm"> <span>80mm 熱感紙（收據機）</span>
+      </label>
+    </div>
+
+    <div class="form-actions" style="margin-top:18px;display:flex;gap:8px">
+      <button id="confirmPrintBtn" class="primary-btn" style="flex:1;background:#3b82f6">🖨 開始列印</button>
+      <button class="secondary-btn" style="flex:1" onclick="document.getElementById('printOptionsModal').classList.add('hidden')">取消</button>
+    </div>
+  </div>
+</div>
 
 
 <!-- ===== 外部腳本 ===== -->
