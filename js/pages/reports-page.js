@@ -301,51 +301,6 @@ function openEndSessionModal(){
   if(modal) modal.classList.remove('hidden');
 }
 
-
-  // 計算本班統計
-  const orders = getCurrentSessionOrders();
-  const cashSales = orders
-    .filter(o => o.paymentMethod === '現金')
-    .reduce((s,o)=>s+Number(o.total||0),0);
-  const expected = Number(cur.openingCash||0) + cashSales;
-
-  // 寫入應收欄位
-  document.getElementById('endSessionInfo').textContent =
-    `班次 ${cur.staffId}　開班 ${fmtLocalDateTime(cur.startedAt)}　${orders.length} 筆訂單`;
-  document.getElementById('endOpeningCash').textContent = '$' + Number(cur.openingCash||0);
-  document.getElementById('endCashSales').textContent = '$' + cashSales;
-  document.getElementById('endExpectedCash').textContent = '$' + expected;
-  document.getElementById('endStaffSelect').value = cur.staffId || 'A1';
-  document.getElementById('endSessionNote').value = '';
-
-  renderCashGrid('endCashGrid', 'endCash', detail => {
-    const closing = calcCashTotal(detail);
-    document.getElementById('endClosingCash').textContent = '$' + closing;
-    const diff = closing - expected;
-    const diffEl = document.getElementById('endCashDiff');
-    if(diff === 0){
-      diffEl.textContent = '$0 ✓';
-      diffEl.style.color = '#10b981';
-      diffEl.parentElement.style.background = '#f0fdf4';
-    } else if(diff < 0){
-      diffEl.textContent = `$${diff}（短少）`;
-      diffEl.style.color = '#ef4444';
-      diffEl.parentElement.style.background = '#fef2f2';
-    } else {
-      diffEl.textContent = `+$${diff}（溢收）`;
-      diffEl.style.color = '#f59e0b';
-      diffEl.parentElement.style.background = '#fffbeb';
-    }
-  });
-  document.getElementById('endClosingCash').textContent = '$0';
-  const diffEl = document.getElementById('endCashDiff');
-  diffEl.textContent = `$${0-expected}（短少）`;
-  diffEl.style.color = '#ef4444';
-  diffEl.parentElement.style.background = '#fef2f2';
-
-  modal.classList.remove('hidden');
-}
-
 function confirmEndSession(){
   const modal = document.getElementById('endSessionModal');
   if(!getCurrentSession()){
