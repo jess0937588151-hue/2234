@@ -338,7 +338,7 @@ function openEndSessionModal(){
   document.getElementById('endCashDiff').style.color = '#10b981';
 
   if(modal) modal.classList.remove('hidden');
-
+} 
 function confirmEndSession(){
   const modal = document.getElementById('endSessionModal');
   if(!getCurrentSession()){
