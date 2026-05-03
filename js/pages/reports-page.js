@@ -669,10 +669,7 @@ const discount = orders.reduce((s,o) => {
   .diff{padding:8px;border-radius:6px;text-align:center;font-weight:bold;font-size:${is80?'13px':'15px'}}
   @media print{ .no-print{display:none!important} }
 </style></head><body>
-<div class="no-print" style="position:sticky;top:0;background:#fff;padding:8px;border-bottom:1px solid #e2e8f0;text-align:center;margin-bottom:12px;z-index:9">
-  <button onclick="window.print()" style="padding:10px 20px;background:#3b82f6;color:#fff;border:none;border-radius:6px;font-size:15px;cursor:pointer">🖨 列印</button>
-  <button onclick="window.close()" style="padding:10px 20px;background:#64748b;color:#fff;border:none;border-radius:6px;font-size:15px;cursor:pointer;margin-left:8px">關閉</button>
-</div>
+
 <h1>📋 班次報表</h1>
 <div class="sub">人員：${escapeHtml(session.staffId)}<br>${escapeHtml(fmtLocalDateTime(session.startedAt))} ~ ${escapeHtml(fmtLocalDateTime(session.endedAt || new Date().toISOString()))}</div>
 ${html_summary}${html_orderTypes}${html_payments}${html_top}${html_hourly}${html_orderList}
@@ -690,10 +687,19 @@ ${html_summary}${html_orderTypes}${html_payments}${html_top}${html_hourly}${html
   printWin.document.write(html);
   printWin.document.close();
   
-  const doPrint = () => {
-    try{ printWin.focus(); printWin.print(); }
-    catch(e){ console.error('列印失敗:', e); }
+ const doPrint = () => {
+    try{
+      printWin.focus();
+      printWin.print();
+      // Android 列印完後自動關閉預覽視窗（onafterprint 事件）
+      printWin.onafterprint = () => {
+        try{ printWin.close(); }catch(e){}
+      };
+      // 備援：5 秒後若視窗還在就嘗試關閉（onafterprint 在某些 Android 不觸發）
+      setTimeout(() => { try{ printWin.close(); }catch(e){} }, 5000);
+    }catch(e){ console.error('列印失敗:', e); }
   };
+
   if(printWin.document.readyState === 'complete'){
     setTimeout(doPrint, 400);
   } else {
