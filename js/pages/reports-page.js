@@ -278,9 +278,18 @@ function confirmStartSession(){
 
 function openEndSessionModal(){
   const cur = getCurrentSession();
-  if(!cur){ alert('目前沒有進行中的班次'); return; }
-  const modal = document.getElementById('endSessionModal');
-  if(!modal) return;
+  if(!cur){
+    // 沒有進行中的班次 → 看是否有最近結束的班次可顯示摘要
+    const lastEnded = (state.reports?.sessions || [])[0];
+    if(lastEnded && confirm('目前沒有進行中的班次。\n\n要查看上一個班次的摘要嗎？')){
+      openSessionSummaryModal(lastEnded);
+    } else if(!lastEnded){
+      alert('目前沒有進行中的班次');
+    }
+    return;
+  }
+  
+
 
   // 計算本班統計
   const orders = getCurrentSessionOrders();
@@ -365,11 +374,12 @@ function openSessionSummaryModal(session){
   if(!modal) return;
 
   // 取出該班次訂單（已結束的 session 仍可從 state.orders 撈）
-  const orders = (state.orders || []).filter(o => o.sessionId === session.id);
+ const orders = (state.orders || []).filter(o => o.sessionId === session.id);
 
-  // 班次資訊
-  document.getElementById('summaryStaffInfo').textContent =
-    `人員：${session.staffId}　${fmtLocalDateTime(session.startedAt)} ~ ${fmtLocalDateTime(session.endedAt || new Date().toISOString())}`;
+// 班次資訊
+document.getElementById('summaryStaffInfo').innerHTML =
+  `人員：${escapeHtml(session.staffId)}　${escapeHtml(fmtLocalDateTime(session.startedAt))} ~ ${escapeHtml(fmtLocalDateTime(session.endedAt || new Date().toISOString()))}` +
+  (orders.length === 0 ? '<div style="margin-top:6px;padding:6px 10px;background:#f1f5f9;border-radius:6px;color:#64748b">📭 本班無交易紀錄</div>' : '');
 
   // 現金誤差橫幅
   const diff = Number(session.cashDiff || 0);
@@ -446,12 +456,38 @@ function openSessionSummaryModal(session){
 function openPrintOptions(session){
   _pendingPrintSession = session;
   const modal = document.getElementById('printOptionsModal');
+  const summaryModal = document.getElementById('sessionSummaryModal');
   if(!modal){
-    // 沒有選項 modal 就 fallback 全印
     printSessionReport(session, null);
     return;
   }
+
+  // ⭐ 1. 依列印設定預選紙張
+  const cfg = (state.settings && state.settings.printConfig) || {};
+  const paperWidth = Number(cfg.receiptPaperWidth || 0);
+  // 58 或 80 都走熱感紙；其他走 A4
+  const useThermal = (paperWidth === 58 || paperWidth === 80);
+  const radios = document.querySelectorAll('input[name="paperSize"]');
+  radios.forEach(r => {
+    if(useThermal && r.value === '80mm') r.checked = true;
+    else if(!useThermal && r.value === 'A4') r.checked = true;
+    else r.checked = false;
+  });
+
+  // ⭐ 2. 暫時隱藏班次摘要，避免兩個 modal 重疊
+  if(summaryModal) summaryModal.classList.add('hidden');
   modal.classList.remove('hidden');
+
+  // ⭐ 3. 取消按鈕：關閉列印選項 + 重新顯示摘要
+  const cancelBtns = modal.querySelectorAll('.secondary-btn, .ghost-btn');
+  cancelBtns.forEach(btn => {
+    const oldHandler = btn.onclick;
+    btn.onclick = () => {
+      modal.classList.add('hidden');
+      if(summaryModal) summaryModal.classList.remove('hidden');
+    };
+  });
+
   document.getElementById('confirmPrintBtn').onclick = () => {
     const opts = {
       summary: document.getElementById('optSummary').checked,
@@ -462,20 +498,21 @@ function openPrintOptions(session){
       orderList: document.getElementById('optOrderList').checked,
       paperSize: document.querySelector('input[name="paperSize"]:checked')?.value || 'A4'
     };
-    // ⭐ 關鍵：在 user gesture 期間「立刻」開窗，避免被 Android 擋
+    // ⭐ 在 user gesture 期間立刻開窗
     const printWin = window.open('', '_blank');
     if(!printWin){
       alert('🚫 瀏覽器擋了彈出視窗，請允許後再試');
       return;
     }
-    // 先寫入 loading 畫面
     printWin.document.write('<html><body style="font-family:sans-serif;padding:40px;text-align:center"><h2>📋 報表產生中...</h2></body></html>');
-    
-    modal.classList.add('hidden');
-    printSessionReport(_pendingPrintSession, opts, printWin);
-};
 
+    modal.classList.add('hidden');
+    // 列印完成後重新顯示摘要（讓用戶可以再印或匯出）
+    if(summaryModal) summaryModal.classList.remove('hidden');
+    printSessionReport(_pendingPrintSession, opts, printWin);
+  };
 }
+
 
 function printSessionReport(session, opts, printWin){
   // 預設全部都印
