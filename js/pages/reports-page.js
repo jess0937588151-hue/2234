@@ -513,7 +513,18 @@ function printSessionReport(session, opts, printWin){
   const sales = orders.reduce((s,o)=>s+Number(o.total||0),0);
   const count = orders.length;
   const avg = count ? Math.round(sales/count) : 0;
-  const discount = orders.reduce((s,o)=>s+Number(o.discountAmount||0),0);
+  const disc// 折扣：掃描每張訂單的 items 找折扣品項（productId === '_discount_'），把負金額加總後取絕對值
+const discount = orders.reduce((s,o) => {
+  const itemDiscount = (o.items||[]).reduce((ss, it) => {
+    if(it.productId === '_discount_'){
+      const amt = (Number(it.basePrice||0) + Number(it.extraPrice||0)) * Number(it.qty||1);
+      return ss + amt;
+    }
+    return ss;
+  }, 0);
+  return s + Math.abs(itemDiscount) + Number(o.discountAmount||0);
+}, 0);
+ount = orders.reduce((s,o)=>s+Number(o.discountAmount||0),0);
 
   const typeMap = {};
   orders.forEach(o => {
