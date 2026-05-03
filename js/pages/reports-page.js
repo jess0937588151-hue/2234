@@ -90,7 +90,18 @@ function renderCurrentSessionData(){
   const sales = orders.reduce((s,o)=>s+Number(o.total||0),0);
   const count = orders.length;
   const avg = count ? Math.round(sales/count) : 0;
-  const discount = orders.reduce((s,o)=>s+Number(o.discountAmount||0),0);
+// 折扣：掃描每張訂單的 items 找折扣品項（productId === '_discount_'），把負金額加總後取絕對值
+const discount = orders.reduce((s,o) => {
+  const itemDiscount = (o.items||[]).reduce((ss, it) => {
+    if(it.productId === '_discount_'){
+      const amt = (Number(it.basePrice||0) + Number(it.extraPrice||0)) * Number(it.qty||1);
+      return ss + amt;  // 折扣 item 的金額是負值
+    }
+    return ss;
+  }, 0);
+  // 加上 order.discountAmount（向後相容，未來若改成 discountAmount 也能算到）
+  return s + Math.abs(itemDiscount) + Number(o.discountAmount||0);
+}, 0);
   const cards = document.getElementById('reportCards');
   if(cards){
     cards.innerHTML = [
@@ -371,7 +382,18 @@ document.getElementById('summaryStaffInfo').innerHTML =
   const sales = orders.reduce((s,o)=>s+Number(o.total||0),0);
   const count = orders.length;
   const avg = count ? Math.round(sales/count) : 0;
-  const discount = orders.reduce((s,o)=>s+Number(o.discountAmount||0),0);
+// 折扣：掃描每張訂單的 items 找折扣品項（productId === '_discount_'），把負金額加總後取絕對值
+const discount = orders.reduce((s,o) => {
+  const itemDiscount = (o.items||[]).reduce((ss, it) => {
+    if(it.productId === '_discount_'){
+      const amt = (Number(it.basePrice||0) + Number(it.extraPrice||0)) * Number(it.qty||1);
+      return ss + amt;  // 折扣 item 的金額是負值
+    }
+    return ss;
+  }, 0);
+  // 加上 order.discountAmount（向後相容，未來若改成 discountAmount 也能算到）
+  return s + Math.abs(itemDiscount) + Number(o.discountAmount||0);
+}, 0);
   document.getElementById('summaryStats').innerHTML = [
     ['營業額', money(sales)],
     ['訂單數', count],
