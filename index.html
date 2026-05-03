@@ -852,41 +852,50 @@
 </div>
 <!-- 班次列印選項 -->
 <div id="printOptionsModal" class="modal hidden" style="z-index:10000">
-  <div class="modal-content" style="max-width:480px;max-height:90vh;overflow-y:auto">
+  <div class="modal-backdrop"></div>
+  <div class="modal-dialog" style="max-width:480px;width:92vw;max-height:90vh;overflow-y:auto">
     <div class="row between wrap">
-      <h2>🖨 列印選項</h2>
+      <h2 style="margin:0">🖨 列印選項</h2>
       <button class="ghost-btn" onclick="document.getElementById('printOptionsModal').classList.add('hidden')">✕</button>
     </div>
 
     <div style="margin-top:14px">
       <h3 style="margin:0 0 8px;font-size:15px">📋 列印內容</h3>
       <label style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px;cursor:pointer">
-        <input type="checkbox" id="optSummary" checked> <span>💰 班次總覽（營業額／現金差異）</span>
+        <input type="checkbox" id="optSummary" checked style="flex-shrink:0">
+        <span style="flex:1">💰 班次總覽（營業額／現金差異）</span>
       </label>
       <label style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px;cursor:pointer">
-        <input type="checkbox" id="optOrderTypes" checked> <span>🍱 訂單類型統計</span>
+        <input type="checkbox" id="optOrderTypes" checked style="flex-shrink:0">
+        <span style="flex:1">🍱 訂單類型統計</span>
       </label>
       <label style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px;cursor:pointer">
-        <input type="checkbox" id="optPayments" checked> <span>💳 付款方式統計</span>
+        <input type="checkbox" id="optPayments" checked style="flex-shrink:0">
+        <span style="flex:1">💳 付款方式統計</span>
       </label>
       <label style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px;cursor:pointer">
-        <input type="checkbox" id="optTopProducts" checked> <span>🔥 熱銷 TOP10</span>
+        <input type="checkbox" id="optTopProducts" checked style="flex-shrink:0">
+        <span style="flex:1">🔥 熱銷 TOP10</span>
       </label>
       <label style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px;cursor:pointer">
-        <input type="checkbox" id="optHourly" checked> <span>🕐 時段分布</span>
+        <input type="checkbox" id="optHourly" checked style="flex-shrink:0">
+        <span style="flex:1">🕐 時段分布</span>
       </label>
       <label style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px;cursor:pointer">
-        <input type="checkbox" id="optOrderList"> <span>📝 訂單明細清單</span>
+        <input type="checkbox" id="optOrderList" style="flex-shrink:0">
+        <span style="flex:1">📝 訂單明細清單</span>
       </label>
     </div>
 
     <div style="margin-top:14px">
       <h3 style="margin:0 0 8px;font-size:15px">📄 紙張格式</h3>
       <label style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px;cursor:pointer">
-        <input type="radio" name="paperSize" value="A4" checked> <span>A4（標準）</span>
+        <input type="radio" name="paperSize" value="A4" checked style="flex-shrink:0">
+        <span style="flex:1">A4（標準）</span>
       </label>
       <label style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px;cursor:pointer">
-        <input type="radio" name="paperSize" value="80mm"> <span>80mm 熱感紙（收據機）</span>
+        <input type="radio" name="paperSize" value="80mm" style="flex-shrink:0">
+        <span style="flex:1">80mm 熱感紙（收據機）</span>
       </label>
     </div>
 
@@ -896,6 +905,7 @@
     </div>
   </div>
 </div>
+
 
 
 <!-- ===== 外部腳本 ===== -->
