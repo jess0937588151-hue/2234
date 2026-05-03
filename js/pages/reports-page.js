@@ -4,6 +4,7 @@
  */
 import { state, persistAll } from '../core/store.js';
 import { escapeHtml, money, downloadFile, fmtLocalDateTime } from '../core/utils.js';
+import { printSessionReportViaBridge } from '../modules/print-service.js';
 import {
   CASH_DENOMINATIONS,
   calcCashTotal,
@@ -551,19 +552,10 @@ function openPrintOptions(session){
     }
 
     // ⭐ 關鍵：在 user gesture 期間立刻開窗（這是 1d95f632 會印的方式）
-    const printWin = window.open('', '_blank');
-    if(!printWin){
-      alert('🚫 瀏覽器擋了彈出視窗，請允許後再試');
-      return;
-    }
-    printWin.document.write('<html><body style="font-family:sans-serif;padding:40px;text-align:center"><h2>📋 報表產生中...</h2></body></html>');
-
     modal.classList.add('hidden');
-    if(summaryModal) summaryModal.classList.remove('hidden');
+if(summaryModal) summaryModal.classList.remove('hidden');
 
-    printSessionReport(_pendingPrintSession, opts, printWin);
-  };
-}
+printSessionReport(_pendingPrintSession, opts, null);
 
 function buildSessionReportHtml(session, opts){
   opts = opts || { summary:true, orderTypes:true, payments:true, topProducts:true, hourly:true, orderList:false, paperSize:'A4' };
@@ -705,31 +697,137 @@ ${html_summary}${html_orderTypes}${html_payments}${html_top}${html_hourly}${html
 }
 
 function printSessionReport(session, opts, printWin){
-  const html = buildSessionReportHtml(session, opts);
-  if(!printWin || printWin.closed){ alert('列印視窗已關閉'); return; }
-
-  printWin.document.write(html);
-  printWin.document.close();
-
-  // 列印完成後自動關閉分頁
-  printWin.onafterprint = () => {
+  // 不再使用 printWin（新分頁），直接呼叫 Sunmi Bridge
+  if(printWin){
     try{ printWin.close(); }catch(e){}
-  };
+  }
 
-  // ⭐ 300ms 內呼叫 print()，user gesture 還沒過期
-  setTimeout(() => {
-    try{
-      printWin.focus();
-      printWin.print();
-    }catch(e){
-      console.error('列印失敗:', e);
+  const orders = (state.orders || []).filter(o => o.sessionId === session.id);
+  const sales = orders.reduce((s,o)=>s+Number(o.total||0),0);
+  const count = orders.length;
+  const avg = count ? Math.round(sales/count) : 0;
+  const discount = orders.reduce((s,o) => {
+    const itemDiscount = (o.items||[]).reduce((ss, it) => {
+      if(it.productId === '_discount_'){
+        const amt = (Number(it.basePrice||0) + Number(it.extraPrice||0)) * Number(it.qty||1);
+        return ss + amt;
+      }
+      return ss;
+    }, 0);
+    return s + Math.abs(itemDiscount) + Number(o.discountAmount||0);
+  }, 0);
+
+  const lines = [];
+  const sep = { label:'------------------------', value:'' };
+
+  // 班次總覽
+  if(opts.summary !== false){
+    lines.push({ label:'💰 班次總覽', value:'' });
+    lines.push({ label:'營業額',   value:`$${sales}` });
+    lines.push({ label:'訂單數',   value:`${count}` });
+    lines.push({ label:'客單價',   value:`$${avg}` });
+    lines.push({ label:'折扣',     value:`$${discount}` });
+    lines.push({ label:'開班備用金', value:`$${Number(session.openingCash||0)}` });
+    lines.push({ label:'應有現金',   value:`$${Number(session.expectedCash||0)}` });
+    lines.push({ label:'實收現金',   value:`$${Number(session.closingCash||0)}` });
+    const diff = Number(session.cashDiff||0);
+    const diffText = diff===0 ? '✓ 平衡' : (diff<0 ? `短少 $${-diff}` : `溢收 +$${diff}`);
+    lines.push({ label:'差異',     value: diffText });
+    lines.push(sep);
+  }
+
+  // 訂單類型
+  if(opts.orderTypes){
+    const typeMap = {};
+    orders.forEach(o => {
+      const k = o.orderType || '未分類';
+      typeMap[k] = typeMap[k] || {count:0, sales:0};
+      typeMap[k].count++;
+      typeMap[k].sales += Number(o.total||0);
+    });
+    lines.push({ label:'🍱 訂單類型', value:'' });
+    Object.entries(typeMap).forEach(([k,v]) => {
+      lines.push({ label:`${k} (${v.count}單)`, value:`$${v.sales}` });
+    });
+    lines.push(sep);
+  }
+
+  // 付款方式
+  if(opts.payments){
+    const payMap = {};
+    orders.forEach(o => {
+      const k = o.paymentMethod || '未設定';
+      payMap[k] = (payMap[k]||0) + Number(o.total||0);
+    });
+    lines.push({ label:'💳 付款方式', value:'' });
+    Object.entries(payMap).forEach(([k,v]) => {
+      lines.push({ label:k, value:`$${v}` });
+    });
+    lines.push(sep);
+  }
+
+  // 熱銷 TOP10
+  if(opts.topProducts){
+    const prodMap = {};
+    orders.forEach(o => (o.items||[]).forEach(i => {
+      if(i.productId === '_discount_') return;
+      prodMap[i.name] = (prodMap[i.name]||0) + Number(i.qty||0);
+    }));
+    const top = Object.entries(prodMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    lines.push({ label:'🔥 熱銷 TOP10', value:'' });
+    top.forEach((p,i) => {
+      lines.push({ label:`${i+1}. ${p[0]}`, value:`${p[1]} 份` });
+    });
+    if(!top.length) lines.push({ label:'(無資料)', value:'' });
+    lines.push(sep);
+  }
+
+  // 時段分布
+  if(opts.hourly){
+    const hourMap = {};
+    orders.forEach(o => {
+      const h = new Date(o.createdAt).getHours();
+      const k = String(h).padStart(2,'0') + ':00';
+      hourMap[k] = hourMap[k] || {count:0, sales:0};
+      hourMap[k].count++;
+      hourMap[k].sales += Number(o.total||0);
+    });
+    const hourEntries = Object.entries(hourMap).sort((a,b) => a[0].localeCompare(b[0]));
+    lines.push({ label:'🕐 時段分布', value:'' });
+    hourEntries.forEach(([k,v]) => {
+      lines.push({ label:`${k} (${v.count}單)`, value:`$${v.sales}` });
+    });
+    if(!hourEntries.length) lines.push({ label:'(無資料)', value:'' });
+    lines.push(sep);
+  }
+
+  // 訂單明細
+  if(opts.orderList){
+    lines.push({ label:'📝 訂單明細', value:'' });
+    orders.forEach(o => {
+      lines.push({ label:`${o.orderNo||o.id}`, value:`$${Number(o.total||0)}` });
+    });
+    if(!orders.length) lines.push({ label:'(無訂單)', value:'' });
+  }
+
+  if(session.note){
+    lines.push(sep);
+    lines.push({ label:'備註', value: session.note });
+  }
+
+  // 呼叫 Sunmi Bridge 列印
+  printSessionReportViaBridge({
+    title: '📋 班次報表',
+    subtitle: `${session.staffId}　${fmtLocalDateTime(session.startedAt).slice(5,16)}~${fmtLocalDateTime(session.endedAt||new Date().toISOString()).slice(11,16)}`,
+    lines
+  }).then(result => {
+    if(result.ok){
+      console.log('班次報表列印成功，路徑：', result.route);
     }
-  }, 300);
-
-  // 備援：5 秒後若還沒關，強制關閉（onafterprint 在某些 Android 不會觸發）
-  setTimeout(() => {
-    try{ if(printWin && !printWin.closed) printWin.close(); }catch(e){}
-  }, 5000);
+  }).catch(err => {
+    console.error('班次報表列印失敗：', err);
+    alert('列印失敗：' + (err.message || err));
+  });
 }
 
 
