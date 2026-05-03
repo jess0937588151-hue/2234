@@ -603,64 +603,33 @@ function printSessionReport(session, opts){
 ${html_summary}${html_orderTypes}${html_payments}${html_top}${html_hourly}${html_orderList}
 </body></html>`;
 
-    // ────────────────────────────────────────
-  // 雙模式列印：先試 iframe（桌機可用），失敗就開新分頁（手機 fallback）
+      // ────────────────────────────────────────
+  // 開新分頁列印（Android / Windows / iOS 都通吃）
   // ────────────────────────────────────────
-  const useNewWindow = () => {
-    const w = window.open('', '_blank');
-    if(!w){
-      alert('🚫 瀏覽器擋了彈出視窗\n請允許彈出視窗後再試一次');
-      return;
+  const w = window.open('', '_blank');
+  if(!w){
+    // 彈窗被擋
+    if(confirm('🚫 列印視窗被瀏覽器擋住了\n\n請按「確定」開啟說明，或手動允許這個網站的彈出視窗後再試一次。')){
+      alert('解除封鎖方式：\n\n【電腦版 Chrome / Edge】\n網址列右上角會有 🚫 圖示 → 點它 → 選「一律允許」→ 重新整理頁面\n\n【Android Chrome】\n設定 → 網站設定 → 彈出式視窗 → 允許');
     }
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
-    setTimeout(()=>{
-      try{ w.focus(); w.print(); }catch(e){ console.error(e); }
-    }, 500);
+    return;
+  }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+  // 讓內容載入完再列印
+  const doPrint = () => {
+    try{ w.focus(); w.print(); }
+    catch(e){ console.error('列印失敗:', e); }
   };
-
-  // 先用 iframe 試（不會被彈窗擋住，桌機體驗較好）
-  let frame = document.getElementById('__sessionPrintFrame');
-  if(frame) frame.remove();
-  frame = document.createElement('iframe');
-  frame.id = '__sessionPrintFrame';
-  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
-  document.body.appendChild(frame);
-
-  let printed = false;
-  const triggerPrint = () => {
-    if(printed) return;
-    printed = true;
-    try{
-      frame.contentWindow.focus();
-      frame.contentWindow.print();
-    }catch(e){
-      console.error('iframe 列印失敗，改開新分頁:', e);
-      useNewWindow();
-    }
-  };
-
-  try{
-    const doc = frame.contentWindow.document;
-    doc.open();
-    doc.write(html);
-    doc.close();
-
-    if(doc.readyState === 'complete'){
-      setTimeout(triggerPrint, 300);
-    } else {
-      frame.onload = () => setTimeout(triggerPrint, 300);
-      // 雙保險
-      setTimeout(triggerPrint, 1500);
-    }
-  }catch(e){
-    console.error('iframe 寫入失敗，改開新分頁:', e);
-    useNewWindow();
+  if(w.document.readyState === 'complete'){
+    setTimeout(doPrint, 400);
+  } else {
+    w.addEventListener('load', () => setTimeout(doPrint, 400));
+    // 雙保險
+    setTimeout(doPrint, 1500);
   }
 }
-
-
 
 function exportSessionCsv(session){
   const orders = (state.orders || []).filter(o => o.sessionId === session.id);
