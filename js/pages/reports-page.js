@@ -277,18 +277,29 @@ function confirmStartSession(){
 
 
 function openEndSessionModal(){
+  const modal = document.getElementById('endSessionModal');
   const cur = getCurrentSession();
   if(!cur){
-    // 沒有進行中的班次 → 看是否有最近結束的班次可顯示摘要
-    const lastEnded = (state.reports?.sessions || [])[0];
-    if(lastEnded && confirm('目前沒有進行中的班次。\n\n要查看上一個班次的摘要嗎？')){
-      openSessionSummaryModal(lastEnded);
-    } else if(!lastEnded){
-      alert('目前沒有進行中的班次');
+    // 沒有進行中的班次 → 詢問是否查看最近一次已結束班次的摘要
+    const sessions = (state.sessions || []).filter(s => s.endedAt).sort((a,b) => new Date(b.endedAt) - new Date(a.endedAt));
+    if(sessions.length > 0){
+      if(confirm('目前沒有進行中的班次。\n\n是否查看最近一次已結束班次的摘要？')){
+        openSessionSummaryModal(sessions[0]);
+      }
+    } else {
+      alert('目前沒有進行中的班次，也沒有歷史班次紀錄');
     }
     return;
   }
-  
+  // 有進行中的班次 → 顯示結束班次表單
+  document.getElementById('endStaffSelect').value = cur.staffId || '';
+  document.getElementById('endSessionInfo').innerHTML = 
+    '人員：' + (cur.staffId || '-') + '<br>' +
+    '開始時間：' + fmtLocalDateTime(cur.startedAt);
+  document.getElementById('endSessionNote').value = '';
+  renderCashGrid('endCash', emptyCashDetail());
+  if(modal) modal.classList.remove('hidden');
+}
 
 
   // 計算本班統計
