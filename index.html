@@ -807,6 +807,44 @@
       <button id="confirmEndSessionBtn" class="primary-btn" style="flex:1;background:#ef4444">🔴 確認結束</button>
       <button class="secondary-btn" onclick="document.getElementById('endSessionModal').classList.add('hidden')">取消</button>
     </div>
+    <!-- ===== 班次摘要 Modal（結束值班後顯示） ===== -->
+<div id="sessionSummaryModal" class="modal hidden">
+  <div class="modal-backdrop"></div>
+  <div class="modal-dialog" style="max-width:520px;max-height:92vh;overflow-y:auto">
+    <div class="row between wrap">
+      <h2>📋 班次摘要</h2>
+      <button class="ghost-btn" onclick="document.getElementById('sessionSummaryModal').classList.add('hidden')">✕</button>
+    </div>
+
+    <div id="summaryStaffInfo" style="font-size:13px;color:#64748b;margin-top:6px"></div>
+
+    <div id="summaryCashDiffBanner" style="margin-top:12px;padding:14px;border-radius:10px;text-align:center;font-size:16px;font-weight:bold"></div>
+
+    <div class="stat-grid" id="summaryStats" style="margin-top:14px"></div>
+
+    <div style="margin-top:14px">
+      <h3 style="margin:0 0 8px;font-size:15px">🍱 訂單類型</h3>
+      <div id="summaryOrderTypes" style="font-size:14px"></div>
+    </div>
+
+    <div style="margin-top:14px">
+      <h3 style="margin:0 0 8px;font-size:15px">💳 付款方式</h3>
+      <div id="summaryPayments" style="font-size:14px"></div>
+    </div>
+
+    <div style="margin-top:14px">
+      <h3 style="margin:0 0 8px;font-size:15px">🔥 熱銷 TOP5</h3>
+      <div id="summaryTopProducts" style="font-size:14px"></div>
+    </div>
+
+    <div class="form-actions" style="margin-top:18px;flex-wrap:wrap;gap:8px">
+      <button id="summaryPrintBtn" class="primary-btn" style="flex:1;min-width:140px;background:#3b82f6">🖨 列印報表</button>
+      <button id="summaryExportBtn" class="secondary-btn" style="flex:1;min-width:140px">📥 匯出 Excel</button>
+      <button id="summaryDoneBtn" class="primary-btn" style="flex:1;min-width:140px;background:#10b981">✓ 完成</button>
+    </div>
+  </div>
+</div>
+
   </div>
 </div>
 
