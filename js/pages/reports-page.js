@@ -491,10 +491,15 @@ function openPrintOptions(session){
     else r.checked = false;
   });
 
-  // 2. 全部選項預設勾選（避免使用者沒勾任何選項導致空報表）
-  ['optSummary','optOrderTypes','optPayments','optTopProducts','optHourly'].forEach(id => {
+    // 2. 讀取上次勾選狀態（首次使用全部不勾）
+  let lastOpts = {};
+  try{
+    lastOpts = JSON.parse(localStorage.getItem('printOptions_lastChecked') || '{}');
+  }catch(e){ lastOpts = {}; }
+  const optIds = ['optSummary','optOrderTypes','optPayments','optTopProducts','optHourly','optOrderList'];
+  optIds.forEach(id => {
     const el = document.getElementById(id);
-    if(el) el.checked = true;
+    if(el) el.checked = !!lastOpts[id];  // 沒記錄就 false（不勾）
   });
 
   // 3. 暫時隱藏摘要避免重疊
