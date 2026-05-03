@@ -462,12 +462,22 @@ function openPrintOptions(session){
       orderList: document.getElementById('optOrderList').checked,
       paperSize: document.querySelector('input[name="paperSize"]:checked')?.value || 'A4'
     };
+    // ⭐ 關鍵：在 user gesture 期間「立刻」開窗，避免被 Android 擋
+    const printWin = window.open('', '_blank');
+    if(!printWin){
+      alert('🚫 瀏覽器擋了彈出視窗，請允許後再試');
+      return;
+    }
+    // 先寫入 loading 畫面
+    printWin.document.write('<html><body style="font-family:sans-serif;padding:40px;text-align:center"><h2>📋 報表產生中...</h2></body></html>');
+    
     modal.classList.add('hidden');
-    printSessionReport(_pendingPrintSession, opts);
-  };
+    printSessionReport(_pendingPrintSession, opts, printWin);
+};
+
 }
 
-function printSessionReport(session, opts){
+function printSessionReport(session, opts, printWin){
   // 預設全部都印
   opts = opts || { summary:true, orderTypes:true, payments:true, topProducts:true, hourly:true, orderList:false, paperSize:'A4' };
 
@@ -603,33 +613,30 @@ function printSessionReport(session, opts){
 ${html_summary}${html_orderTypes}${html_payments}${html_top}${html_hourly}${html_orderList}
 </body></html>`;
 
-      // ────────────────────────────────────────
-  // 開新分頁列印（Android / Windows / iOS 都通吃）
+        // ────────────────────────────────────────
+  // 把已開的視窗灌入內容並列印
   // ────────────────────────────────────────
-  const w = window.open('', '_blank');
-  if(!w){
-    // 彈窗被擋
-    if(confirm('🚫 列印視窗被瀏覽器擋住了\n\n請按「確定」開啟說明，或手動允許這個網站的彈出視窗後再試一次。')){
-      alert('解除封鎖方式：\n\n【電腦版 Chrome / Edge】\n網址列右上角會有 🚫 圖示 → 點它 → 選「一律允許」→ 重新整理頁面\n\n【Android Chrome】\n設定 → 網站設定 → 彈出式視窗 → 允許');
-    }
+  if(!printWin || printWin.closed){
+    alert('列印視窗已關閉，請重新嘗試');
     return;
   }
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
-  // 讓內容載入完再列印
+  
+  printWin.document.open();
+  printWin.document.write(html);
+  printWin.document.close();
+  
   const doPrint = () => {
-    try{ w.focus(); w.print(); }
+    try{ printWin.focus(); printWin.print(); }
     catch(e){ console.error('列印失敗:', e); }
   };
-  if(w.document.readyState === 'complete'){
+  if(printWin.document.readyState === 'complete'){
     setTimeout(doPrint, 400);
   } else {
-    w.addEventListener('load', () => setTimeout(doPrint, 400));
-    // 雙保險
+    printWin.addEventListener('load', () => setTimeout(doPrint, 400));
     setTimeout(doPrint, 1500);
   }
 }
+
 
 function exportSessionCsv(session){
   const orders = (state.orders || []).filter(o => o.sessionId === session.id);
