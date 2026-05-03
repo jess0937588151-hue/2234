@@ -603,17 +603,29 @@ function printSessionReport(session, opts){
 ${html_summary}${html_orderTypes}${html_payments}${html_top}${html_hourly}${html_orderList}
 </body></html>`;
 
-  // ────────────────────────────────────────
     // ────────────────────────────────────────
-  // 同頁 iframe 列印（Windows 加強版）
+  // 雙模式列印：先試 iframe（桌機可用），失敗就開新分頁（手機 fallback）
   // ────────────────────────────────────────
+  const useNewWindow = () => {
+    const w = window.open('', '_blank');
+    if(!w){
+      alert('🚫 瀏覽器擋了彈出視窗\n請允許彈出視窗後再試一次');
+      return;
+    }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    setTimeout(()=>{
+      try{ w.focus(); w.print(); }catch(e){ console.error(e); }
+    }, 500);
+  };
+
+  // 先用 iframe 試（不會被彈窗擋住，桌機體驗較好）
   let frame = document.getElementById('__sessionPrintFrame');
   if(frame) frame.remove();
   frame = document.createElement('iframe');
   frame.id = '__sessionPrintFrame';
-  // 注意：用 srcdoc 比 document.write 在 Chrome Windows 更穩
-  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
-  frame.srcdoc = html;
+  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
   document.body.appendChild(frame);
 
   let printed = false;
@@ -621,35 +633,33 @@ ${html_summary}${html_orderTypes}${html_payments}${html_top}${html_hourly}${html
     if(printed) return;
     printed = true;
     try{
-      const win = frame.contentWindow;
-      win.focus();
-      // Windows Chrome 需要再等一拍讓 layout 完成
-      setTimeout(()=>{
-        try{ win.print(); }
-        catch(e){ console.error('iframe print 失敗', e); fallbackOpenNewTab(); }
-      }, 100);
+      frame.contentWindow.focus();
+      frame.contentWindow.print();
     }catch(e){
-      console.error('列印觸發失敗:', e);
-      fallbackOpenNewTab();
+      console.error('iframe 列印失敗，改開新分頁:', e);
+      useNewWindow();
     }
   };
 
-  const fallbackOpenNewTab = () => {
-    const w = window.open('', '_blank');
-    if(w){
-      w.document.open();
-      w.document.write(html);
-      w.document.close();
-      setTimeout(()=>{ try{ w.focus(); w.print(); }catch(_){} }, 500);
+  try{
+    const doc = frame.contentWindow.document;
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    if(doc.readyState === 'complete'){
+      setTimeout(triggerPrint, 300);
     } else {
-      alert('🚫 瀏覽器擋了彈出視窗\n請按網址列右上角的「彈出式視窗」圖示 → 允許');
+      frame.onload = () => setTimeout(triggerPrint, 300);
+      // 雙保險
+      setTimeout(triggerPrint, 1500);
     }
-  };
-
-  frame.onload = () => setTimeout(triggerPrint, 300);
-  // 雙保險：1.5 秒後若 onload 還沒觸發就強制
-  setTimeout(triggerPrint, 1500);
+  }catch(e){
+    console.error('iframe 寫入失敗，改開新分頁:', e);
+    useNewWindow();
+  }
 }
+
 
 
 function exportSessionCsv(session){
