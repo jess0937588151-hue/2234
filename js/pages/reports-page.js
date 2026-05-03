@@ -604,41 +604,51 @@ ${html_summary}${html_orderTypes}${html_payments}${html_top}${html_hourly}${html
 </body></html>`;
 
   // ────────────────────────────────────────
-  // 改用「同頁 iframe 列印」—— 解決 Windows 彈窗被擋
+    // ────────────────────────────────────────
+  // 同頁 iframe 列印（Windows 加強版）
   // ────────────────────────────────────────
   let frame = document.getElementById('__sessionPrintFrame');
   if(frame) frame.remove();
   frame = document.createElement('iframe');
   frame.id = '__sessionPrintFrame';
-  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  // 注意：用 srcdoc 比 document.write 在 Chrome Windows 更穩
+  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  frame.srcdoc = html;
   document.body.appendChild(frame);
 
-  const doc = frame.contentWindow.document;
-  doc.open();
-  doc.write(html);
-  doc.close();
-
-  // 等資源載入完再列印
+  let printed = false;
   const triggerPrint = () => {
+    if(printed) return;
+    printed = true;
     try{
-      frame.contentWindow.focus();
-      frame.contentWindow.print();
+      const win = frame.contentWindow;
+      win.focus();
+      // Windows Chrome 需要再等一拍讓 layout 完成
+      setTimeout(()=>{
+        try{ win.print(); }
+        catch(e){ console.error('iframe print 失敗', e); fallbackOpenNewTab(); }
+      }, 100);
     }catch(e){
-      console.error('列印失敗，改開新分頁:', e);
-      // Fallback：開新分頁
-      const w = window.open('', '_blank');
-      if(w){ w.document.write(html); w.document.close(); }
-      else alert('請允許彈出視窗以列印報表');
+      console.error('列印觸發失敗:', e);
+      fallbackOpenNewTab();
     }
   };
 
-  if(frame.contentWindow.document.readyState === 'complete'){
-    setTimeout(triggerPrint, 200);
-  } else {
-    frame.onload = () => setTimeout(triggerPrint, 200);
-    // 雙保險：1.2 秒後若還沒觸發就強制
-    setTimeout(triggerPrint, 1200);
-  }
+  const fallbackOpenNewTab = () => {
+    const w = window.open('', '_blank');
+    if(w){
+      w.document.open();
+      w.document.write(html);
+      w.document.close();
+      setTimeout(()=>{ try{ w.focus(); w.print(); }catch(_){} }, 500);
+    } else {
+      alert('🚫 瀏覽器擋了彈出視窗\n請按網址列右上角的「彈出式視窗」圖示 → 允許');
+    }
+  };
+
+  frame.onload = () => setTimeout(triggerPrint, 300);
+  // 雙保險：1.5 秒後若 onload 還沒觸發就強制
+  setTimeout(triggerPrint, 1500);
 }
 
 
