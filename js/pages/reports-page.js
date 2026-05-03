@@ -480,10 +480,9 @@ function openPrintOptions(session){
     return;
   }
 
-  // ⭐ 1. 依列印設定預選紙張
+  // 1. 依列印設定預選紙張
   const cfg = (state.settings && state.settings.printConfig) || {};
   const paperWidth = Number(cfg.receiptPaperWidth || 0);
-  // 58 或 80 都走熱感紙；其他走 A4
   const useThermal = (paperWidth === 58 || paperWidth === 80);
   const radios = document.querySelectorAll('input[name="paperSize"]');
   radios.forEach(r => {
@@ -492,22 +491,28 @@ function openPrintOptions(session){
     else r.checked = false;
   });
 
-  // ⭐ 2. 暫時隱藏班次摘要，避免兩個 modal 重疊
+  // 2. 全部選項預設勾選（避免使用者沒勾任何選項導致空報表）
+  ['optSummary','optOrderTypes','optPayments','optTopProducts','optHourly'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.checked = true;
+  });
+
+  // 3. 暫時隱藏摘要避免重疊
   if(summaryModal) summaryModal.classList.add('hidden');
   modal.classList.remove('hidden');
 
-  // ⭐ 3. 取消按鈕：關閉列印選項 + 重新顯示摘要
+  // 4. 取消鈕：關閉列印選項 + 重新顯示摘要
   const cancelBtns = modal.querySelectorAll('.secondary-btn, .ghost-btn');
   cancelBtns.forEach(btn => {
-    const oldHandler = btn.onclick;
     btn.onclick = () => {
       modal.classList.add('hidden');
       if(summaryModal) summaryModal.classList.remove('hidden');
     };
   });
 
+  // 5. 確認列印
   document.getElementById('confirmPrintBtn').onclick = () => {
-    const opts = {
+    let opts = {
       summary: document.getElementById('optSummary').checked,
       orderTypes: document.getElementById('optOrderTypes').checked,
       payments: document.getElementById('optPayments').checked,
@@ -516,41 +521,78 @@ function openPrintOptions(session){
       orderList: document.getElementById('optOrderList').checked,
       paperSize: document.querySelector('input[name="paperSize"]:checked')?.value || 'A4'
     };
-    // ⭐ 在 user gesture 期間立刻開窗
-    const printWin = window.open('', '_blank');
-    if(!printWin){
-      alert('🚫 瀏覽器擋了彈出視窗，請允許後再試');
-      return;
+
+    // 防呆：如果使用者一個都沒勾，全部當作有勾
+    const noneChecked = !opts.summary && !opts.orderTypes && !opts.payments && !opts.topProducts && !opts.hourly && !opts.orderList;
+    if(noneChecked){
+      opts.summary = true;
+      opts.orderTypes = true;
+      opts.payments = true;
+      opts.topProducts = true;
+      opts.hourly = true;
     }
-    printWin.document.write('<html><body style="font-family:sans-serif;padding:40px;text-align:center"><h2>📋 報表產生中...</h2></body></html>');
 
     modal.classList.add('hidden');
-    // 列印完成後重新顯示摘要（讓用戶可以再印或匯出）
     if(summaryModal) summaryModal.classList.remove('hidden');
-    printSessionReport(_pendingPrintSession, opts, printWin);
+
+    // 用隱藏 iframe 列印（不開新視窗、不顯示預覽頁）
+    printSessionReportViaIframe(_pendingPrintSession, opts);
   };
+}
+function printSessionReportViaIframe(session, opts){
+  // 先用既有的 printSessionReport 邏輯產生 HTML
+  // 但不開 printWin，改成把 HTML 注入隱藏 iframe
+  const html = buildSessionReportHtml(session, opts);
+
+  // 移除舊的列印 iframe（避免重複）
+  const oldFrame = document.getElementById('__printFrame');
+  if(oldFrame) oldFrame.remove();
+
+  const iframe = document.createElement('iframe');
+  iframe.id = '__printFrame';
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  const doPrint = () => {
+    try{
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    }catch(e){ console.error('列印失敗:', e); alert('列印失敗：' + e.message); }
+    // 列印完移除 iframe
+    setTimeout(() => { try{ iframe.remove(); }catch(e){} }, 3000);
+  };
+
+  if(doc.readyState === 'complete'){
+    setTimeout(doPrint, 300);
+  } else {
+    iframe.addEventListener('load', () => setTimeout(doPrint, 300));
+    setTimeout(doPrint, 1500); // 備援
+  }
 }
 
 
-function printSessionReport(session, opts, printWin){
-  // 預設全部都印
+function buildSessionReportHtml(session, opts){
   opts = opts || { summary:true, orderTypes:true, payments:true, topProducts:true, hourly:true, orderList:false, paperSize:'A4' };
 
   const orders = (state.orders || []).filter(o => o.sessionId === session.id);
   const sales = orders.reduce((s,o)=>s+Number(o.total||0),0);
   const count = orders.length;
   const avg = count ? Math.round(sales/count) : 0;
- // 折扣：掃描每張訂單的 items 找折扣品項（productId === '_discount_'），把負金額加總後取絕對值
-const discount = orders.reduce((s,o) => {
-  const itemDiscount = (o.items||[]).reduce((ss, it) => {
-    if(it.productId === '_discount_'){
-      const amt = (Number(it.basePrice||0) + Number(it.extraPrice||0)) * Number(it.qty||1);
-      return ss + amt;
-    }
-    return ss;
+  const discount = orders.reduce((s,o) => {
+    const itemDiscount = (o.items||[]).reduce((ss, it) => {
+      if(it.productId === '_discount_'){
+        const amt = (Number(it.basePrice||0) + Number(it.extraPrice||0)) * Number(it.qty||1);
+        return ss + amt;
+      }
+      return ss;
+    }, 0);
+    return s + Math.abs(itemDiscount) + Number(o.discountAmount||0);
   }, 0);
-  return s + Math.abs(itemDiscount) + Number(o.discountAmount||0);
-}, 0);
 
   const typeMap = {};
   orders.forEach(o => {
@@ -592,7 +634,6 @@ const discount = orders.reduce((s,o) => {
     ? `@page{size:80mm auto;margin:3mm} body{width:74mm;font-size:12px;padding:0;margin:0}`
     : `@page{size:A4;margin:10mm} body{padding:20px}`;
 
-  // 各區塊 HTML
   const html_summary = !opts.summary ? '' : `
 <div class="section">
   <h2>💰 班次總覽</h2>
@@ -652,7 +693,7 @@ const discount = orders.reduce((s,o) => {
   </table>
 </div>`;
 
-  const html = `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>班次報表</title>
 <style>
   ${pageCss}
@@ -667,45 +708,18 @@ const discount = orders.reduce((s,o) => {
   .right{text-align:right}
   .summary-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dashed #e2e8f0;font-size:${is80?'12px':'14px'}}
   .diff{padding:8px;border-radius:6px;text-align:center;font-weight:bold;font-size:${is80?'13px':'15px'}}
-  @media print{ .no-print{display:none!important} }
 </style></head><body>
-
 <h1>📋 班次報表</h1>
 <div class="sub">人員：${escapeHtml(session.staffId)}<br>${escapeHtml(fmtLocalDateTime(session.startedAt))} ~ ${escapeHtml(fmtLocalDateTime(session.endedAt || new Date().toISOString()))}</div>
 ${html_summary}${html_orderTypes}${html_payments}${html_top}${html_hourly}${html_orderList}
 </body></html>`;
+}
 
-        // ────────────────────────────────────────
-  // 把已開的視窗灌入內容並列印
-  // ────────────────────────────────────────
-  if(!printWin || printWin.closed){
-    alert('列印視窗已關閉，請重新嘗試');
-    return;
-  }
-  
-  printWin.document.open();
-  printWin.document.write(html);
-  printWin.document.close();
-  
- const doPrint = () => {
-    try{
-      printWin.focus();
-      printWin.print();
-      // Android 列印完後自動關閉預覽視窗（onafterprint 事件）
-      printWin.onafterprint = () => {
-        try{ printWin.close(); }catch(e){}
-      };
-      // 備援：5 秒後若視窗還在就嘗試關閉（onafterprint 在某些 Android 不觸發）
-      setTimeout(() => { try{ printWin.close(); }catch(e){} }, 5000);
-    }catch(e){ console.error('列印失敗:', e); }
-  };
-
-  if(printWin.document.readyState === 'complete'){
-    setTimeout(doPrint, 400);
-  } else {
-    printWin.addEventListener('load', () => setTimeout(doPrint, 400));
-    setTimeout(doPrint, 1500);
-  }
+// 保留舊的 printSessionReport 給其他地方呼叫（向後相容），改為走 iframe 路徑
+function printSessionReport(session, opts, printWin){
+  // printWin 參數已棄用（為了向後相容仍接受但不使用）
+  if(printWin){ try{ printWin.close(); }catch(e){} }
+  printSessionReportViaIframe(session, opts || { summary:true, orderTypes:true, payments:true, topProducts:true, hourly:true, orderList:false, paperSize:'A4' });
 }
 
 
