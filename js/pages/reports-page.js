@@ -360,23 +360,12 @@ function confirmEndSession(){
     if(typeof window.refreshPosLockState === 'function') window.refreshPosLockState();
     if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
 
-    // ⭐ 關鍵：用 setTimeout 確保 endSessionModal 已完全關閉再開摘要
-    // 避免兩個 modal 同時操作 DOM 造成顯示問題
+    // 用 setTimeout 確保 endSessionModal 已完全關閉再開摘要
     setTimeout(() => {
       openSessionSummaryModal(ended);
     }, 100);
-}catch(err){
-    console.error('[結束值班] 失敗:', err);
-    if(modal) modal.classList.add('hidden');
-    renderReports();
-    if(typeof window.refreshPosLockState === 'function') window.refreshPosLockState();
-    if(typeof window.refreshAllViews === 'function') window.refreshAllViews();
-    alert('結束值班失敗：' + err.message);
-}
-
-    // 顯示班次摘要 modal
-    openSessionSummaryModal(ended);
   }catch(err){
+    console.error('[結束值班] 失敗:', err);
     if(modal) modal.classList.add('hidden');
     renderReports();
     if(typeof window.refreshPosLockState === 'function') window.refreshPosLockState();
@@ -384,6 +373,7 @@ function confirmEndSession(){
     alert('結束值班失敗：' + err.message);
   }
 }
+
 // ──────────────────────────────────────────────
 // 班次摘要 Modal
 // ──────────────────────────────────────────────
