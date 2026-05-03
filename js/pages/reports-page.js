@@ -17,6 +17,9 @@ import {
   getRecentSessions
 } from '../modules/report-session.js';
 
+// 暫存目前要列印的班次（讓 confirmPrintBtn 取用）
+let _pendingPrintSession = null;
+
 // ──────────────────────────────────────────────
 // 工具：把 session 訂單抓出來（含 fallback 給尚未寫入 sessionId 的舊單）
 // ──────────────────────────────────────────────
@@ -432,7 +435,7 @@ function openSessionSummaryModal(session){
     : '<div class="muted">無</div>';
 
   // 綁按鈕
-  document.getElementById('summaryPrintBtn').onclick = ()=> printSessionReport(session);
+  document.getElementById('summaryPrintBtn').onclick = ()=> openPrintOptions(session);
   document.getElementById('summaryExportBtn').onclick = ()=> exportSessionCsv(session);
   document.getElementById('summaryDoneBtn').onclick = ()=> {
     modal.classList.add('hidden');
@@ -440,15 +443,40 @@ function openSessionSummaryModal(session){
 
   modal.classList.remove('hidden');
 }
+function openPrintOptions(session){
+  _pendingPrintSession = session;
+  const modal = document.getElementById('printOptionsModal');
+  if(!modal){
+    // 沒有選項 modal 就 fallback 全印
+    printSessionReport(session, null);
+    return;
+  }
+  modal.classList.remove('hidden');
+  document.getElementById('confirmPrintBtn').onclick = () => {
+    const opts = {
+      summary: document.getElementById('optSummary').checked,
+      orderTypes: document.getElementById('optOrderTypes').checked,
+      payments: document.getElementById('optPayments').checked,
+      topProducts: document.getElementById('optTopProducts').checked,
+      hourly: document.getElementById('optHourly').checked,
+      orderList: document.getElementById('optOrderList').checked,
+      paperSize: document.querySelector('input[name="paperSize"]:checked')?.value || 'A4'
+    };
+    modal.classList.add('hidden');
+    printSessionReport(_pendingPrintSession, opts);
+  };
+}
 
-function printSessionReport(session){
+function printSessionReport(session, opts){
+  // 預設全部都印
+  opts = opts || { summary:true, orderTypes:true, payments:true, topProducts:true, hourly:true, orderList:false, paperSize:'A4' };
+
   const orders = (state.orders || []).filter(o => o.sessionId === session.id);
   const sales = orders.reduce((s,o)=>s+Number(o.total||0),0);
   const count = orders.length;
   const avg = count ? Math.round(sales/count) : 0;
   const discount = orders.reduce((s,o)=>s+Number(o.discountAmount||0),0);
 
-  // 訂單類型
   const typeMap = {};
   orders.forEach(o => {
     const k = o.orderType || '未分類';
@@ -457,21 +485,18 @@ function printSessionReport(session){
     typeMap[k].sales += Number(o.total||0);
   });
 
-  // 付款
   const payMap = {};
   orders.forEach(o => {
     const k = o.paymentMethod || '未設定';
     payMap[k] = (payMap[k]||0) + Number(o.total||0);
   });
 
-  // TOP10
   const prodMap = {};
   orders.forEach(o => (o.items||[]).forEach(i=>{
     prodMap[i.name] = (prodMap[i.name]||0) + Number(i.qty||0);
   }));
   const top = Object.entries(prodMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
 
-  // 時段
   const hourMap = {};
   orders.forEach(o => {
     const h = new Date(o.createdAt).getHours();
@@ -482,31 +507,18 @@ function printSessionReport(session){
   });
   const hourEntries = Object.entries(hourMap).sort((a,b)=>a[0].localeCompare(b[0]));
 
-  // 現金誤差
   const diff = Number(session.cashDiff || 0);
-  let diffText = diff===0 ? '✓ 平衡' : (diff<0 ? `短少 $${-diff}` : `溢收 +$${diff}`);
-  let diffColor = diff===0 ? '#10b981' : (diff<0 ? '#ef4444' : '#f59e0b');
+  const diffText = diff===0 ? '✓ 平衡' : (diff<0 ? `短少 $${-diff}` : `溢收 +$${diff}`);
+  const diffColor = diff===0 ? '#10b981' : (diff<0 ? '#ef4444' : '#f59e0b');
+  const diffBg = diff===0 ? '#f0fdf4' : (diff<0 ? '#fef2f2' : '#fffbeb');
 
-  const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>班次報表</title>
-<style>
-  body{font-family:'Microsoft JhengHei','PingFang TC',sans-serif;padding:20px;color:#0f172a}
-  h1{text-align:center;margin:0 0 6px;font-size:22px}
-  .sub{text-align:center;color:#64748b;font-size:13px;margin-bottom:16px}
-  .section{margin-top:16px;page-break-inside:avoid}
-  h2{font-size:15px;margin:0 0 6px;border-bottom:2px solid #0f172a;padding-bottom:4px}
-  table{width:100%;border-collapse:collapse;font-size:13px}
-  td,th{border:1px solid #cbd5e1;padding:5px 8px}
-  th{background:#f1f5f9;text-align:left}
-  .right{text-align:right}
-  .summary-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed #e2e8f0;font-size:14px}
-  .diff{padding:10px;border-radius:6px;text-align:center;font-weight:bold;font-size:15px}
-  @media print{ body{padding:10px} }
-</style>
-</head><body>
-<h1>📋 班次報表</h1>
-<div class="sub">人員：${escapeHtml(session.staffId)}　${escapeHtml(fmtLocalDateTime(session.startedAt))} ~ ${escapeHtml(fmtLocalDateTime(session.endedAt || new Date().toISOString()))}</div>
+  const is80 = opts.paperSize === '80mm';
+  const pageCss = is80
+    ? `@page{size:80mm auto;margin:3mm} body{width:74mm;font-size:12px;padding:0;margin:0}`
+    : `@page{size:A4;margin:10mm} body{padding:20px}`;
 
+  // 各區塊 HTML
+  const html_summary = !opts.summary ? '' : `
 <div class="section">
   <h2>💰 班次總覽</h2>
   <div class="summary-row"><span>營業額</span><strong>${money(sales)}</strong></div>
@@ -516,52 +528,119 @@ function printSessionReport(session){
   <div class="summary-row"><span>開班備用金</span><strong>${money(Number(session.openingCash||0))}</strong></div>
   <div class="summary-row"><span>應有現金</span><strong>${money(Number(session.expectedCash||0))}</strong></div>
   <div class="summary-row"><span>實收現金</span><strong>${money(Number(session.closingCash||0))}</strong></div>
-  <div class="diff" style="background:${diff===0?'#f0fdf4':(diff<0?'#fef2f2':'#fffbeb')};color:${diffColor};margin-top:8px">
-    ${diffText}
-  </div>
+  <div class="diff" style="background:${diffBg};color:${diffColor};margin-top:8px">${diffText}</div>
   ${session.note?`<div style="margin-top:8px;font-size:13px;color:#64748b">備註：${escapeHtml(session.note)}</div>`:''}
-</div>
+</div>`;
 
+  const html_orderTypes = !opts.orderTypes ? '' : `
 <div class="section">
   <h2>🍱 訂單類型</h2>
   <table>
-    <tr><th>類型</th><th class="right">訂單數</th><th class="right">營業額</th></tr>
+    <tr><th>類型</th><th class="right">單數</th><th class="right">金額</th></tr>
     ${Object.entries(typeMap).map(([k,v])=>`<tr><td>${escapeHtml(k)}</td><td class="right">${v.count}</td><td class="right">${money(v.sales)}</td></tr>`).join('') || '<tr><td colspan="3">無</td></tr>'}
   </table>
-</div>
+</div>`;
 
+  const html_payments = !opts.payments ? '' : `
 <div class="section">
   <h2>💳 付款方式</h2>
   <table>
-    <tr><th>付款方式</th><th class="right">金額</th></tr>
+    <tr><th>方式</th><th class="right">金額</th></tr>
     ${Object.entries(payMap).map(([k,v])=>`<tr><td>${escapeHtml(k)}</td><td class="right">${money(v)}</td></tr>`).join('') || '<tr><td colspan="2">無</td></tr>'}
   </table>
-</div>
+</div>`;
 
+  const html_top = !opts.topProducts ? '' : `
 <div class="section">
   <h2>🔥 熱銷 TOP10</h2>
   <table>
-    <tr><th>排名</th><th>商品</th><th class="right">數量</th></tr>
+    <tr><th>#</th><th>商品</th><th class="right">數量</th></tr>
     ${top.map((p,i)=>`<tr><td>${i+1}</td><td>${escapeHtml(p[0])}</td><td class="right">${p[1]}</td></tr>`).join('') || '<tr><td colspan="3">無</td></tr>'}
   </table>
-</div>
+</div>`;
 
+  const html_hourly = !opts.hourly ? '' : `
 <div class="section">
   <h2>🕐 時段分布</h2>
   <table>
-    <tr><th>時段</th><th class="right">訂單數</th><th class="right">營業額</th></tr>
+    <tr><th>時段</th><th class="right">單數</th><th class="right">金額</th></tr>
     ${hourEntries.map(([k,v])=>`<tr><td>${k}</td><td class="right">${v.count}</td><td class="right">${money(v.sales)}</td></tr>`).join('') || '<tr><td colspan="3">無</td></tr>'}
   </table>
-</div>
+</div>`;
 
+  const html_orderList = !opts.orderList ? '' : `
+<div class="section">
+  <h2>📝 訂單明細</h2>
+  <table>
+    <tr><th>編號</th><th>時間</th><th>類型</th><th>付款</th><th class="right">金額</th></tr>
+    ${orders.map(o=>`<tr><td>${escapeHtml(o.orderNo||o.id)}</td><td>${escapeHtml(fmtLocalDateTime(o.createdAt))}</td><td>${escapeHtml(o.orderType||'')}</td><td>${escapeHtml(o.paymentMethod||'')}</td><td class="right">${money(Number(o.total||0))}</td></tr>`).join('') || '<tr><td colspan="5">無</td></tr>'}
+  </table>
+</div>`;
+
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>班次報表</title>
+<style>
+  ${pageCss}
+  body{font-family:'Microsoft JhengHei','PingFang TC',sans-serif;color:#0f172a}
+  h1{text-align:center;margin:0 0 6px;font-size:${is80?'15px':'22px'}}
+  .sub{text-align:center;color:#64748b;font-size:${is80?'11px':'13px'};margin-bottom:12px}
+  .section{margin-top:12px;page-break-inside:avoid}
+  h2{font-size:${is80?'13px':'15px'};margin:0 0 6px;border-bottom:2px solid #0f172a;padding-bottom:4px}
+  table{width:100%;border-collapse:collapse;font-size:${is80?'11px':'13px'}}
+  td,th{border:1px solid #cbd5e1;padding:${is80?'2px 4px':'5px 8px'}}
+  th{background:#f1f5f9;text-align:left}
+  .right{text-align:right}
+  .summary-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dashed #e2e8f0;font-size:${is80?'12px':'14px'}}
+  .diff{padding:8px;border-radius:6px;text-align:center;font-weight:bold;font-size:${is80?'13px':'15px'}}
+  @media print{ .no-print{display:none!important} }
+</style></head><body>
+<div class="no-print" style="position:sticky;top:0;background:#fff;padding:8px;border-bottom:1px solid #e2e8f0;text-align:center;margin-bottom:12px;z-index:9">
+  <button onclick="window.print()" style="padding:10px 20px;background:#3b82f6;color:#fff;border:none;border-radius:6px;font-size:15px;cursor:pointer">🖨 列印</button>
+  <button onclick="window.close()" style="padding:10px 20px;background:#64748b;color:#fff;border:none;border-radius:6px;font-size:15px;cursor:pointer;margin-left:8px">關閉</button>
+</div>
+<h1>📋 班次報表</h1>
+<div class="sub">人員：${escapeHtml(session.staffId)}<br>${escapeHtml(fmtLocalDateTime(session.startedAt))} ~ ${escapeHtml(fmtLocalDateTime(session.endedAt || new Date().toISOString()))}</div>
+${html_summary}${html_orderTypes}${html_payments}${html_top}${html_hourly}${html_orderList}
 </body></html>`;
 
-  const w = window.open('', '_blank', 'width=720,height=900');
-  if(!w){ alert('請允許彈出視窗才能列印報表'); return; }
-  w.document.write(html);
-  w.document.close();
-  setTimeout(()=>{ try{ w.focus(); w.print(); }catch(e){} }, 400);
+  // ────────────────────────────────────────
+  // 改用「同頁 iframe 列印」—— 解決 Windows 彈窗被擋
+  // ────────────────────────────────────────
+  let frame = document.getElementById('__sessionPrintFrame');
+  if(frame) frame.remove();
+  frame = document.createElement('iframe');
+  frame.id = '__sessionPrintFrame';
+  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  document.body.appendChild(frame);
+
+  const doc = frame.contentWindow.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  // 等資源載入完再列印
+  const triggerPrint = () => {
+    try{
+      frame.contentWindow.focus();
+      frame.contentWindow.print();
+    }catch(e){
+      console.error('列印失敗，改開新分頁:', e);
+      // Fallback：開新分頁
+      const w = window.open('', '_blank');
+      if(w){ w.document.write(html); w.document.close(); }
+      else alert('請允許彈出視窗以列印報表');
+    }
+  };
+
+  if(frame.contentWindow.document.readyState === 'complete'){
+    setTimeout(triggerPrint, 200);
+  } else {
+    frame.onload = () => setTimeout(triggerPrint, 200);
+    // 雙保險：1.2 秒後若還沒觸發就強制
+    setTimeout(triggerPrint, 1200);
+  }
 }
+
 
 function exportSessionCsv(session){
   const orders = (state.orders || []).filter(o => o.sessionId === session.id);
