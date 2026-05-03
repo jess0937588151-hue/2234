@@ -573,7 +573,6 @@ export function buildCartPreviewOrder(){
  * @param {string} reportData.subtitle - 副標（人員/日期）
  */
 export async function printSessionReportViaBridge(reportData){
-  // 把報表 lines 轉成 items 結構（Sunmi 認得的）
   const items = (reportData.lines || []).map(line => ({
     name: line.label || '',
     qty: 1,
@@ -595,32 +594,56 @@ export async function printSessionReportViaBridge(reportData){
     subtotal: 0,
     discountAmount: 0,
     total: 0,
-    isReport: true   // 標記用，避免被當成真訂單
+    isReport: true
   };
 
   const payload = buildBridgePayload(fakeOrder, 'receipt');
+  const html = getReceiptHtml(fakeOrder, 'customer');
 
-  // 走 Sunmi → 藍牙 → 網路 三層
+  // 1) Sunmi 內建（新版）
   if(isSunmiReady() && typeof window.SunmiPrinter.printReceiptWithFields === 'function'){
     try{
       const ok = window.SunmiPrinter.printReceiptWithFields(JSON.stringify(payload));
       if(ok) return { route:'sunmi', ok:true };
-    }catch(e){ console.warn('Sunmi 報表列印失敗：', e); }
+    }catch(e){ console.warn('Sunmi 報表失敗：', e); }
   }
+  // 1b) Sunmi legacy
+  if(isSunmiReady() && typeof window.SunmiPrinter.printPosReceipt === 'function'){
+    try{
+      const ok = window.SunmiPrinter.printPosReceipt(JSON.stringify(payload));
+      if(ok) return { route:'sunmi-legacy', ok:true };
+    }catch(e){ console.warn('Sunmi legacy 報表失敗：', e); }
+  }
+
+  // 2) 藍牙
   if(isBtReady() && typeof window.SunmiPrinter.btPrintReceiptWithFields === 'function'){
     try{
       const ok = window.SunmiPrinter.btPrintReceiptWithFields(JSON.stringify(payload));
       if(ok) return { route:'bluetooth', ok:true };
-    }catch(e){ console.warn('Bluetooth 報表列印失敗：', e); }
+    }catch(e){ console.warn('Bluetooth 報表失敗：', e); }
   }
+  if(isBtReady() && typeof window.SunmiPrinter.btPrintReceipt === 'function'){
+    try{
+      const ok = window.SunmiPrinter.btPrintReceipt(JSON.stringify(payload));
+      if(ok) return { route:'bluetooth-legacy', ok:true };
+    }catch(e){ console.warn('Bluetooth legacy 報表失敗：', e); }
+  }
+
+  // 3) 網路
   if(isNetReady() && typeof window.SunmiPrinter.netPrintReceiptWithFields === 'function'){
     try{
       const ok = window.SunmiPrinter.netPrintReceiptWithFields(JSON.stringify(payload));
       if(ok) return { route:'network', ok:true };
-    }catch(e){ console.warn('Network 報表列印失敗：', e); }
+    }catch(e){ console.warn('Network 報表失敗：', e); }
+  }
+  if(isNetReady() && typeof window.SunmiPrinter.netPrintReceipt === 'function'){
+    try{
+      const ok = window.SunmiPrinter.netPrintReceipt(JSON.stringify(payload));
+      if(ok) return { route:'network-legacy', ok:true };
+    }catch(e){ console.warn('Network legacy 報表失敗：', e); }
   }
 
-  // 偵測不到任何 Sunmi 印表機
-  alert('⚠️ 偵測不到出單機，請確認連線');
-  return { route:'none', ok:false };
+  // 4) 瀏覽器 fallback（跟結帳出單一樣）
+  await browserPrintHtml(html);
+  return { route:'browser', ok:true };
 }
