@@ -705,34 +705,33 @@ ${html_summary}${html_orderTypes}${html_payments}${html_top}${html_hourly}${html
 }
 
 function printSessionReport(session, opts, printWin){
-  // 用 buildSessionReportHtml 產生 HTML
   const html = buildSessionReportHtml(session, opts);
+  if(!printWin || printWin.closed){ alert('列印視窗已關閉'); return; }
 
-  if(!printWin || printWin.closed){
-    alert('列印視窗已關閉，請重新嘗試');
-    return;
-  }
-
-  printWin.document.open();
   printWin.document.write(html);
   printWin.document.close();
 
-  const doPrint = () => {
+  // 列印完成後自動關閉分頁
+  printWin.onafterprint = () => {
+    try{ printWin.close(); }catch(e){}
+  };
+
+  // ⭐ 300ms 內呼叫 print()，user gesture 還沒過期
+  setTimeout(() => {
     try{
       printWin.focus();
       printWin.print();
     }catch(e){
       console.error('列印失敗:', e);
     }
-  };
+  }, 300);
 
-  if(printWin.document.readyState === 'complete'){
-    setTimeout(doPrint, 400);
-  } else {
-    printWin.addEventListener('load', () => setTimeout(doPrint, 400));
-    setTimeout(doPrint, 1500);
-  }
+  // 備援：5 秒後若還沒關，強制關閉（onafterprint 在某些 Android 不會觸發）
+  setTimeout(() => {
+    try{ if(printWin && !printWin.closed) printWin.close(); }catch(e){}
+  }, 5000);
 }
+
 
 function exportSessionCsv(session){
   const orders = (state.orders || []).filter(o => o.sessionId === session.id);
