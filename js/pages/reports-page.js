@@ -557,39 +557,49 @@ function openPrintOptions(session){
   };
 }
 function printSessionReportViaIframe(session, opts){
-  // 先用既有的 printSessionReport 邏輯產生 HTML
-  // 但不開 printWin，改成把 HTML 注入隱藏 iframe
   const html = buildSessionReportHtml(session, opts);
 
-  // 移除舊的列印 iframe（避免重複）
+  // 移除舊的 iframe
   const oldFrame = document.getElementById('__printFrame');
-  if(oldFrame) oldFrame.remove();
+  if(oldFrame){ try{ oldFrame.remove(); }catch(e){} }
 
+  // 注意：不要設 visibility:hidden，Sunmi WebView 對隱藏 iframe 的 print() 會被忽略
   const iframe = document.createElement('iframe');
   iframe.id = '__printFrame';
-  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
   document.body.appendChild(iframe);
 
-  const doc = iframe.contentWindow.document;
+  const doc = iframe.contentDocument || iframe.contentWindow.document;
   doc.open();
   doc.write(html);
   doc.close();
 
-  const doPrint = () => {
+  iframe.onload = () => {
     try{
       iframe.contentWindow.focus();
       iframe.contentWindow.print();
-    }catch(e){ console.error('列印失敗:', e); alert('列印失敗：' + e.message); }
-    // 列印完移除 iframe
-    setTimeout(() => { try{ iframe.remove(); }catch(e){} }, 3000);
+    }catch(e){
+      console.error('列印失敗:', e);
+      alert('列印失敗：' + e.message);
+    }
+    // 列印後 1.5 秒移除 iframe（與 print-service.js 一致）
+    setTimeout(() => {
+      try{ document.body.removeChild(iframe); }catch(e){}
+    }, 1500);
   };
 
-  if(doc.readyState === 'complete'){
-    setTimeout(doPrint, 300);
-  } else {
-    iframe.addEventListener('load', () => setTimeout(doPrint, 300));
-    setTimeout(doPrint, 1500); // 備援
-  }
+  // Sunmi WebView 在某些情況不會觸發 onload，500ms 後直接呼叫 print 作為備援
+  setTimeout(() => {
+    try{
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    }catch(e){}
+  }, 500);
 }
 
 
