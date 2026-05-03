@@ -526,6 +526,18 @@ function openPrintOptions(session){
       orderList: document.getElementById('optOrderList').checked,
       paperSize: document.querySelector('input[name="paperSize"]:checked')?.value || 'A4'
     };
+    // 儲存本次勾選狀態，下次開啟時恢復
+    try{
+      const toSave = {
+        optSummary: opts.summary,
+        optOrderTypes: opts.orderTypes,
+        optPayments: opts.payments,
+        optTopProducts: opts.topProducts,
+        optHourly: opts.hourly,
+        optOrderList: opts.orderList
+      };
+      localStorage.setItem('printOptions_lastChecked', JSON.stringify(toSave));
+    }catch(e){ console.warn('儲存列印選項失敗', e); }
 
     // 防呆：如果使用者一個都沒勾，全部當作有勾
     const noneChecked = !opts.summary && !opts.orderTypes && !opts.payments && !opts.topProducts && !opts.hourly && !opts.orderList;
