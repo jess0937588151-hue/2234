@@ -303,14 +303,41 @@ function openEndSessionModal(){
     return;
   }
   // 有進行中的班次 → 顯示結束班次表單
-  document.getElementById('endStaffSelect').value = cur.staffId || '';
+    document.getElementById('endStaffSelect').value = cur.staffId || '';
   document.getElementById('endSessionInfo').innerHTML = 
     '人員：' + (cur.staffId || '-') + '<br>' +
     '開始時間：' + fmtLocalDateTime(cur.startedAt);
   document.getElementById('endSessionNote').value = '';
-  renderCashGrid('endCash', emptyCashDetail());
+
+  // 先計算應收現金（系統計算）
+  const stats = calcSessionStats(cur.id);
+  const expectedCash = Number(cur.openingCash || 0) + Number(stats.cashSales || 0);
+  document.getElementById('endOpeningCash').textContent = '$' + Number(cur.openingCash || 0);
+  document.getElementById('endCashSales').textContent = '$' + Number(stats.cashSales || 0);
+  document.getElementById('endExpectedCash').textContent = '$' + expectedCash;
+
+  // 渲染盤點輸入格子（即時更新實收現金與誤差）
+  renderCashGrid('endCashGrid', 'endCash', detail => {
+    const closing = calcCashTotal(detail);
+    document.getElementById('endClosingCash').textContent = '$' + closing;
+    const d = closing - expectedCash;
+    const diffEl = document.getElementById('endCashDiff');
+    if(d === 0){
+      diffEl.textContent = '$0 ✓';
+      diffEl.style.color = '#10b981';
+    } else if(d < 0){
+      diffEl.textContent = `短少 $${-d}`;
+      diffEl.style.color = '#ef4444';
+    } else {
+      diffEl.textContent = `溢收 +$${d}`;
+      diffEl.style.color = '#f59e0b';
+    }
+  });
+  document.getElementById('endClosingCash').textContent = '$0';
+  document.getElementById('endCashDiff').textContent = '$0 ✓';
+  document.getElementById('endCashDiff').style.color = '#10b981';
+
   if(modal) modal.classList.remove('hidden');
-}
 
 function confirmEndSession(){
   const modal = document.getElementById('endSessionModal');
