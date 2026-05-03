@@ -491,7 +491,7 @@ function openPrintOptions(session){
     else r.checked = false;
   });
 
-    // 2. 讀取上次勾選狀態（首次使用全部不勾）
+  // 2. 讀取上次勾選狀態（首次使用全部不勾）
   let lastOpts = {};
   try{
     lastOpts = JSON.parse(localStorage.getItem('printOptions_lastChecked') || '{}');
@@ -499,7 +499,7 @@ function openPrintOptions(session){
   const optIds = ['optSummary','optOrderTypes','optPayments','optTopProducts','optHourly','optOrderList'];
   optIds.forEach(id => {
     const el = document.getElementById(id);
-    if(el) el.checked = !!lastOpts[id];  // 沒記錄就 false（不勾）
+    if(el) el.checked = !!lastOpts[id];
   });
 
   // 3. 暫時隱藏摘要避免重疊
@@ -526,7 +526,8 @@ function openPrintOptions(session){
       orderList: document.getElementById('optOrderList').checked,
       paperSize: document.querySelector('input[name="paperSize"]:checked')?.value || 'A4'
     };
-    // 儲存本次勾選狀態，下次開啟時恢復
+
+    // 儲存本次勾選狀態
     try{
       const toSave = {
         optSummary: opts.summary,
@@ -537,9 +538,9 @@ function openPrintOptions(session){
         optOrderList: opts.orderList
       };
       localStorage.setItem('printOptions_lastChecked', JSON.stringify(toSave));
-    }catch(e){ console.warn('儲存列印選項失敗', e); }
+    }catch(e){}
 
-    // 防呆：如果使用者一個都沒勾，全部當作有勾
+    // 防呆：一個都沒勾就全部當有勾
     const noneChecked = !opts.summary && !opts.orderTypes && !opts.payments && !opts.topProducts && !opts.hourly && !opts.orderList;
     if(noneChecked){
       opts.summary = true;
@@ -549,59 +550,20 @@ function openPrintOptions(session){
       opts.hourly = true;
     }
 
+    // ⭐ 關鍵：在 user gesture 期間立刻開窗（這是 1d95f632 會印的方式）
+    const printWin = window.open('', '_blank');
+    if(!printWin){
+      alert('🚫 瀏覽器擋了彈出視窗，請允許後再試');
+      return;
+    }
+    printWin.document.write('<html><body style="font-family:sans-serif;padding:40px;text-align:center"><h2>📋 報表產生中...</h2></body></html>');
+
     modal.classList.add('hidden');
     if(summaryModal) summaryModal.classList.remove('hidden');
 
-    // 用隱藏 iframe 列印（不開新視窗、不顯示預覽頁）
-    printSessionReportViaIframe(_pendingPrintSession, opts);
+    printSessionReport(_pendingPrintSession, opts, printWin);
   };
 }
-function printSessionReportViaIframe(session, opts){
-  const html = buildSessionReportHtml(session, opts);
-
-  // 移除舊的 iframe
-  const oldFrame = document.getElementById('__printFrame');
-  if(oldFrame){ try{ oldFrame.remove(); }catch(e){} }
-
-  // 注意：不要設 visibility:hidden，Sunmi WebView 對隱藏 iframe 的 print() 會被忽略
-  const iframe = document.createElement('iframe');
-  iframe.id = '__printFrame';
-  iframe.style.position = 'fixed';
-  iframe.style.right = '0';
-  iframe.style.bottom = '0';
-  iframe.style.width = '0';
-  iframe.style.height = '0';
-  iframe.style.border = '0';
-  document.body.appendChild(iframe);
-
-  const doc = iframe.contentDocument || iframe.contentWindow.document;
-  doc.open();
-  doc.write(html);
-  doc.close();
-
-  iframe.onload = () => {
-    try{
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-    }catch(e){
-      console.error('列印失敗:', e);
-      alert('列印失敗：' + e.message);
-    }
-    // 列印後 1.5 秒移除 iframe（與 print-service.js 一致）
-    setTimeout(() => {
-      try{ document.body.removeChild(iframe); }catch(e){}
-    }, 1500);
-  };
-
-  // Sunmi WebView 在某些情況不會觸發 onload，500ms 後直接呼叫 print 作為備援
-  setTimeout(() => {
-    try{
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-    }catch(e){}
-  }, 500);
-}
-
 
 function buildSessionReportHtml(session, opts){
   opts = opts || { summary:true, orderTypes:true, payments:true, topProducts:true, hourly:true, orderList:false, paperSize:'A4' };
@@ -742,13 +704,35 @@ ${html_summary}${html_orderTypes}${html_payments}${html_top}${html_hourly}${html
 </body></html>`;
 }
 
-// 保留舊的 printSessionReport 給其他地方呼叫（向後相容），改為走 iframe 路徑
 function printSessionReport(session, opts, printWin){
-  // printWin 參數已棄用（為了向後相容仍接受但不使用）
-  if(printWin){ try{ printWin.close(); }catch(e){} }
-  printSessionReportViaIframe(session, opts || { summary:true, orderTypes:true, payments:true, topProducts:true, hourly:true, orderList:false, paperSize:'A4' });
-}
+  // 用 buildSessionReportHtml 產生 HTML
+  const html = buildSessionReportHtml(session, opts);
 
+  if(!printWin || printWin.closed){
+    alert('列印視窗已關閉，請重新嘗試');
+    return;
+  }
+
+  printWin.document.open();
+  printWin.document.write(html);
+  printWin.document.close();
+
+  const doPrint = () => {
+    try{
+      printWin.focus();
+      printWin.print();
+    }catch(e){
+      console.error('列印失敗:', e);
+    }
+  };
+
+  if(printWin.document.readyState === 'complete'){
+    setTimeout(doPrint, 400);
+  } else {
+    printWin.addEventListener('load', () => setTimeout(doPrint, 400));
+    setTimeout(doPrint, 1500);
+  }
+}
 
 function exportSessionCsv(session){
   const orders = (state.orders || []).filter(o => o.sessionId === session.id);
