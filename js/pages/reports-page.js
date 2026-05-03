@@ -315,29 +315,7 @@ function confirmEndSession(){
     const staffId = document.getElementById('endStaffSelect').value;
     const cashDetail = getCashDetailFromGrid('endCash');
     const note = document.getElementById('endSessionNote').value || '';
-
-    // ── 診斷 1：結束前先看 currentSession 跟訂單 ──
-    const cur = getCurrentSession();
-    const ordersBefore = (state.orders||[]).slice(0,5).map(o=>({
-      no:o.orderNo, pay:o.paymentMethod, sid:o.sessionId, total:o.total
-    }));
-    alert('【診斷1 結束前】\n'
-      + 'currentSession.id=' + (cur && cur.id) + '\n'
-      + 'state.orders 共 ' + (state.orders||[]).length + ' 筆\n'
-      + '前 5 筆：\n' + JSON.stringify(ordersBefore, null, 2));
-
     const ended = endSession({ staffId, cashDetail, note });
-
-    // ── 診斷 2：結束後比對 ended.id 跟訂單 sessionId ──
-    const matched = (state.orders||[]).filter(o => o.sessionId === ended.id);
-    const ordersAfter = (state.orders||[]).slice(0,5).map(o=>({
-      no:o.orderNo, pay:o.paymentMethod, sid:o.sessionId, total:o.total
-    }));
-    alert('【診斷2 結束後】\n'
-      + 'ended.id=' + ended.id + '\n'
-      + '配對到 ' + matched.length + ' 筆訂單\n'
-      + '配對訂單總額=' + matched.reduce((s,o)=>s+Number(o.total||0),0) + '\n'
-      + '前 5 筆：\n' + JSON.stringify(ordersAfter, null, 2));
 
     if(modal) modal.classList.add('hidden');
     renderReports();
