@@ -306,6 +306,66 @@ export function getLabelHtml(order){
 }
 
 // ============================================================
+// 班次報表專用 HTML（模仿廚房單版型，但抬頭改成報表）
+// ============================================================
+export function getSessionReportHtml(reportData){
+  const cfg = getPrintSettings();
+  const fontSize = Number(cfg.receiptFontSize || 12);
+  const paperWidthMm = Number(cfg.receiptPaperWidth || 58);
+  const offX = Number(cfg.receiptOffsetX || 0);
+  const offY = Number(cfg.receiptOffsetY || 0);
+
+  const lines = [];
+
+  // 抬頭：店名 + 報表標題
+  lines.push(`<div class="center bold big">${escapeHtml(cfg.storeName || '')}</div>`);
+  lines.push(`<div class="center bold">${escapeHtml(reportData.title || '班次報表')}</div>`);
+  if(reportData.subtitle){
+    lines.push(`<div class="center small">${escapeHtml(reportData.subtitle)}</div>`);
+  }
+  lines.push('<div class="sep"></div>');
+
+  // 內容（一行一個 line.label）
+  (reportData.lines || []).forEach(line => {
+    const text = line.label || '';
+    if(text.startsWith('---') || text.startsWith('===')){
+      lines.push('<div class="sep"></div>');
+    } else if(text.startsWith('--') && text.endsWith('--')){
+      // 區塊標題加粗
+      lines.push(`<div class="bold">${escapeHtml(text)}</div>`);
+    } else {
+      lines.push(`<div>${escapeHtml(text)}</div>`);
+    }
+  });
+
+  lines.push('<div class="sep"></div>');
+
+  const css = `
+    <style>
+      @page { size: ${paperWidthMm}mm auto; margin: 0; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        font-family: "PingFang TC","Microsoft JhengHei","Heiti TC", monospace, sans-serif;
+        font-size: ${fontSize}px;
+        width: ${paperWidthMm}mm;
+        padding: 4mm 3mm;
+        margin-left: ${offX}mm;
+        margin-top: ${offY}mm;
+        color: #000;
+      }
+      .center { text-align: center; }
+      .bold { font-weight: 700; }
+      .big { font-size: ${fontSize + 4}px; }
+      .small { font-size: ${fontSize - 2}px; }
+      .sep { border-top: 1px dashed #000; margin: 4px 0; }
+      div { line-height: 1.5; word-break: break-all; white-space: pre-wrap; }
+    </style>
+  `;
+
+  return `<!doctype html><html><head><meta charset="utf-8">${css}</head><body>${lines.join('')}</body></html>`;
+}
+
+// ============================================================
 // 印表機判斷 / 路由
 // ============================================================
 function hasSunmi(){
@@ -573,77 +633,93 @@ export function buildCartPreviewOrder(){
  * @param {string} reportData.subtitle - 副標（人員/日期）
  */
 export async function printSessionReportViaBridge(reportData){
+  // 把 lines 包成廚房單品項格式（純文字，無金額右欄）
   const items = (reportData.lines || []).map(line => ({
     name: line.label || '',
-    qty: 1,
+    qty: 0,
     basePrice: 0,
     extraPrice: 0,
-    note: line.value != null ? String(line.value) : '',
-    selections: []
+    options: '',
+    note: ''
   }));
 
   const fakeOrder = {
     orderNo: reportData.title || '班次報表',
     createdAt: new Date().toISOString(),
-    orderType: '報表',
+    orderType: reportData.subtitle || '',
     tableNo: '',
     paymentMethod: '',
-    customerName: reportData.subtitle || '',
+    customerName: '',
     customerPhone: '',
     items,
     subtotal: 0,
     discountAmount: 0,
-    total: 0,
-    isReport: true
+    total: 0
   };
 
-  const payload = buildBridgePayload(fakeOrder, 'receipt');
-  const html = getReceiptHtml(fakeOrder, 'customer');
+  const payload = buildBridgePayload(fakeOrder, 'kitchen');
+  // 強制覆蓋 fields：不印 storeName、關掉 itemQty、保留 orderNo（會印「單號：班次報表」）
+  payload.fields = {
+    storeName: false,
+    orderNo: true,
+    dateTime: true,
+    orderType: true,
+    customerInfo: false,
+    items: true,
+    itemQty: false,
+    itemNote: false,
+    orderNote: false
+  };
+  // 加一個自訂抬頭欄位給 APK 看（如果 APK 支援）
+  payload.reportTitle = reportData.title || '班次報表';
+  payload.reportSubtitle = reportData.subtitle || '';
+  payload.isReport = true;
 
-  // 1) Sunmi 內建（新版）
-  if(isSunmiReady() && typeof window.SunmiPrinter.printReceiptWithFields === 'function'){
-    try{
-      const ok = window.SunmiPrinter.printReceiptWithFields(JSON.stringify(payload));
-      if(ok) return { route:'sunmi', ok:true };
-    }catch(e){ console.warn('Sunmi 報表失敗：', e); }
-  }
-  // 1b) Sunmi legacy
-  if(isSunmiReady() && typeof window.SunmiPrinter.printPosReceipt === 'function'){
-    try{
-      const ok = window.SunmiPrinter.printPosReceipt(JSON.stringify(payload));
-      if(ok) return { route:'sunmi-legacy', ok:true };
-    }catch(e){ console.warn('Sunmi legacy 報表失敗：', e); }
-  }
+  // 瀏覽器 fallback 用我們自製的報表 HTML
+  const html = getSessionReportHtml(reportData);
 
+  // 1) Sunmi 廚房 API
+  if(isSunmiReady() && typeof window.SunmiPrinter.printKitchenWithFields === 'function'){
+    try{
+      const ok = window.SunmiPrinter.printKitchenWithFields(JSON.stringify(payload));
+      if(ok) return { route:'sunmi-kitchen', ok:true };
+    }catch(e){ console.warn('Sunmi 廚房報表失敗：', e); }
+  }
+  if(isSunmiReady() && typeof window.SunmiPrinter.printKitchenReceipt === 'function'){
+    try{
+      const ok = window.SunmiPrinter.printKitchenReceipt(JSON.stringify(payload));
+      if(ok) return { route:'sunmi-kitchen-legacy', ok:true };
+    }catch(e){}
+  }
   // 2) 藍牙
-  if(isBtReady() && typeof window.SunmiPrinter.btPrintReceiptWithFields === 'function'){
+  if(isBtReady() && typeof window.SunmiPrinter.btPrintKitchenWithFields === 'function'){
     try{
-      const ok = window.SunmiPrinter.btPrintReceiptWithFields(JSON.stringify(payload));
-      if(ok) return { route:'bluetooth', ok:true };
-    }catch(e){ console.warn('Bluetooth 報表失敗：', e); }
+      const ok = window.SunmiPrinter.btPrintKitchenWithFields(JSON.stringify(payload));
+      if(ok) return { route:'bt-kitchen', ok:true };
+    }catch(e){}
   }
-  if(isBtReady() && typeof window.SunmiPrinter.btPrintReceipt === 'function'){
+  if(isBtReady() && typeof window.SunmiPrinter.btPrintKitchen === 'function'){
     try{
-      const ok = window.SunmiPrinter.btPrintReceipt(JSON.stringify(payload));
-      if(ok) return { route:'bluetooth-legacy', ok:true };
-    }catch(e){ console.warn('Bluetooth legacy 報表失敗：', e); }
+      const ok = window.SunmiPrinter.btPrintKitchen(JSON.stringify(payload));
+      if(ok) return { route:'bt-kitchen-legacy', ok:true };
+    }catch(e){}
   }
-
   // 3) 網路
-  if(isNetReady() && typeof window.SunmiPrinter.netPrintReceiptWithFields === 'function'){
+  if(isNetReady() && typeof window.SunmiPrinter.netPrintKitchenWithFields === 'function'){
     try{
-      const ok = window.SunmiPrinter.netPrintReceiptWithFields(JSON.stringify(payload));
-      if(ok) return { route:'network', ok:true };
-    }catch(e){ console.warn('Network 報表失敗：', e); }
+      const ok = window.SunmiPrinter.netPrintKitchenWithFields(JSON.stringify(payload));
+      if(ok) return { route:'net-kitchen', ok:true };
+    }catch(e){}
   }
-  if(isNetReady() && typeof window.SunmiPrinter.netPrintReceipt === 'function'){
+  if(isNetReady() && typeof window.SunmiPrinter.netPrintKitchen === 'function'){
     try{
-      const ok = window.SunmiPrinter.netPrintReceipt(JSON.stringify(payload));
-      if(ok) return { route:'network-legacy', ok:true };
-    }catch(e){ console.warn('Network legacy 報表失敗：', e); }
+      const ok = window.SunmiPrinter.netPrintKitchen(JSON.stringify(payload));
+      if(ok) return { route:'net-kitchen-legacy', ok:true };
+    }catch(e){}
   }
 
-  // 4) 瀏覽器 fallback（跟結帳出單一樣）
+  // 4) 瀏覽器 fallback（用我們自製版面，抬頭正確）
   await browserPrintHtml(html);
   return { route:'browser', ok:true };
 }
+
