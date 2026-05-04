@@ -633,93 +633,57 @@ export function buildCartPreviewOrder(){
  * @param {string} reportData.subtitle - 副標（人員/日期）
  */
 export async function printSessionReportViaBridge(reportData){
-  // 把 lines 包成廚房單品項格式（純文字，無金額右欄）
-  const items = (reportData.lines || []).map(line => ({
-    name: line.label || '',
-    qty: 0,
-    basePrice: 0,
-    extraPrice: 0,
-    options: '',
-    note: ''
-  }));
-
-  const fakeOrder = {
-    orderNo: reportData.title || '班次報表',
-    createdAt: new Date().toISOString(),
-    orderType: reportData.subtitle || '',
-    tableNo: '',
-    paymentMethod: '',
-    customerName: '',
-    customerPhone: '',
-    items,
-    subtotal: 0,
-    discountAmount: 0,
-    total: 0
-  };
-
-  const payload = buildBridgePayload(fakeOrder, 'kitchen');
-  // 強制覆蓋 fields：不印 storeName、關掉 itemQty、保留 orderNo（會印「單號：班次報表」）
-  payload.fields = {
-    storeName: false,
-    orderNo: true,
-    dateTime: true,
-    orderType: true,
-    customerInfo: false,
-    items: true,
-    itemQty: false,
-    itemNote: false,
-    orderNote: false
-  };
-  // 加一個自訂抬頭欄位給 APK 看（如果 APK 支援）
-  payload.reportTitle = reportData.title || '班次報表';
-  payload.reportSubtitle = reportData.subtitle || '';
-  payload.isReport = true;
-
-  // 瀏覽器 fallback 用我們自製的報表 HTML
-  const html = getSessionReportHtml(reportData);
-
-  // 1) Sunmi 廚房 API
-  if(isSunmiReady() && typeof window.SunmiPrinter.printKitchenWithFields === 'function'){
-    try{
-      const ok = window.SunmiPrinter.printKitchenWithFields(JSON.stringify(payload));
-      if(ok) return { route:'sunmi-kitchen', ok:true };
-    }catch(e){ console.warn('Sunmi 廚房報表失敗：', e); }
-  }
-  if(isSunmiReady() && typeof window.SunmiPrinter.printKitchenReceipt === 'function'){
-    try{
-      const ok = window.SunmiPrinter.printKitchenReceipt(JSON.stringify(payload));
-      if(ok) return { route:'sunmi-kitchen-legacy', ok:true };
-    }catch(e){}
-  }
-  // 2) 藍牙
-  if(isBtReady() && typeof window.SunmiPrinter.btPrintKitchenWithFields === 'function'){
-    try{
-      const ok = window.SunmiPrinter.btPrintKitchenWithFields(JSON.stringify(payload));
-      if(ok) return { route:'bt-kitchen', ok:true };
-    }catch(e){}
-  }
-  if(isBtReady() && typeof window.SunmiPrinter.btPrintKitchen === 'function'){
-    try{
-      const ok = window.SunmiPrinter.btPrintKitchen(JSON.stringify(payload));
-      if(ok) return { route:'bt-kitchen-legacy', ok:true };
-    }catch(e){}
-  }
-  // 3) 網路
-  if(isNetReady() && typeof window.SunmiPrinter.netPrintKitchenWithFields === 'function'){
-    try{
-      const ok = window.SunmiPrinter.netPrintKitchenWithFields(JSON.stringify(payload));
-      if(ok) return { route:'net-kitchen', ok:true };
-    }catch(e){}
-  }
-  if(isNetReady() && typeof window.SunmiPrinter.netPrintKitchen === 'function'){
-    try{
-      const ok = window.SunmiPrinter.netPrintKitchen(JSON.stringify(payload));
-      if(ok) return { route:'net-kitchen-legacy', ok:true };
-    }catch(e){}
+  if(!hasSunmi()) {
+    alert('⚠️ 偵測不到出單機，請確認連線');
+    return {route:'none', ok:false};
   }
 
-  // 4) 瀏覽器 fallback（用我們自製版面，抬頭正確）
-  await browserPrintHtml(html);
-  return { route:'browser', ok:true };
+  const SP = window.SunmiPrinter;
+  const lines = reportData.lines || [];
+
+  try{
+    // 1. 設定置中、加大字體印標題
+    if(SP.setAlignment) SP.setAlignment(1);  // 1=置中
+    if(SP.setFontSize) SP.setFontSize(28);
+    if(SP.printText) SP.printText((reportData.title||'班次報表') + '\n');
+
+    // 2. 副標（時間）置中、小字
+    if(SP.setFontSize) SP.setFontSize(20);
+    if(SP.printText) SP.printText((reportData.subtitle||'') + '\n');
+    if(SP.printText) SP.printText('--------------------------------\n');
+
+    // 3. 內文左對齊、正常字
+    if(SP.setAlignment) SP.setAlignment(0);  // 0=左
+    if(SP.setFontSize) SP.setFontSize(24);
+    lines.forEach(line => {
+      const text = (line.label || '') + '\n';
+      if(SP.printText) SP.printText(text);
+    });
+
+    // 4. 收尾
+    if(SP.printText) SP.printText('\n\n\n');
+    if(SP.cutPaper) SP.cutPaper();
+
+    return {route:'sunmi-text', ok:true};
+  }catch(e){
+    console.error('班次報表低階列印失敗：', e);
+    // fallback: 走瀏覽器列印
+    const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+      @page{size:58mm auto;margin:0}
+      body{font-family:sans-serif;font-size:13px;width:58mm;padding:3mm;margin:0;color:#000}
+      .title{font-weight:700;text-align:center;font-size:16px;margin-bottom:4px}
+      .sub{text-align:center;font-size:11px;margin-bottom:6px}
+      .line{line-height:1.45;white-space:pre-wrap;word-break:break-all}
+      .sep{border-top:1px dashed #000;margin:4px 0}
+    </style></head><body>
+      <div class="title">${escapeHtml(reportData.title||'班次報表')}</div>
+      <div class="sub">${escapeHtml(reportData.subtitle||'')}</div>
+      <div class="sep"></div>
+      ${lines.map(l=>`<div class="line">${escapeHtml(l.label||'')}</div>`).join('')}
+    </body></html>`;
+    await browserPrintHtml(html);
+    return {route:'browser', ok:true};
+  }
 }
+
 
