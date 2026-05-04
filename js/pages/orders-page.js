@@ -181,15 +181,16 @@ function renderOrdersSection(wrap, orders, isPending){
       persistAll();
       window.refreshAllViews();
     };
-    btns[2].onclick = ()=>{
-      previewInModal(getReceiptHtml(o, 'customer'));
+        btns[2].onclick = ()=>{
+      printOrderReceipt(o, 'customer');
     };
     btns[3].onclick = ()=>{
-      previewInModal(getReceiptHtml(o, 'kitchen'));
+      printKitchenCopies(o);
     };
     btns[4].onclick = ()=>{
-      previewInModal(getLabelHtml(o));
+      printOrderLabels(o);
     };
+
     if(isPending && btns[5]){
       btns[5].onclick = ()=>{
         if(!hasOpenSession()) return alert('🔒 尚未開始值班，請先到報表頁開班');
