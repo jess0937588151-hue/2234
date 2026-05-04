@@ -393,7 +393,7 @@ function buildBridgePayload(order, mode){
   return {
     mode,                                     // 'receipt' | 'kitchen' | 'label'
     fields,                                   // 欄位勾選
-    openDrawer: !!cfg.openDrawer && mode === 'receipt',
+    openDrawer: false,
     shopName: cfg.storeName || '',
     shopPhone: cfg.storePhone || '',
     shopAddress: cfg.storeAddress || '',
