@@ -649,57 +649,66 @@ export function buildCartPreviewOrder(){
  * @param {string} reportData.subtitle - 副標（人員/日期）
  */
 export async function printSessionReportViaBridge(reportData){
-  if(!hasSunmi()) {
-    alert('⚠️ 偵測不到出單機，請確認連線');
-    return {route:'none', ok:false};
-  }
-
-  const SP = window.SunmiPrinter;
   const lines = reportData.lines || [];
+  const title = reportData.title || '班次報表';
+  const subtitle = reportData.subtitle || '';
 
-  try{
-    // 1. 設定置中、加大字體印標題
-    if(SP.setAlignment) SP.setAlignment(1);  // 1=置中
-    if(SP.setFontSize) SP.setFontSize(28);
-    if(SP.printText) SP.printText((reportData.title||'班次報表') + '\n');
+  // 組成單一純文字字串（每行一個 \n）
+  let body = title + '\n';
+  if(subtitle) body += subtitle + '\n';
+  body += '--------------------------------\n';
+  lines.forEach(line => { body += (line.label || '') + '\n'; });
+  body += '\n\n\n';
 
-    // 2. 副標（時間）置中、小字
-    if(SP.setFontSize) SP.setFontSize(20);
-    if(SP.printText) SP.printText((reportData.subtitle||'') + '\n');
-    if(SP.printText) SP.printText('--------------------------------\n');
-
-    // 3. 內文左對齊、正常字
-    if(SP.setAlignment) SP.setAlignment(0);  // 0=左
-    if(SP.setFontSize) SP.setFontSize(24);
-    lines.forEach(line => {
-      const text = (line.label || '') + '\n';
-      if(SP.printText) SP.printText(text);
-    });
-
-    // 4. 收尾
-    if(SP.printText) SP.printText('\n\n\n');
-    if(SP.cutPaper) SP.cutPaper();
-
-    return {route:'sunmi-text', ok:true};
-  }catch(e){
-    console.error('班次報表低階列印失敗：', e);
-    // fallback: 走瀏覽器列印
-    const html = `<!doctype html><html><head><meta charset="utf-8"><style>
-      @page{size:58mm auto;margin:0}
-      body{font-family:sans-serif;font-size:13px;width:58mm;padding:3mm;margin:0;color:#000}
-      .title{font-weight:700;text-align:center;font-size:16px;margin-bottom:4px}
-      .sub{text-align:center;font-size:11px;margin-bottom:6px}
-      .line{line-height:1.45;white-space:pre-wrap;word-break:break-all}
-      .sep{border-top:1px dashed #000;margin:4px 0}
-    </style></head><body>
-      <div class="title">${escapeHtml(reportData.title||'班次報表')}</div>
-      <div class="sub">${escapeHtml(reportData.subtitle||'')}</div>
-      <div class="sep"></div>
-      ${lines.map(l=>`<div class="line">${escapeHtml(l.label||'')}</div>`).join('')}
-    </body></html>`;
-    await browserPrintHtml(html);
-    return {route:'browser', ok:true};
+  // 1) Sunmi printText（單一字串就好，不用 setAlignment / setFontSize）
+  if(hasSunmi() && typeof window.SunmiPrinter.printText === 'function'){
+    try {
+      const ok = window.SunmiPrinter.printText(body);
+      if(typeof window.SunmiPrinter.cutPaper === 'function'){
+        try { window.SunmiPrinter.cutPaper(); } catch(e){}
+      }
+      if(ok !== false) return { route:'sunmi-text', ok:true };
+    } catch(e) { console.warn('Sunmi printText 失敗：', e); }
   }
+  // 1b) 退回 printReceipt(title, body)
+  if(hasSunmi() && typeof window.SunmiPrinter.printReceipt === 'function'){
+    try {
+      const ok = window.SunmiPrinter.printReceipt(title, body);
+      if(ok !== false) return { route:'sunmi-receipt', ok:true };
+    } catch(e) {}
+  }
+
+  // 2) 藍牙
+  if(hasSunmi()
+     && typeof window.SunmiPrinter.isBtPrinterConnected === 'function'
+     && window.SunmiPrinter.isBtPrinterConnected()
+     && typeof window.SunmiPrinter.btPrintText === 'function'){
+    try {
+      const ok = window.SunmiPrinter.btPrintText(body);
+      if(ok !== false) return { route:'bluetooth-text', ok:true };
+    } catch(e) {}
+  }
+
+  // 3) 網路
+  if(hasSunmi()
+     && typeof window.SunmiPrinter.isNetPrinterConnected === 'function'
+     && window.SunmiPrinter.isNetPrinterConnected()
+     && typeof window.SunmiPrinter.netPrintText === 'function'){
+    try {
+      const ok = window.SunmiPrinter.netPrintText(body);
+      if(ok !== false) return { route:'network-text', ok:true };
+    } catch(e) {}
+  }
+
+  // 4) 瀏覽器 fallback
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+    @page{size:58mm auto;margin:0}
+    body{font-family:"PingFang TC",sans-serif;font-size:13px;width:58mm;padding:3mm;margin:0;color:#000;white-space:pre-wrap;word-break:break-all}
+  </style></head><body>${escapeHtml(body)}</body></html>`;
+  await browserPrintHtml(html);
+  return { route:'browser', ok:true };
+}
+
 }
 
 
