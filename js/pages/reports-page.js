@@ -724,17 +724,17 @@ function printSessionReport(session, opts, printWin){
 
   // 班次總覽
   if(opts.summary !== false){
-    lines.push({ label:'💰 班次總覽', value:'' });
-    lines.push({ label:'營業額',   value:`$${sales}` });
-    lines.push({ label:'訂單數',   value:`${count}` });
-    lines.push({ label:'客單價',   value:`$${avg}` });
-    lines.push({ label:'折扣',     value:`$${discount}` });
-    lines.push({ label:'開班備用金', value:`$${Number(session.openingCash||0)}` });
-    lines.push({ label:'應有現金',   value:`$${Number(session.expectedCash||0)}` });
-    lines.push({ label:'實收現金',   value:`$${Number(session.closingCash||0)}` });
+    lines.push({ label:'-- 班次總覽 --', value:'' });
+    lines.push({ label:`營業額      $${sales}`, value:'' });
+    lines.push({ label:`訂單數      ${count}`, value:'' });
+    lines.push({ label:`客單價      $${avg}`, value:'' });
+    lines.push({ label:`折扣        $${discount}`, value:'' });
+    lines.push({ label:`開班備用金  $${Number(session.openingCash||0)}`, value:'' });
+    lines.push({ label:`應有現金    $${Number(session.expectedCash||0)}`, value:'' });
+    lines.push({ label:`實收現金    $${Number(session.closingCash||0)}`, value:'' });
     const diff = Number(session.cashDiff||0);
-    const diffText = diff===0 ? '✓ 平衡' : (diff<0 ? `短少 $${-diff}` : `溢收 +$${diff}`);
-    lines.push({ label:'差異',     value: diffText });
+    const diffText = diff===0 ? '平衡' : (diff<0 ? `短少 $${-diff}` : `溢收 +$${diff}`);
+    lines.push({ label:`差異        ${diffText}`, value:'' });
     lines.push(sep);
   }
 
@@ -747,10 +747,11 @@ function printSessionReport(session, opts, printWin){
       typeMap[k].count++;
       typeMap[k].sales += Number(o.total||0);
     });
-    lines.push({ label:'🍱 訂單類型', value:'' });
+    lines.push({ label:'-- 訂單類型 --', value:'' });
     Object.entries(typeMap).forEach(([k,v]) => {
-      lines.push({ label:`${k} (${v.count}單)`, value:`$${v.sales}` });
+      lines.push({ label:`${k}  ${v.count}單  $${v.sales}`, value:'' });
     });
+    if(!Object.keys(typeMap).length) lines.push({ label:'(無資料)', value:'' });
     lines.push(sep);
   }
 
@@ -761,10 +762,11 @@ function printSessionReport(session, opts, printWin){
       const k = o.paymentMethod || '未設定';
       payMap[k] = (payMap[k]||0) + Number(o.total||0);
     });
-    lines.push({ label:'💳 付款方式', value:'' });
+    lines.push({ label:'-- 付款方式 --', value:'' });
     Object.entries(payMap).forEach(([k,v]) => {
-      lines.push({ label:k, value:`$${v}` });
+      lines.push({ label:`${k}  $${v}`, value:'' });
     });
+    if(!Object.keys(payMap).length) lines.push({ label:'(無資料)', value:'' });
     lines.push(sep);
   }
 
@@ -776,9 +778,9 @@ function printSessionReport(session, opts, printWin){
       prodMap[i.name] = (prodMap[i.name]||0) + Number(i.qty||0);
     }));
     const top = Object.entries(prodMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
-    lines.push({ label:'🔥 熱銷 TOP10', value:'' });
+    lines.push({ label:'-- 熱銷 TOP10 --', value:'' });
     top.forEach((p,i) => {
-      lines.push({ label:`${i+1}. ${p[0]}`, value:`${p[1]} 份` });
+      lines.push({ label:`${i+1}. ${p[0]}  ${p[1]}份`, value:'' });
     });
     if(!top.length) lines.push({ label:'(無資料)', value:'' });
     lines.push(sep);
@@ -795,9 +797,9 @@ function printSessionReport(session, opts, printWin){
       hourMap[k].sales += Number(o.total||0);
     });
     const hourEntries = Object.entries(hourMap).sort((a,b) => a[0].localeCompare(b[0]));
-    lines.push({ label:'🕐 時段分布', value:'' });
+    lines.push({ label:'-- 時段分布 --', value:'' });
     hourEntries.forEach(([k,v]) => {
-      lines.push({ label:`${k} (${v.count}單)`, value:`$${v.sales}` });
+      lines.push({ label:`${k}  ${v.count}單  $${v.sales}`, value:'' });
     });
     if(!hourEntries.length) lines.push({ label:'(無資料)', value:'' });
     lines.push(sep);
@@ -805,21 +807,21 @@ function printSessionReport(session, opts, printWin){
 
   // 訂單明細
   if(opts.orderList){
-    lines.push({ label:'📝 訂單明細', value:'' });
+    lines.push({ label:'-- 訂單明細 --', value:'' });
     orders.forEach(o => {
-      lines.push({ label:`${o.orderNo||o.id}`, value:`$${Number(o.total||0)}` });
+      lines.push({ label:`${o.orderNo||o.id}  $${Number(o.total||0)}`, value:'' });
     });
     if(!orders.length) lines.push({ label:'(無訂單)', value:'' });
   }
 
   if(session.note){
     lines.push(sep);
-    lines.push({ label:'備註', value: session.note });
+    lines.push({ label:`備註: ${session.note}`, value:'' });
   }
 
   // 呼叫 Sunmi Bridge 列印
   printSessionReportViaBridge({
-    title: '📋 班次報表',
+    title: '班次報表',
     subtitle: `${session.staffId}　${fmtLocalDateTime(session.startedAt).slice(5,16)}~${fmtLocalDateTime(session.endedAt||new Date().toISOString()).slice(11,16)}`,
     lines
   }).then(result => {
