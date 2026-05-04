@@ -709,6 +709,6 @@ export async function printSessionReportViaBridge(reportData){
   return { route:'browser', ok:true };
 }
 
-}
+
 
 
