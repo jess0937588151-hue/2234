@@ -957,6 +957,14 @@ export function initReportsPage(){
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById('reportsView')?.classList.add('active');
   });
+  document.getElementById('openCashDrawerBtn')?.addEventListener('click', () => {
+    if(window.SunmiPrinter && window.SunmiPrinter.openCashDrawer){
+      const ok = window.SunmiPrinter.openCashDrawer();
+      if(!ok) alert('開啟錢箱失敗，請確認連線');
+    } else {
+      alert('未偵測到出單機，無法開啟錢箱');
+    }
+  });
 
   startStatusTimer();
   renderReports();
