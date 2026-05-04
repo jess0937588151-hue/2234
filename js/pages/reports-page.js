@@ -175,28 +175,48 @@ const discount = orders.reduce((s,o) => {
 }
 
 // 歷史班次列表
-function renderHistorySessions(){
-  const el = document.getElementById('reportSessionList');
+// 歷史班次列表（在浮動視窗內渲染）
+function renderHistorySessionsInModal(dateFrom, dateTo){
+  const el = document.getElementById('historySessionsList');
   if(!el) return;
-  const list = getRecentSessions(30);
+
+  let list = (state.sessions || []).filter(s => s.endedAt);
+
+  if(dateFrom){
+    const from = new Date(dateFrom + 'T00:00:00');
+    list = list.filter(s => new Date(s.endedAt) >= from);
+  }
+  if(dateTo){
+    const to = new Date(dateTo + 'T23:59:59');
+    list = list.filter(s => new Date(s.endedAt) <= to);
+  }
+
+  // 預設近 30 天
+  if(!dateFrom && !dateTo){
+    const cutoff = Date.now() - 30*24*3600*1000;
+    list = list.filter(s => new Date(s.endedAt).getTime() >= cutoff);
+  }
+
+  list.sort((a,b) => new Date(b.endedAt) - new Date(a.endedAt));
+
   if(!list.length){
-    el.innerHTML = '<div class="muted">近 30 天尚無已結束班次</div>';
+    el.innerHTML = '<div class="muted" style="text-align:center;padding:30px;color:#94a3b8">查無資料</div>';
     return;
   }
+
   el.innerHTML = list.map(s => {
-    const start = fmtLocalDateTime(s.startedAt).slice(5);  // 顯示 MM-DD HH:mm
-    const end = s.endedAt ? fmtLocalDateTime(s.endedAt).slice(11) : '進行中';  // 只顯示 HH:mm
+    const start = fmtLocalDateTime(s.startedAt).slice(5);
+    const end = s.endedAt ? fmtLocalDateTime(s.endedAt).slice(11) : '進行中';
     const sales = s.stats ? money(s.stats.salesTotal) : money(0);
     const count = s.stats ? s.stats.orderCount : 0;
     const diffNum = Number(s.cashDiff||0);
     let diffHtml = '';
-    if(s.endedAt){
-      if(diffNum===0) diffHtml = '<span style="color:#10b981;font-weight:bold">✓ 平衡</span>';
-      else if(diffNum<0) diffHtml = `<span style="color:#ef4444;font-weight:bold">短少 ${diffNum}</span>`;
-      else diffHtml = `<span style="color:#f59e0b;font-weight:bold">溢收 +${diffNum}</span>`;
-    }
+    if(diffNum===0) diffHtml = '<span style="color:#10b981;font-weight:bold">✓ 平衡</span>';
+    else if(diffNum<0) diffHtml = `<span style="color:#ef4444;font-weight:bold">短少 ${diffNum}</span>`;
+    else diffHtml = `<span style="color:#f59e0b;font-weight:bold">溢收 +${diffNum}</span>`;
+
     return `
-      <div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:8px;background:#fff">
+      <div class="history-session-card" data-session-id="${escapeHtml(s.id)}" style="border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:8px;background:#fff;cursor:pointer;transition:all 0.15s">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
           <strong>${escapeHtml(start)} ~ ${escapeHtml(end)}</strong>
           <span style="font-size:13px;color:#64748b">${escapeHtml(s.staffId||'')}${s.endStaffId&&s.endStaffId!==s.staffId?' / '+escapeHtml(s.endStaffId):''}</span>
@@ -207,10 +227,36 @@ function renderHistorySessions(){
           <span>${diffHtml}</span>
         </div>
         ${s.note?`<div style="margin-top:6px;font-size:12px;color:#64748b">備註：${escapeHtml(s.note)}</div>`:''}
+        <div style="margin-top:6px;font-size:12px;color:#3b82f6">👉 點擊查看摘要與列印</div>
       </div>
     `;
   }).join('');
+
+  // 綁定點擊
+  el.querySelectorAll('.history-session-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const sid = card.dataset.sessionId;
+      const session = (state.sessions || []).find(s => s.id === sid);
+      if(session){
+        document.getElementById('historySessionsModal').classList.add('hidden');
+        openSessionSummaryModal(session);
+      }
+    });
+  });
 }
+
+function openHistorySessionsModal(){
+  const modal = document.getElementById('historySessionsModal');
+  if(!modal) return;
+  document.getElementById('historyDateFrom').value = '';
+  document.getElementById('historyDateTo').value = '';
+  renderHistorySessionsInModal();
+  modal.classList.remove('hidden');
+}
+function closeHistorySessionsModal(){
+  document.getElementById('historySessionsModal')?.classList.add('hidden');
+}
+
 
 // ──────────────────────────────────────────────
 // 主刷新 export
@@ -218,7 +264,7 @@ function renderHistorySessions(){
 export function renderReports(){
   renderSessionStatusBar();
   renderCurrentSessionData();
-  renderHistorySessions();
+  
 }
 
 // ──────────────────────────────────────────────
@@ -857,26 +903,6 @@ function exportSessionCsv(session){
 // ──────────────────────────────────────────────
 // 列印 / 匯出（簡化版，06.16/8 會做選擇對話框）
 // ──────────────────────────────────────────────
-function printCurrentReport(){
-  const cur = getCurrentSession();
-  if(!cur){ alert('尚未開班，無法列印'); return; }
-  const orders = getCurrentSessionOrders();
-  const sales = orders.reduce((s,o)=>s+Number(o.total||0),0);
-  const html = `
-    <html><head><meta charset="utf-8"><title>班次報表</title>
-    <style>body{font-family:sans-serif;padding:20px}h1{text-align:center}table{width:100%;border-collapse:collapse;margin-top:12px}td,th{border:1px solid #ccc;padding:6px}</style>
-    </head><body>
-    <h1>班次報表</h1>
-    <p>人員：${escapeHtml(cur.staffId)}　開班：${escapeHtml(fmtLocalDateTime(cur.startedAt))}</p>
-    <table><tr><td>營業額</td><td style="text-align:right">${money(sales)}</td></tr>
-    <tr><td>訂單數</td><td style="text-align:right">${orders.length}</td></tr></table>
-    </body></html>`;
-  const w = window.open('', '_blank');
-  if(!w){ alert('請允許彈出視窗'); return; }
-  w.document.write(html);
-  w.document.close();
-  setTimeout(()=>w.print(), 300);
-}
 
 function exportCurrentReportCsv(){
   const cur = getCurrentSession();
@@ -901,9 +927,22 @@ function exportCurrentReportCsv(){
 export function initReportsPage(){
   document.getElementById('startSessionBtn')?.addEventListener('click', openStartSessionModal);
   document.getElementById('endSessionBtn')?.addEventListener('click', openEndSessionModal);
+    document.getElementById('openHistorySessionsBtn')?.addEventListener('click', openHistorySessionsModal);
+  document.getElementById('closeHistorySessionsModal')?.addEventListener('click', closeHistorySessionsModal);
+  document.querySelector('#historySessionsModal .modal-backdrop')?.addEventListener('click', closeHistorySessionsModal);
+  document.getElementById('historyDateFilterBtn')?.addEventListener('click', () => {
+    const f = document.getElementById('historyDateFrom').value;
+    const t = document.getElementById('historyDateTo').value;
+    renderHistorySessionsInModal(f, t);
+  });
+  document.getElementById('historyDateResetBtn')?.addEventListener('click', () => {
+    document.getElementById('historyDateFrom').value = '';
+    document.getElementById('historyDateTo').value = '';
+    renderHistorySessionsInModal();
+  });
+
   document.getElementById('confirmStartSessionBtn')?.addEventListener('click', confirmStartSession);
   document.getElementById('confirmEndSessionBtn')?.addEventListener('click', confirmEndSession);
-  document.getElementById('reportPrintBtn')?.addEventListener('click', printCurrentReport);
   document.getElementById('reportExportBtn')?.addEventListener('click', exportCurrentReportCsv);
   document.getElementById('costManageBtn')?.addEventListener('click', () => {
     alert('💰 成本管理功能將在 Batch 06.16/7 提供');
