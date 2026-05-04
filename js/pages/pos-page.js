@@ -381,7 +381,7 @@ function finalizeOrder(paymentMethod){
         window.refreshAllViews();
 
         // 開錢箱（依設定 openDrawer，且僅結帳時）
-     if(order && paymentMethod === '現金' && printConfig.openDrawer){
+     if(order && paymentMethod === '現金'){
     try { openCashDrawer(); } catch(e) { console.error('開錢箱失敗:', e); }
 }
 
@@ -408,7 +408,7 @@ if(order && printConfig.autoPrintKitchen){
     window.refreshAllViews();
 
     // 開錢箱（僅現金付款）
-if(order && paymentMethod === '現金' && printConfig.openDrawer){
+if(order && paymentMethod === '現金'){
     try { openCashDrawer(); } catch(e) { console.error('開錢箱失敗:', e); }
 }
 
