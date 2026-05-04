@@ -52,7 +52,7 @@ export function getPrintSettings(){
   cfg.labelOffsetX = Number(cfg.labelOffsetX || 0);
   cfg.labelOffsetY = Number(cfg.labelOffsetY || 0);
   cfg.kitchenCopies = Math.max(1, Number(cfg.kitchenCopies || 1));
-  if (typeof cfg.openDrawer === 'undefined') cfg.openDrawer = true;
+  if (typeof cfg.openDrawer === 'undefined') cfg.openDrawer = false;
   if (!cfg.fields) cfg.fields = JSON.parse(JSON.stringify(DEFAULT_FIELDS));
   // 補齊缺少的子欄位
   ['receipt','kitchen','label'].forEach(kind => {
