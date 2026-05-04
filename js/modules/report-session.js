@@ -137,8 +137,11 @@ export function endSession(opts){
     stats
   };
 
+    if(!state.reports) state.reports = { currentSession: null, sessions: [], savedSnapshots: [] };
+  if(!Array.isArray(state.reports.sessions)) state.reports.sessions = [];
   state.reports.sessions.unshift(ended);
   state.reports.currentSession = null;
+
 
   // 清理 90 天前的歷史班次
   cleanupOldSessions();
