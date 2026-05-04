@@ -319,7 +319,7 @@ export function getSessionReportHtml(reportData){
 
   // 抬頭：店名 + 報表標題
   lines.push(`<div class="center bold big">${escapeHtml(cfg.storeName || '')}</div>`);
-  lines.push(`<div class="center bold">${escapeHtml(reportData.title || '班次報表')}</div>`);
+  lines.push(`<div class="center bold big">${escapeHtml(reportData.title || '班次報表')}</div>`);
   if(reportData.subtitle){
     lines.push(`<div class="center small">${escapeHtml(reportData.subtitle)}</div>`);
   }
@@ -355,7 +355,7 @@ export function getSessionReportHtml(reportData){
       }
       .center { text-align: center; }
       .bold { font-weight: 700; }
-      .big { font-size: ${fontSize + 4}px; }
+      .big { font-size: ${fontSize + 6}px; }
       .small { font-size: ${fontSize - 2}px; }
       .sep { border-top: 1px dashed #000; margin: 4px 0; }
       div { line-height: 1.5; word-break: break-all; white-space: pre-wrap; }
