@@ -26,7 +26,10 @@
     <button class="nav-btn" data-view="reportsView">報表</button>
     <button class="nav-btn" data-view="productsView">商品管理</button>
     <button class="nav-btn" data-view="settingsView">設定</button>
+    <button id="openCashDrawerBtn" class="nav-btn" 
+      style="background:#fef3c7;color:#92400e">💰 開啟錢箱</button>
     <button id="installBtn" class="secondary-btn hidden">安裝到桌面</button>
+
   </aside>
 
   <main class="main">
@@ -832,7 +835,7 @@
 </div>
 
   <!-- ===== 列印欄位選擇 Modal ===== -->
-<div id="printFieldsModal" class="modal hidden">
+<div id="printFieldsModal" class="modal hidden" style="z-index:1490">
   <div class="modal-backdrop" data-close="print-fields"></div>
   <div class="modal-dialog" style="max-width:420px">
     <div class="row between wrap">
