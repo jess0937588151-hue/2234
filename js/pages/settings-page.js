@@ -431,6 +431,210 @@ export function initSettingsPage() {
       }]
     };
   }
+     // ============================
+  // 列印預覽（欄位選擇 → 浮動視窗預覽 → 列印）
+  // 完整搬自 v2332 舊版
+  // ============================
+
+  function esc(text){
+    return String(text==null?'':text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+  function moneyFmt(v){ return '$' + Number(v||0).toFixed(0); }
+
+  function getFieldFlags(){
+    return {
+      storeName:    document.getElementById('pf_storeName').checked,
+      storePhone:   document.getElementById('pf_storePhone').checked,
+      storeAddress: document.getElementById('pf_storeAddress').checked,
+      orderNo:      document.getElementById('pf_orderNo').checked,
+      createdAt:    document.getElementById('pf_createdAt').checked,
+      orderType:    document.getElementById('pf_orderType').checked,
+      paymentMethod:document.getElementById('pf_paymentMethod').checked,
+      itemSelections:document.getElementById('pf_itemSelections').checked,
+      itemNote:     document.getElementById('pf_itemNote').checked,
+      itemPrice:    document.getElementById('pf_itemPrice').checked,
+      totalSection: document.getElementById('pf_totalSection').checked,
+      footer:       document.getElementById('pf_footer').checked
+    };
+  }
+
+  function buildPreviewOrderLocal(){
+    if (Array.isArray(state.cart) && state.cart.length) return buildCartPreviewOrder();
+    return {
+      orderNo:'PREVIEW-'+Date.now(), createdAt:new Date().toISOString(),
+      orderType:'內用', tableNo:'A1', paymentMethod:'現金',
+      subtotal:145, discountAmount:0, total:145,
+      items:[{
+        rowId:'p1', productId:'p1', name:'雞排', basePrice:70, qty:2, note:'不要切',
+        selections:[{moduleName:'辣度',optionName:'小辣',price:0},{moduleName:'灑粉',optionName:'梅粉',price:5}],
+        extraPrice:5
+      }]
+    };
+  }
+
+  function buildReceiptHtmlLocal(order, mode, flags){
+    var cfg = getPrintSettings();
+    var w = Number(cfg.receiptPaperWidth||58);
+    var fs = Math.max(8, Number(cfg.receiptFontSize||12));
+    var ox = Number(cfg.receiptOffsetX||0);
+    var oy = Number(cfg.receiptOffsetY||0);
+    var isKitchen = mode==='kitchen';
+    var title = isKitchen ? '廚房出單' : '顧客收據';
+    var time = String(order.createdAt||'').replace('T',' ').slice(0,16);
+
+    var rows = (order.items||[]).map(function(item){
+      var up = Number(item.basePrice||0)+Number(item.extraPrice||0);
+      var subParts = [];
+      if(flags.itemSelections && (item.selections||[]).length){
+        subParts.push((item.selections||[]).map(function(s){ return s.moduleName+':'+s.optionName; }).join(' / '));
+      }
+      if(flags.itemNote && item.note) subParts.push('備註：'+item.note);
+      return '<div class="item-row">' +
+        '<div class="item-top"><div class="item-name">'+esc(item.name)+'</div><div class="item-qty">x '+Number(item.qty||0)+'</div></div>' +
+        (subParts.length ? '<div class="item-sub">'+esc(subParts.join(' ｜ '))+'</div>' : '') +
+        (flags.itemPrice && !isKitchen ? '<div class="item-sub">'+moneyFmt(up)+' / 小計 '+moneyFmt(up*Number(item.qty||0))+'</div>' : '') +
+      '</div>';
+    }).join('');
+
+    return '<!doctype html><html lang="zh-Hant"><head><meta charset="UTF-8"><style>' +
+      '@page{size:'+w+'mm auto;margin:0}' +
+      'body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC",sans-serif;color:#000}' +
+      '.sheet{width:'+w+'mm;padding:4mm;box-sizing:border-box;transform:translate('+ox+'mm,'+oy+'mm);font-size:'+fs+'px;line-height:1.45}' +
+      '.center{text-align:center}.title{font-size:'+(fs+5)+'px;font-weight:800}.sub{font-size:'+(fs-1)+'px;margin-top:2px}' +
+      '.line{border-top:1px dashed #000;margin:8px 0}.row{display:flex;justify-content:space-between;gap:8px}' +
+      '.item-row{padding:6px 0;border-bottom:1px dashed #bbb}.item-top{display:flex;justify-content:space-between;gap:8px;font-weight:700}' +
+      '.item-name{flex:1}.item-qty{white-space:nowrap}.item-sub{margin-top:3px;font-size:'+(fs-1)+'px;color:#333}' +
+      '.big{font-size:'+(fs+2)+'px;font-weight:800}.footer{margin-top:10px;text-align:center;font-size:'+(fs-1)+'px}' +
+    '</style></head><body><div class="sheet">' +
+      (flags.storeName ? '<div class="center"><div class="title">'+esc(cfg.storeName||'餐廳 POS')+'</div></div>' : '') +
+      (flags.storePhone && cfg.storePhone ? '<div class="center"><div class="sub">電話：'+esc(cfg.storePhone)+'</div></div>' : '') +
+      (flags.storeAddress && cfg.storeAddress ? '<div class="center"><div class="sub">地址：'+esc(cfg.storeAddress)+'</div></div>' : '') +
+      '<div class="center"><div class="sub">'+esc(title)+'</div></div>' +
+      '<div class="line"></div>' +
+      (flags.orderNo ? '<div class="sub">單號：'+esc(order.orderNo||'')+'</div>' : '') +
+      (flags.createdAt ? '<div class="sub">時間：'+esc(time)+'</div>' : '') +
+      (flags.orderType ? '<div class="sub">類型：'+esc(order.orderType||'')+(order.tableNo?' / '+esc(order.tableNo):'')+'</div>' : '') +
+      (flags.paymentMethod && !isKitchen ? '<div class="sub">付款：'+esc(order.paymentMethod||'')+'</div>' : '') +
+      '<div class="line"></div>' + rows +
+      (flags.totalSection && !isKitchen ?
+        '<div class="line"></div>' +
+        '<div class="row"><span>小計</span><strong>'+moneyFmt(order.subtotal||0)+'</strong></div>' +
+        '<div class="row"><span>折扣</span><strong>'+moneyFmt(order.discountAmount||0)+'</strong></div>' +
+        '<div class="row big"><span>合計</span><span>'+moneyFmt(order.total||0)+'</span></div>'
+      : '') +
+      (flags.footer && cfg.receiptFooter ? '<div class="line"></div><div class="footer">'+esc(cfg.receiptFooter)+'</div>' : '') +
+    '</div></body></html>';
+  }
+
+  function buildLabelHtmlLocal(order, flags){
+    var cfg = getPrintSettings();
+    var w = Math.max(30,Number(cfg.labelPaperWidth||60));
+    var h = Math.max(20,Number(cfg.labelPaperHeight||40));
+    var fs = Math.max(8,Number(cfg.labelFontSize||12));
+    var ox = Number(cfg.labelOffsetX||0);
+    var oy = Number(cfg.labelOffsetY||0);
+    var labels = (order.items||[]).map(function(item){
+      var subParts = [];
+      if(flags.itemSelections && (item.selections||[]).length){
+        subParts.push((item.selections||[]).map(function(s){ return s.moduleName+':'+s.optionName; }).join(' / '));
+      }
+      if(flags.itemNote && item.note) subParts.push('備註：'+item.note);
+      return '<div class="label">' +
+        (flags.storeName ? '<div class="store">'+esc(cfg.storeName||'餐廳 POS')+'</div>' : '') +
+        '<div class="main">'+esc(item.name)+' x '+Number(item.qty||0)+'</div>' +
+        (subParts.length ? '<div class="sub">'+esc(subParts.join(' ｜ '))+'</div>' : '') +
+        (flags.orderNo ? '<div class="sub">單號：'+esc(order.orderNo||'')+'</div>' : '') +
+        (flags.createdAt ? '<div class="sub">'+esc(String(order.createdAt||'').replace('T',' ').slice(0,16))+'</div>' : '') +
+      '</div>';
+    }).join('');
+    return '<!doctype html><html lang="zh-Hant"><head><meta charset="UTF-8"><style>' +
+      '@page{size:'+w+'mm '+h+'mm;margin:0}' +
+      'body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC",sans-serif;color:#000}' +
+      '.label{width:'+w+'mm;height:'+h+'mm;box-sizing:border-box;page-break-after:always;padding:3mm;' +
+      'transform:translate('+ox+'mm,'+oy+'mm);font-size:'+fs+'px;line-height:1.35}' +
+      '.store{font-size:'+(fs-1)+'px;font-weight:700}.main{font-size:'+(fs+3)+'px;font-weight:800;margin-top:2mm}' +
+      '.sub{font-size:'+(fs-1)+'px;margin-top:1mm}' +
+    '</style></head><body>'+labels+'</body></html>';
+  }
+
+  function openPreview(title, html){
+    var modal = document.getElementById('printPreviewModal');
+    var frame = document.getElementById('printPreviewFrame');
+    document.getElementById('printPreviewTitle').textContent = title;
+    modal.classList.remove('hidden');
+    var clean = html.replace(/<script[\s\S]*?<\/script>/gi,'');
+    var doc = frame.contentDocument || frame.contentWindow.document;
+    doc.open(); doc.write(clean); doc.close();
+  }
+  function closePreview(){
+    document.getElementById('printPreviewModal').classList.add('hidden');
+    var frame = document.getElementById('printPreviewFrame');
+    var doc = frame.contentDocument || frame.contentWindow.document;
+    doc.open(); doc.write(''); doc.close();
+  }
+  document.getElementById('printPreviewPrintBtn')?.addEventListener('click', function(){
+    var frame = document.getElementById('printPreviewFrame');
+    if(frame && frame.contentWindow) frame.contentWindow.print();
+  });
+  document.getElementById('closePrintPreviewModal')?.addEventListener('click', closePreview);
+  document.querySelector('#printPreviewModal .modal-backdrop')?.addEventListener('click', closePreview);
+
+  var pendingPreviewMode = null;
+  function openFieldsModal(mode){
+    pendingPreviewMode = mode;
+    var titles = { receipt:'預覽顧客單 — 選擇列印欄位', kitchen:'預覽廚房單 — 選擇列印欄位', label:'預覽標籤 — 選擇列印欄位' };
+    document.getElementById('printFieldsTitle').textContent = titles[mode] || '選擇列印欄位';
+
+    if(mode==='kitchen'){
+      document.querySelectorAll('#printFieldsModal input[type="checkbox"]').forEach(function(cb){ cb.checked = true; });
+      document.getElementById('pf_paymentMethod').checked = false;
+      document.getElementById('pf_itemPrice').checked = false;
+      document.getElementById('pf_totalSection').checked = false;
+      document.getElementById('pf_footer').checked = false;
+    } else if(mode==='label'){
+      document.querySelectorAll('#printFieldsModal input[type="checkbox"]').forEach(function(cb){ cb.checked = true; });
+      document.getElementById('pf_storePhone').checked = false;
+      document.getElementById('pf_storeAddress').checked = false;
+      document.getElementById('pf_orderType').checked = false;
+      document.getElementById('pf_paymentMethod').checked = false;
+      document.getElementById('pf_itemPrice').checked = false;
+      document.getElementById('pf_totalSection').checked = false;
+      document.getElementById('pf_footer').checked = false;
+    } else {
+      document.querySelectorAll('#printFieldsModal input[type="checkbox"]').forEach(function(cb){ cb.checked = true; });
+    }
+    document.getElementById('printFieldsModal').classList.remove('hidden');
+  }
+  function closeFieldsModal(){
+    document.getElementById('printFieldsModal').classList.add('hidden');
+    pendingPreviewMode = null;
+  }
+  document.getElementById('closePrintFieldsModal')?.addEventListener('click', closeFieldsModal);
+  document.getElementById('printFieldsCancelBtn')?.addEventListener('click', closeFieldsModal);
+  document.querySelector('#printFieldsModal .modal-backdrop')?.addEventListener('click', closeFieldsModal);
+
+  document.getElementById('printFieldsConfirmBtn')?.addEventListener('click', function(){
+    var flags = getFieldFlags();
+    var order = buildPreviewOrderLocal();
+    var html = '', title = '';
+    if(pendingPreviewMode==='receipt'){
+      html = buildReceiptHtmlLocal(order, 'customer', flags);
+      title = '預覽顧客單';
+    } else if(pendingPreviewMode==='kitchen'){
+      html = buildReceiptHtmlLocal(order, 'kitchen', flags);
+      title = '預覽廚房單';
+    } else if(pendingPreviewMode==='label'){
+      html = buildLabelHtmlLocal(order, flags);
+      title = '預覽標籤';
+    }
+    closeFieldsModal();
+    if(html) openPreview(title, html);
+  });
+
+  document.getElementById('previewReceiptPrintBtn')?.addEventListener('click', function(){ applyFormToConfig(); openFieldsModal('receipt'); });
+  document.getElementById('previewKitchenPrintBtn')?.addEventListener('click', function(){ applyFormToConfig(); openFieldsModal('kitchen'); });
+  document.getElementById('previewLabelPrintBtn')?.addEventListener('click', function(){ applyFormToConfig(); openFieldsModal('label'); });
+
   /** 把表單上目前填的值即時寫入設定（這樣預覽才會用到最新的數值） */
   function applyFormToConfig() {
     var cfg = getPrintSettings();
@@ -449,29 +653,211 @@ export function initSettingsPage() {
     cfg.labelOffsetY = Number(document.getElementById('printLabelOffsetY')?.value) || 0;
     cfg.kitchenCopies = Math.max(1, Number(document.getElementById('printKitchenCopies')?.value) || 1);
   }
+  // ============================
+  // 列印預覽（欄位選擇 → 浮動視窗預覽 → 列印）
+  // 完整搬自 v2332 舊版
+  // ============================
 
-  document.getElementById('previewReceiptPrintBtn')?.addEventListener('click', function() {
-    applyFormToConfig();
-    previewInModal(getReceiptHtml(buildPreviewOrder(), 'customer'));
+  function esc(text){
+    return String(text==null?'':text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+  function moneyFmt(v){ return '$' + Number(v||0).toFixed(0); }
+
+  function getFieldFlags(){
+    return {
+      storeName:    document.getElementById('pf_storeName').checked,
+      storePhone:   document.getElementById('pf_storePhone').checked,
+      storeAddress: document.getElementById('pf_storeAddress').checked,
+      orderNo:      document.getElementById('pf_orderNo').checked,
+      createdAt:    document.getElementById('pf_createdAt').checked,
+      orderType:    document.getElementById('pf_orderType').checked,
+      paymentMethod:document.getElementById('pf_paymentMethod').checked,
+      itemSelections:document.getElementById('pf_itemSelections').checked,
+      itemNote:     document.getElementById('pf_itemNote').checked,
+      itemPrice:    document.getElementById('pf_itemPrice').checked,
+      totalSection: document.getElementById('pf_totalSection').checked,
+      footer:       document.getElementById('pf_footer').checked
+    };
+  }
+
+  function buildPreviewOrderLocal(){
+    if (Array.isArray(state.cart) && state.cart.length) return buildCartPreviewOrder();
+    return {
+      orderNo:'PREVIEW-'+Date.now(), createdAt:new Date().toISOString(),
+      orderType:'內用', tableNo:'A1', paymentMethod:'現金',
+      subtotal:145, discountAmount:0, total:145,
+      items:[{
+        rowId:'p1', productId:'p1', name:'雞排', basePrice:70, qty:2, note:'不要切',
+        selections:[{moduleName:'辣度',optionName:'小辣',price:0},{moduleName:'灑粉',optionName:'梅粉',price:5}],
+        extraPrice:5
+      }]
+    };
+  }
+
+  function buildReceiptHtmlLocal(order, mode, flags){
+    var cfg = getPrintSettings();
+    var w = Number(cfg.receiptPaperWidth||58);
+    var fs = Math.max(8, Number(cfg.receiptFontSize||12));
+    var ox = Number(cfg.receiptOffsetX||0);
+    var oy = Number(cfg.receiptOffsetY||0);
+    var isKitchen = mode==='kitchen';
+    var title = isKitchen ? '廚房出單' : '顧客收據';
+    var time = String(order.createdAt||'').replace('T',' ').slice(0,16);
+
+    var rows = (order.items||[]).map(function(item){
+      var up = Number(item.basePrice||0)+Number(item.extraPrice||0);
+      var subParts = [];
+      if(flags.itemSelections && (item.selections||[]).length){
+        subParts.push((item.selections||[]).map(function(s){ return s.moduleName+':'+s.optionName; }).join(' / '));
+      }
+      if(flags.itemNote && item.note) subParts.push('備註：'+item.note);
+      return '<div class="item-row">' +
+        '<div class="item-top"><div class="item-name">'+esc(item.name)+'</div><div class="item-qty">x '+Number(item.qty||0)+'</div></div>' +
+        (subParts.length ? '<div class="item-sub">'+esc(subParts.join(' ｜ '))+'</div>' : '') +
+        (flags.itemPrice && !isKitchen ? '<div class="item-sub">'+moneyFmt(up)+' / 小計 '+moneyFmt(up*Number(item.qty||0))+'</div>' : '') +
+      '</div>';
+    }).join('');
+
+    return '<!doctype html><html lang="zh-Hant"><head><meta charset="UTF-8"><style>' +
+      '@page{size:'+w+'mm auto;margin:0}' +
+      'body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC",sans-serif;color:#000}' +
+      '.sheet{width:'+w+'mm;padding:4mm;box-sizing:border-box;transform:translate('+ox+'mm,'+oy+'mm);font-size:'+fs+'px;line-height:1.45}' +
+      '.center{text-align:center}.title{font-size:'+(fs+5)+'px;font-weight:800}.sub{font-size:'+(fs-1)+'px;margin-top:2px}' +
+      '.line{border-top:1px dashed #000;margin:8px 0}.row{display:flex;justify-content:space-between;gap:8px}' +
+      '.item-row{padding:6px 0;border-bottom:1px dashed #bbb}.item-top{display:flex;justify-content:space-between;gap:8px;font-weight:700}' +
+      '.item-name{flex:1}.item-qty{white-space:nowrap}.item-sub{margin-top:3px;font-size:'+(fs-1)+'px;color:#333}' +
+      '.big{font-size:'+(fs+2)+'px;font-weight:800}.footer{margin-top:10px;text-align:center;font-size:'+(fs-1)+'px}' +
+    '</style></head><body><div class="sheet">' +
+      (flags.storeName ? '<div class="center"><div class="title">'+esc(cfg.storeName||'餐廳 POS')+'</div></div>' : '') +
+      (flags.storePhone && cfg.storePhone ? '<div class="center"><div class="sub">電話：'+esc(cfg.storePhone)+'</div></div>' : '') +
+      (flags.storeAddress && cfg.storeAddress ? '<div class="center"><div class="sub">地址：'+esc(cfg.storeAddress)+'</div></div>' : '') +
+      '<div class="center"><div class="sub">'+esc(title)+'</div></div>' +
+      '<div class="line"></div>' +
+      (flags.orderNo ? '<div class="sub">單號：'+esc(order.orderNo||'')+'</div>' : '') +
+      (flags.createdAt ? '<div class="sub">時間：'+esc(time)+'</div>' : '') +
+      (flags.orderType ? '<div class="sub">類型：'+esc(order.orderType||'')+(order.tableNo?' / '+esc(order.tableNo):'')+'</div>' : '') +
+      (flags.paymentMethod && !isKitchen ? '<div class="sub">付款：'+esc(order.paymentMethod||'')+'</div>' : '') +
+      '<div class="line"></div>' + rows +
+      (flags.totalSection && !isKitchen ?
+        '<div class="line"></div>' +
+        '<div class="row"><span>小計</span><strong>'+moneyFmt(order.subtotal||0)+'</strong></div>' +
+        '<div class="row"><span>折扣</span><strong>'+moneyFmt(order.discountAmount||0)+'</strong></div>' +
+        '<div class="row big"><span>合計</span><span>'+moneyFmt(order.total||0)+'</span></div>'
+      : '') +
+      (flags.footer && cfg.receiptFooter ? '<div class="line"></div><div class="footer">'+esc(cfg.receiptFooter)+'</div>' : '') +
+    '</div></body></html>';
+  }
+
+  function buildLabelHtmlLocal(order, flags){
+    var cfg = getPrintSettings();
+    var w = Math.max(30,Number(cfg.labelPaperWidth||60));
+    var h = Math.max(20,Number(cfg.labelPaperHeight||40));
+    var fs = Math.max(8,Number(cfg.labelFontSize||12));
+    var ox = Number(cfg.labelOffsetX||0);
+    var oy = Number(cfg.labelOffsetY||0);
+    var labels = (order.items||[]).map(function(item){
+      var subParts = [];
+      if(flags.itemSelections && (item.selections||[]).length){
+        subParts.push((item.selections||[]).map(function(s){ return s.moduleName+':'+s.optionName; }).join(' / '));
+      }
+      if(flags.itemNote && item.note) subParts.push('備註：'+item.note);
+      return '<div class="label">' +
+        (flags.storeName ? '<div class="store">'+esc(cfg.storeName||'餐廳 POS')+'</div>' : '') +
+        '<div class="main">'+esc(item.name)+' x '+Number(item.qty||0)+'</div>' +
+        (subParts.length ? '<div class="sub">'+esc(subParts.join(' ｜ '))+'</div>' : '') +
+        (flags.orderNo ? '<div class="sub">單號：'+esc(order.orderNo||'')+'</div>' : '') +
+        (flags.createdAt ? '<div class="sub">'+esc(String(order.createdAt||'').replace('T',' ').slice(0,16))+'</div>' : '') +
+      '</div>';
+    }).join('');
+    return '<!doctype html><html lang="zh-Hant"><head><meta charset="UTF-8"><style>' +
+      '@page{size:'+w+'mm '+h+'mm;margin:0}' +
+      'body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC",sans-serif;color:#000}' +
+      '.label{width:'+w+'mm;height:'+h+'mm;box-sizing:border-box;page-break-after:always;padding:3mm;' +
+      'transform:translate('+ox+'mm,'+oy+'mm);font-size:'+fs+'px;line-height:1.35}' +
+      '.store{font-size:'+(fs-1)+'px;font-weight:700}.main{font-size:'+(fs+3)+'px;font-weight:800;margin-top:2mm}' +
+      '.sub{font-size:'+(fs-1)+'px;margin-top:1mm}' +
+    '</style></head><body>'+labels+'</body></html>';
+  }
+
+  function openPreview(title, html){
+    var modal = document.getElementById('printPreviewModal');
+    var frame = document.getElementById('printPreviewFrame');
+    document.getElementById('printPreviewTitle').textContent = title;
+    modal.classList.remove('hidden');
+    var clean = html.replace(/<script[\s\S]*?<\/script>/gi,'');
+    var doc = frame.contentDocument || frame.contentWindow.document;
+    doc.open(); doc.write(clean); doc.close();
+  }
+  function closePreview(){
+    document.getElementById('printPreviewModal').classList.add('hidden');
+    var frame = document.getElementById('printPreviewFrame');
+    var doc = frame.contentDocument || frame.contentWindow.document;
+    doc.open(); doc.write(''); doc.close();
+  }
+  document.getElementById('printPreviewPrintBtn')?.addEventListener('click', function(){
+    var frame = document.getElementById('printPreviewFrame');
+    if(frame && frame.contentWindow) frame.contentWindow.print();
   });
-  document.getElementById('previewKitchenPrintBtn')?.addEventListener('click', function() {
-    applyFormToConfig();
-    previewInModal(getReceiptHtml(buildPreviewOrder(), 'kitchen'));
-  });
-  document.getElementById('previewLabelPrintBtn')?.addEventListener('click', function() {
-    applyFormToConfig();
-    previewInModal(getLabelHtml(buildPreviewOrder()));
+  document.getElementById('closePrintPreviewModal')?.addEventListener('click', closePreview);
+  document.querySelector('#printPreviewModal .modal-backdrop')?.addEventListener('click', closePreview);
+
+  var pendingPreviewMode = null;
+  function openFieldsModal(mode){
+    pendingPreviewMode = mode;
+    var titles = { receipt:'預覽顧客單 — 選擇列印欄位', kitchen:'預覽廚房單 — 選擇列印欄位', label:'預覽標籤 — 選擇列印欄位' };
+    document.getElementById('printFieldsTitle').textContent = titles[mode] || '選擇列印欄位';
+
+    if(mode==='kitchen'){
+      document.querySelectorAll('#printFieldsModal input[type="checkbox"]').forEach(function(cb){ cb.checked = true; });
+      document.getElementById('pf_paymentMethod').checked = false;
+      document.getElementById('pf_itemPrice').checked = false;
+      document.getElementById('pf_totalSection').checked = false;
+      document.getElementById('pf_footer').checked = false;
+    } else if(mode==='label'){
+      document.querySelectorAll('#printFieldsModal input[type="checkbox"]').forEach(function(cb){ cb.checked = true; });
+      document.getElementById('pf_storePhone').checked = false;
+      document.getElementById('pf_storeAddress').checked = false;
+      document.getElementById('pf_orderType').checked = false;
+      document.getElementById('pf_paymentMethod').checked = false;
+      document.getElementById('pf_itemPrice').checked = false;
+      document.getElementById('pf_totalSection').checked = false;
+      document.getElementById('pf_footer').checked = false;
+    } else {
+      document.querySelectorAll('#printFieldsModal input[type="checkbox"]').forEach(function(cb){ cb.checked = true; });
+    }
+    document.getElementById('printFieldsModal').classList.remove('hidden');
+  }
+  function closeFieldsModal(){
+    document.getElementById('printFieldsModal').classList.add('hidden');
+    pendingPreviewMode = null;
+  }
+  document.getElementById('closePrintFieldsModal')?.addEventListener('click', closeFieldsModal);
+  document.getElementById('printFieldsCancelBtn')?.addEventListener('click', closeFieldsModal);
+  document.querySelector('#printFieldsModal .modal-backdrop')?.addEventListener('click', closeFieldsModal);
+
+  document.getElementById('printFieldsConfirmBtn')?.addEventListener('click', function(){
+    var flags = getFieldFlags();
+    var order = buildPreviewOrderLocal();
+    var html = '', title = '';
+    if(pendingPreviewMode==='receipt'){
+      html = buildReceiptHtmlLocal(order, 'customer', flags);
+      title = '預覽顧客單';
+    } else if(pendingPreviewMode==='kitchen'){
+      html = buildReceiptHtmlLocal(order, 'kitchen', flags);
+      title = '預覽廚房單';
+    } else if(pendingPreviewMode==='label'){
+      html = buildLabelHtmlLocal(order, flags);
+      title = '預覽標籤';
+    }
+    closeFieldsModal();
+    if(html) openPreview(title, html);
   });
 
-  document.getElementById('previewReceiptPrintBtn')?.addEventListener('click', function() {
-    previewInModal(getReceiptHtml(buildPreviewOrder(), 'customer'));
-  });
-  document.getElementById('previewKitchenPrintBtn')?.addEventListener('click', function() {
-    previewInModal(getReceiptHtml(buildPreviewOrder(), 'kitchen'));
-  });
-  document.getElementById('previewLabelPrintBtn')?.addEventListener('click', function() {
-    previewInModal(getLabelHtml(buildPreviewOrder()));
-  });
+  document.getElementById('previewReceiptPrintBtn')?.addEventListener('click', function(){ applyFormToConfig(); openFieldsModal('receipt'); });
+  document.getElementById('previewKitchenPrintBtn')?.addEventListener('click', function(){ applyFormToConfig(); openFieldsModal('kitchen'); });
+  document.getElementById('previewLabelPrintBtn')?.addEventListener('click', function(){ applyFormToConfig(); openFieldsModal('label'); });
+
+  
 
   // ============================
   // Sunmi 印表機
