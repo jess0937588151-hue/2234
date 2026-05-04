@@ -573,9 +573,16 @@ export function initSettingsPage() {
     doc.open(); doc.write(''); doc.close();
   }
   document.getElementById('printPreviewPrintBtn')?.addEventListener('click', function(){
-    var frame = document.getElementById('printPreviewFrame');
-    if(frame && frame.contentWindow) frame.contentWindow.print();
-  });
+  var order = buildPreviewOrderLocal();
+  if(pendingPreviewMode === 'kitchen'){
+    printKitchenCopies(order);
+  } else if(pendingPreviewMode === 'label'){
+    printOrderLabels(order);
+  } else {
+    printOrderReceipt(order, 'customer');
+  }
+});
+
   document.getElementById('closePrintPreviewModal')?.addEventListener('click', closePreview);
   document.querySelector('#printPreviewModal .modal-backdrop')?.addEventListener('click', closePreview);
 
