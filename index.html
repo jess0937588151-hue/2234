@@ -836,6 +836,22 @@
 
   </div>
 </div>
+
+  <!-- 列印預覽 modal -->
+<div id="printPreviewModal" class="modal hidden">
+  <div class="modal-backdrop"></div>
+  <div class="modal-dialog" style="max-width:600px;width:92vw;max-height:90vh;display:flex;flex-direction:column">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #e2e8f0">
+      <strong>🖨 列印預覽</strong>
+      <button id="closePrintPreviewModal" class="ghost-btn" style="font-size:20px;border:none;background:none;cursor:pointer">✕</button>
+    </div>
+    <iframe id="printPreviewFrame" style="flex:1;width:100%;min-height:400px;border:none;background:#fff"></iframe>
+    <div style="padding:12px 16px;border-top:1px solid #e2e8f0;text-align:right">
+      <button id="printPreviewPrintBtn" class="primary-btn">🖨 列印</button>
+    </div>
+  </div>
+</div>
+
 <!-- 班次列印選項 -->
 <div id="printOptionsModal" class="modal hidden" style="z-index:10000">
   <div class="modal-backdrop"></div>
