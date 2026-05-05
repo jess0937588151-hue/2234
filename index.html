@@ -403,26 +403,26 @@
       <div class="sm-check-row"><input id="printAutoCheckout" type="checkbox"><span>結帳後自動列印顧客單</span></div>
       <div class="sm-check-row"><input id="printAutoKitchen" type="checkbox"><span>點餐結帳或待付款時自動列印廚房單</span></div>
 
-            <div class="sm-section-title">列印欄位（套用全系統列印）</div>
+                  <div class="sm-section-title">列印欄位（顧客單 / 廚房單 / 標籤 各自勾選）</div>
       <div class="sm-info-box" style="font-size:12px;color:#64748b;margin-bottom:8px">
-        勾選的項目會套用到顧客單、廚房單、標籤、線上接單列印。儲存後立即生效。
+        每個欄位有三個勾：左 = 顧客單，中 = 廚房單，右 = 標籤。儲存後套用到全系統列印（訂單查詢、結帳、線上接單）。
       </div>
-      <div class="stack" style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-        <label class="inline-check"><input type="checkbox" id="pfg_storeName"> 店名</label>
-        <label class="inline-check"><input type="checkbox" id="pfg_storePhone"> 電話</label>
-        <label class="inline-check"><input type="checkbox" id="pfg_storeAddress"> 地址</label>
-        <label class="inline-check"><input type="checkbox" id="pfg_orderNo"> 單號</label>
-        <label class="inline-check"><input type="checkbox" id="pfg_createdAt"> 時間</label>
-        <label class="inline-check"><input type="checkbox" id="pfg_orderType"> 類型/桌號</label>
-        <label class="inline-check"><input type="checkbox" id="pfg_paymentMethod"> 付款方式</label>
-        <label class="inline-check"><input type="checkbox" id="pfg_customerInfo"> 顧客資訊</label>
-        <label class="inline-check"><input type="checkbox" id="pfg_itemSelections"> 品項模組</label>
-        <label class="inline-check"><input type="checkbox" id="pfg_itemNote"> 品項備註</label>
-        <label class="inline-check"><input type="checkbox" id="pfg_itemPrice"> 品項金額</label>
-        <label class="inline-check"><input type="checkbox" id="pfg_totalSection"> 合計區塊</label>
-        <label class="inline-check"><input type="checkbox" id="pfg_orderNote"> 訂單備註</label>
-        <label class="inline-check"><input type="checkbox" id="pfg_footer"> 收據備註</label>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="background:#f1f5f9;text-align:center">
+              <th style="text-align:left;padding:6px 8px">欄位</th>
+              <th style="padding:6px 4px;width:48px">顧客單</th>
+              <th style="padding:6px 4px;width:48px">廚房單</th>
+              <th style="padding:6px 4px;width:48px">標籤</th>
+            </tr>
+          </thead>
+          <tbody id="printFieldsMatrixBody">
+            <!-- 由 settings-page.js 動態產生 -->
+          </tbody>
+        </table>
       </div>
+
 
       <div class="sm-section-title">預覽</div>
       <div class="sm-btn-row">
