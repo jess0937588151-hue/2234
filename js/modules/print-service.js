@@ -539,17 +539,16 @@ export async function printOrderReceipt(order, mode){
   const payload = buildBridgePayload(order, realMode);
   const jsonStr = JSON.stringify(payload);
   const html = getReceiptHtml(order, realMode === 'kitchen' ? 'kitchen' : 'customer');
+  const title = realMode === 'kitchen' ? '廚房單' : '顧客收據';
 
-      // 1) Sunmi 內建 — 用 printText（純文字，APK 端不會開錢箱、不會印出 CSS）
-  if(hasSunmi() && typeof window.SunmiPrinter.printText === 'function'){
+  // 1) Sunmi 內建 — 用 printReceipt（APK 端會自動切紙、不會開錢箱）
+  if(hasSunmi() && typeof window.SunmiPrinter.printReceipt === 'function'){
     try {
       const txt = buildPlainTextFromOrder(order, realMode);
-      const ok = window.SunmiPrinter.printText(txt);
-      if(ok !== false) return { route:'sunmi-text', ok:true };
-    } catch(e) { console.warn('Sunmi printText 失敗：', e); }
+      const ok = window.SunmiPrinter.printReceipt(title, txt);
+      if(ok !== false) return { route:'sunmi-receipt', ok:true };
+    } catch(e) { console.warn('Sunmi printReceipt 失敗：', e); }
   }
-
-
 
   // 2) 藍牙
   if(hasSunmi() && typeof window.SunmiPrinter.isBtPrinterConnected === 'function'
@@ -571,7 +570,7 @@ export async function printOrderReceipt(order, mode){
     } catch(e) {}
   }
 
-  // 4) 瀏覽器 fallback（最後手段）
+  // 4) 瀏覽器 fallback
   await browserPrintHtml(html);
   return { route:'browser', ok:true };
 }
@@ -589,17 +588,16 @@ export async function printKitchenCopies(order){
   for(let i = 0; i < copies; i++){
     let printed = false;
 
-            // 1) Sunmi printText（純文字）
-    if(!printed && hasSunmi() && typeof window.SunmiPrinter.printText === 'function'){
+    // 1) Sunmi printReceipt（會自動切紙、不開錢箱）
+    if(!printed && hasSunmi() && typeof window.SunmiPrinter.printReceipt === 'function'){
       try {
         const txt = buildPlainTextFromOrder(order, 'kitchen');
-        const r = window.SunmiPrinter.printText(txt);
+        const r = window.SunmiPrinter.printReceipt('廚房單', txt);
         if(r !== false) printed = true;
       } catch(e) { console.warn('Sunmi 廚房單失敗：', e); }
     }
 
-
-    // 2) 藍牙廚房（有專屬 btPrintKitchen）
+    // 2) 藍牙
     if(!printed && hasSunmi()
        && typeof window.SunmiPrinter.isBtPrinterConnected === 'function'
        && window.SunmiPrinter.isBtPrinterConnected()
@@ -608,7 +606,7 @@ export async function printKitchenCopies(order){
       catch(e) {}
     }
 
-    // 3) 網路廚房（有專屬 netPrintKitchen）
+    // 3) 網路
     if(!printed && hasSunmi()
        && typeof window.SunmiPrinter.isNetPrinterConnected === 'function'
        && window.SunmiPrinter.isNetPrinterConnected()
@@ -625,6 +623,7 @@ export async function printKitchenCopies(order){
   return { ok:true, copies };
 }
 
+
 // ============================================================
 // 主路由：標籤（APK 沒專屬標籤 API，走 printPosReceipt 或瀏覽器）
 // ============================================================
@@ -633,18 +632,16 @@ export async function printOrderLabels(order){
   const jsonStr = JSON.stringify(payload);
   const html = getLabelHtml(order);
 
-      // 1) Sunmi printText（純文字）
-  if(hasSunmi() && typeof window.SunmiPrinter.printText === 'function'){
+  // 1) Sunmi printReceipt（會自動切紙、不開錢箱）
+  if(hasSunmi() && typeof window.SunmiPrinter.printReceipt === 'function'){
     try {
       const txt = buildPlainTextFromOrder(order, 'label');
-      const ok = window.SunmiPrinter.printText(txt);
-      if(ok !== false) return { route:'sunmi-text', ok:true };
+      const ok = window.SunmiPrinter.printReceipt('標籤', txt);
+      if(ok !== false) return { route:'sunmi-receipt', ok:true };
     } catch(e) { console.warn('Sunmi 標籤失敗：', e); }
   }
 
-
-
-  // 2) 藍牙（沒專屬標籤 API，走 btPrintReceipt）
+  // 2) 藍牙
   if(hasSunmi()
      && typeof window.SunmiPrinter.isBtPrinterConnected === 'function'
      && window.SunmiPrinter.isBtPrinterConnected()
