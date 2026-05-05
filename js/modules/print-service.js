@@ -88,6 +88,82 @@ function fmtDate(s){
   if(!s) return '';
   return String(s).replace('T',' ').slice(0,16);
 }
+// 把訂單轉成純文字（給 Sunmi printText 用，避免 CSS 被當文字印出）
+function buildPlainTextFromOrder(order, mode){
+  const cfg = getPrintSettings();
+  const isKitchen = mode === 'kitchen';
+  const isLabel = mode === 'label';
+  const fields = cfg.fields[isKitchen ? 'kitchen' : (isLabel ? 'label' : 'receipt')];
+  const lines = [];
+  const sep = '--------------------------------';
+
+  if(fields.storeName && cfg.storeName) lines.push(cfg.storeName);
+  if(isKitchen) lines.push('** 廚房單 **');
+  if(isLabel) lines.push('** 標籤 **');
+  if(!isKitchen && !isLabel){
+    if(fields.storePhone && cfg.storePhone) lines.push('電話：' + cfg.storePhone);
+    if(fields.storeAddress && cfg.storeAddress) lines.push('地址：' + cfg.storeAddress);
+  }
+  lines.push(sep);
+
+  if(fields.orderNo) lines.push('單號：' + (order.orderNo || order.id || ''));
+  if(fields.dateTime) lines.push('時間：' + fmtDate(order.createdAt));
+  if(fields.orderType){
+    const t = (order.orderType || '') + (order.tableNo ? ' / ' + order.tableNo : '');
+    if(t.trim()) lines.push('類型：' + t);
+  }
+  if(fields.customerInfo){
+    const cName = order.customerName || '';
+    const cPhone = maskCustomerPhone(order.customerPhone) || '';
+    if(cName || cPhone) lines.push('顧客：' + cName + (cPhone ? ' / ' + cPhone : ''));
+  }
+  if(!isKitchen && !isLabel && fields.paymentMethod && order.paymentMethod){
+    lines.push('付款：' + order.paymentMethod);
+  }
+  lines.push(sep);
+
+  if(fields.items){
+    (order.items || []).forEach(it => {
+      const name = it.name || '';
+      const qty = Number(it.qty || 0);
+      const sel = buildSelectionText(it);
+      const note = it.note || '';
+      const unitPrice = Number(it.basePrice || 0) + Number(it.extraPrice || 0);
+      const lineTotal = unitPrice * qty;
+      if(isKitchen || isLabel){
+        lines.push(name + (fields.itemQty ? ' x' + qty : ''));
+      } else {
+        const left = name + (fields.itemQty ? ' x' + qty : '');
+        const right = fields.itemPrice ? '$' + lineTotal : '';
+        lines.push(right ? (left + '  ' + right) : left);
+      }
+      if(sel) lines.push('  ' + sel);
+      if(fields.itemNote && note) lines.push('  備註：' + note);
+    });
+  }
+
+  if(fields.orderNote && order.customerNote){
+    lines.push(sep);
+    lines.push('訂單備註：' + order.customerNote);
+  }
+
+  if(!isKitchen && !isLabel){
+    lines.push(sep);
+    if(fields.subtotal) lines.push('小計  $' + Number(order.subtotal || order.total || 0));
+    if(fields.discount && Number(order.discountAmount || 0) > 0){
+      lines.push('折扣  -$' + Number(order.discountAmount));
+    }
+    if(fields.total) lines.push('合計  $' + Number(order.total || 0));
+    if(fields.footer && cfg.receiptFooter){
+      lines.push(sep);
+      lines.push(cfg.receiptFooter);
+    }
+  }
+
+  lines.push('');
+  lines.push('');
+  return lines.join('\n');
+}
 
 // ============================================================
 // 預覽 modal（配合 index.html 既有元素）
@@ -464,13 +540,15 @@ export async function printOrderReceipt(order, mode){
   const jsonStr = JSON.stringify(payload);
   const html = getReceiptHtml(order, realMode === 'kitchen' ? 'kitchen' : 'customer');
 
-    // 1) Sunmi 內建 — 用 printHtml（不會開錢箱、且會照網頁 HTML 列印）
-  if(hasSunmi() && typeof window.SunmiPrinter.printHtml === 'function'){
+      // 1) Sunmi 內建 — 用 printText（純文字，APK 端不會開錢箱、不會印出 CSS）
+  if(hasSunmi() && typeof window.SunmiPrinter.printText === 'function'){
     try {
-      const ok = window.SunmiPrinter.printHtml(realMode === 'kitchen' ? '廚房單' : '顧客收據', html);
-      if(ok !== false) return { route:'sunmi-html', ok:true };
-    } catch(e) { console.warn('Sunmi printHtml 失敗：', e); }
+      const txt = buildPlainTextFromOrder(order, realMode);
+      const ok = window.SunmiPrinter.printText(txt);
+      if(ok !== false) return { route:'sunmi-text', ok:true };
+    } catch(e) { console.warn('Sunmi printText 失敗：', e); }
   }
+
 
 
   // 2) 藍牙
@@ -511,10 +589,11 @@ export async function printKitchenCopies(order){
   for(let i = 0; i < copies; i++){
     let printed = false;
 
-        // 1) Sunmi printHtml（不會開錢箱）
-    if(!printed && hasSunmi() && typeof window.SunmiPrinter.printHtml === 'function'){
+            // 1) Sunmi printText（純文字）
+    if(!printed && hasSunmi() && typeof window.SunmiPrinter.printText === 'function'){
       try {
-        const r = window.SunmiPrinter.printHtml('廚房單', html);
+        const txt = buildPlainTextFromOrder(order, 'kitchen');
+        const r = window.SunmiPrinter.printText(txt);
         if(r !== false) printed = true;
       } catch(e) { console.warn('Sunmi 廚房單失敗：', e); }
     }
@@ -554,13 +633,15 @@ export async function printOrderLabels(order){
   const jsonStr = JSON.stringify(payload);
   const html = getLabelHtml(order);
 
-    // 1) Sunmi printHtml（不會開錢箱）
-  if(hasSunmi() && typeof window.SunmiPrinter.printHtml === 'function'){
+      // 1) Sunmi printText（純文字）
+  if(hasSunmi() && typeof window.SunmiPrinter.printText === 'function'){
     try {
-      const ok = window.SunmiPrinter.printHtml('標籤', html);
-      if(ok !== false) return { route:'sunmi-html', ok:true };
+      const txt = buildPlainTextFromOrder(order, 'label');
+      const ok = window.SunmiPrinter.printText(txt);
+      if(ok !== false) return { route:'sunmi-text', ok:true };
     } catch(e) { console.warn('Sunmi 標籤失敗：', e); }
   }
+
 
 
   // 2) 藍牙（沒專屬標籤 API，走 btPrintReceipt）
