@@ -88,6 +88,113 @@ function fmtDate(s){
   if(!s) return '';
   return String(s).replace('T',' ').slice(0,16);
 }
+// 用 printTextWithFont 逐行印出，可控制字體大小，最後切紙
+// 回傳 true 表示已成功送出 Sunmi 列印
+function sunmiPrintReceiptByFont(order, mode){
+  if(!hasSunmi() || typeof window.SunmiPrinter.printTextWithFont !== 'function') return false;
+  const cfg = getPrintSettings();
+  const fields = cfg.fields[mode === 'kitchen' ? 'kitchen' : (mode === 'label' ? 'label' : 'receipt')];
+  const isKitchen = mode === 'kitchen';
+  const isLabel = mode === 'label';
+  const baseSize = isLabel
+    ? Math.max(16, Number(cfg.labelFontSize || 12) * 2)        // 設定值是 px，APK 用 pt，乘 2 接近
+    : Math.max(16, Number(cfg.receiptFontSize || 12) * 2);
+  const bigSize = baseSize + 8;
+  const smallSize = Math.max(14, baseSize - 4);
+  const sep = '--------------------------------\n';
+  const sp = window.SunmiPrinter;
+
+  function line(text, size){
+    try { sp.printTextWithFont(String(text || '') + '\n', '', size || baseSize); }
+    catch(e){ console.warn('printTextWithFont 失敗', e); }
+  }
+
+  try {
+    // 抬頭
+    if(fields.storeName && cfg.storeName) line(cfg.storeName, bigSize);
+    if(isKitchen) line('** 廚房單 **', bigSize);
+    if(isLabel) line('** 標籤 **', bigSize);
+    if(!isKitchen && !isLabel){
+      if(fields.storePhone && cfg.storePhone) line('電話：' + cfg.storePhone, smallSize);
+      if(fields.storeAddress && cfg.storeAddress) line('地址：' + cfg.storeAddress, smallSize);
+    }
+    line(sep, smallSize);
+
+    // 訂單資訊
+    if(fields.orderNo) line('單號：' + (order.orderNo || order.id || ''), baseSize);
+    if(fields.dateTime) line('時間：' + fmtDate(order.createdAt), baseSize);
+    if(fields.orderType){
+      const t = (order.orderType || '') + (order.tableNo ? ' / ' + order.tableNo : '');
+      if(t.trim()) line('類型：' + t, baseSize);
+    }
+    if(fields.customerInfo){
+      const cName = order.customerName || '';
+      const cPhone = maskCustomerPhone(order.customerPhone) || '';
+      if(cName || cPhone) line('顧客：' + cName + (cPhone ? ' / ' + cPhone : ''), baseSize);
+    }
+    if(!isKitchen && !isLabel && fields.paymentMethod && order.paymentMethod){
+      line('付款：' + order.paymentMethod, baseSize);
+    }
+    line(sep, smallSize);
+
+    // 品項
+    if(fields.items){
+      (order.items || []).forEach(it => {
+        const name = it.name || '';
+        const qty = Number(it.qty || 0);
+        const sel = (function(item){
+          if(!item || !Array.isArray(item.selections)) return '';
+          return item.selections.map(s => s.moduleName + ':' + s.optionName).join(' / ');
+        })(it);
+        const note = it.note || '';
+        const unitPrice = Number(it.basePrice || 0) + Number(it.extraPrice || 0);
+        const lineTotal = unitPrice * qty;
+
+        if(isKitchen || isLabel){
+          line(name + (fields.itemQty ? ' x' + qty : ''), bigSize);
+        } else {
+          // 顧客單：商品 x數量      $金額
+          const left = name + (fields.itemQty ? ' x' + qty : '');
+          const right = '$' + lineTotal;        // 強制印單品金額，不再受 itemPrice 勾選影響
+          line(left + '   ' + right, baseSize);
+        }
+        if(sel) line('  ' + sel, smallSize);
+        if(fields.itemNote && note) line('  備註：' + note, smallSize);
+      });
+    }
+
+    if(fields.orderNote && order.customerNote){
+      line(sep, smallSize);
+      line('訂單備註：' + order.customerNote, baseSize);
+    }
+
+    // 顧客單一定要印金額（強制，不看 fields）
+    if(!isKitchen && !isLabel){
+      line(sep, smallSize);
+      line('小計      $' + Number(order.subtotal || order.total || 0), baseSize);
+      if(Number(order.discountAmount || 0) > 0){
+        line('折扣     -$' + Number(order.discountAmount), baseSize);
+      }
+      line('合計      $' + Number(order.total || 0), bigSize);
+      if(cfg.receiptFooter){
+        line(sep, smallSize);
+        line(cfg.receiptFooter, baseSize);
+      }
+    }
+
+    // 留白 + 切紙
+    line(' ', smallSize);
+    line(' ', smallSize);
+    if(typeof sp.cutPaper === 'function'){
+      try { sp.cutPaper(); } catch(e) {}
+    }
+    return true;
+  } catch(e) {
+    console.warn('sunmiPrintReceiptByFont 失敗', e);
+    return false;
+  }
+}
+
 // 把訂單轉成純文字（給 Sunmi printText 用，避免 CSS 被當文字印出）
 function buildPlainTextFromOrder(order, mode){
   const cfg = getPrintSettings();
@@ -539,15 +646,10 @@ export async function printOrderReceipt(order, mode){
   const payload = buildBridgePayload(order, realMode);
   const jsonStr = JSON.stringify(payload);
   const html = getReceiptHtml(order, realMode === 'kitchen' ? 'kitchen' : 'customer');
-  const title = realMode === 'kitchen' ? '廚房單' : '顧客收據';
 
-  // 1) Sunmi 內建 — 用 printReceipt（APK 端會自動切紙、不會開錢箱）
-  if(hasSunmi() && typeof window.SunmiPrinter.printReceipt === 'function'){
-    try {
-      const txt = buildPlainTextFromOrder(order, realMode);
-      const ok = window.SunmiPrinter.printReceipt(title, txt);
-      if(ok !== false) return { route:'sunmi-receipt', ok:true };
-    } catch(e) { console.warn('Sunmi printReceipt 失敗：', e); }
+  // 1) Sunmi printTextWithFont（依設定頁字體大小，自動切紙，不開錢箱，金額一定印）
+  if(sunmiPrintReceiptByFont(order, realMode)){
+    return { route:'sunmi-font', ok:true };
   }
 
   // 2) 藍牙
@@ -588,13 +690,9 @@ export async function printKitchenCopies(order){
   for(let i = 0; i < copies; i++){
     let printed = false;
 
-    // 1) Sunmi printReceipt（會自動切紙、不開錢箱）
-    if(!printed && hasSunmi() && typeof window.SunmiPrinter.printReceipt === 'function'){
-      try {
-        const txt = buildPlainTextFromOrder(order, 'kitchen');
-        const r = window.SunmiPrinter.printReceipt('廚房單', txt);
-        if(r !== false) printed = true;
-      } catch(e) { console.warn('Sunmi 廚房單失敗：', e); }
+    // 1) Sunmi printTextWithFont
+    if(!printed && sunmiPrintReceiptByFont(order, 'kitchen')){
+      printed = true;
     }
 
     // 2) 藍牙
@@ -632,13 +730,9 @@ export async function printOrderLabels(order){
   const jsonStr = JSON.stringify(payload);
   const html = getLabelHtml(order);
 
-  // 1) Sunmi printReceipt（會自動切紙、不開錢箱）
-  if(hasSunmi() && typeof window.SunmiPrinter.printReceipt === 'function'){
-    try {
-      const txt = buildPlainTextFromOrder(order, 'label');
-      const ok = window.SunmiPrinter.printReceipt('標籤', txt);
-      if(ok !== false) return { route:'sunmi-receipt', ok:true };
-    } catch(e) { console.warn('Sunmi 標籤失敗：', e); }
+  // 1) Sunmi printTextWithFont
+  if(sunmiPrintReceiptByFont(order, 'label')){
+    return { route:'sunmi-font', ok:true };
   }
 
   // 2) 藍牙
