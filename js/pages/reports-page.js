@@ -180,7 +180,8 @@ function renderHistorySessionsInModal(dateFrom, dateTo){
   const el = document.getElementById('historySessionsList');
   if(!el) return;
 
-  let list = (state.sessions || []).filter(s => s.endedAt);
+  // ★ 修正：班次儲存在 state.reports.sessions，不是 state.sessions
+  let list = ((state.reports && state.reports.sessions) || []).filter(s => s.endedAt);
 
   if(dateFrom){
     const from = new Date(dateFrom + 'T00:00:00');
@@ -190,8 +191,6 @@ function renderHistorySessionsInModal(dateFrom, dateTo){
     const to = new Date(dateTo + 'T23:59:59');
     list = list.filter(s => new Date(s.endedAt) <= to);
   }
-
-  // 預設近 30 天
   if(!dateFrom && !dateTo){
     const cutoff = Date.now() - 30*24*3600*1000;
     list = list.filter(s => new Date(s.endedAt).getTime() >= cutoff);
@@ -232,11 +231,11 @@ function renderHistorySessionsInModal(dateFrom, dateTo){
     `;
   }).join('');
 
-  // 綁定點擊
   el.querySelectorAll('.history-session-card').forEach(card => {
     card.addEventListener('click', () => {
       const sid = card.dataset.sessionId;
-      const session = (state.sessions || []).find(s => s.id === sid);
+      // ★ 修正：同樣改讀 state.reports.sessions
+      const session = ((state.reports && state.reports.sessions) || []).find(s => s.id === sid);
       if(session){
         document.getElementById('historySessionsModal').classList.add('hidden');
         openSessionSummaryModal(session);
@@ -339,7 +338,7 @@ function openEndSessionModal(){
   const cur = getCurrentSession();
   if(!cur){
     // 沒有進行中的班次 → 詢問是否查看最近一次已結束班次的摘要
-    const sessions = (state.sessions || []).filter(s => s.endedAt).sort((a,b) => new Date(b.endedAt) - new Date(a.endedAt));
+const sessions = ((state.reports && state.reports.sessions) || []).filter(s => s.endedAt).sort((a,b) => new Date(b.endedAt) - new Date(a.endedAt));
     if(sessions.length > 0){
       if(confirm('目前沒有進行中的班次。\n\n是否查看最近一次已結束班次的摘要？')){
         openSessionSummaryModal(sessions[0]);
