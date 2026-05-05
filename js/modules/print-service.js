@@ -233,7 +233,7 @@ function buildPlainTextFromOrder(order, mode){
     (order.items || []).forEach(it => {
       const name = it.name || '';
       const qty = Number(it.qty || 0);
-      const sel = buildSelectionText(it);
+      const sel = fields.itemSelections !== false ? buildSelectionText(it) : '';
       const note = it.note || '';
       const unitPrice = Number(it.basePrice || 0) + Number(it.extraPrice || 0);
       const lineTotal = unitPrice * qty;
