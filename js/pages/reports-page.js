@@ -899,25 +899,149 @@ function exportSessionCsv(session){
 
 
 
-// ──────────────────────────────────────────────
-// 列印 / 匯出（簡化版，06.16/8 會做選擇對話框）
-// ──────────────────────────────────────────────
 
+// ──────────────────────────────────────────────
+// 匯出 Excel（.xlsx）
+//   - 有開班：匯出當前班次
+//   - 沒開班：匯出最近一個已結束班次（並提示）
+//   - 班次明細含「班次摘要」+「訂單明細」兩個工作表
+// ──────────────────────────────────────────────
 function exportCurrentReportCsv(){
-  const cur = getCurrentSession();
-  if(!cur){ alert('尚未開班，無法匯出'); return; }
-  const orders = getCurrentSessionOrders();
-  const rows = [['訂單編號','時間','類型','付款','金額']];
-    orders.forEach(o => rows.push([
-    o.orderNo||o.id,
-    fmtLocalDateTime(o.createdAt),
-    o.orderType||'',
-    o.paymentMethod||'',
-    Number(o.total||0)
-  ]));
-  // BOM 修正中文
-  const csv = '\uFEFF' + rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
-  downloadFile(`班次_${cur.staffId}_${new Date().toISOString().slice(0,10)}.csv`, csv, 'text/csv');
+  try {
+    if(typeof XLSX === 'undefined' || !XLSX){
+      alert('Excel 函式庫尚未載入，請重新整理頁面再試');
+      return;
+    }
+
+    // 1) 決定要匯出哪個班次
+    let session = getCurrentSession();
+    let orders;
+    if(session){
+      orders = getCurrentSessionOrders();
+    } else {
+      const list = ((state.reports && state.reports.sessions) || [])
+        .filter(s => s.endedAt)
+        .sort((a,b) => new Date(b.endedAt) - new Date(a.endedAt));
+      if(!list.length){
+        alert('尚無任何班次紀錄，無法匯出');
+        return;
+      }
+      session = list[0];
+      orders = (state.orders || []).filter(o => o.sessionId === session.id);
+      // 後備：舊資料沒寫 sessionId 時，用時間範圍補抓
+      if(!orders.length && session.startedAt && session.endedAt){
+        const s = new Date(session.startedAt).getTime();
+        const e = new Date(session.endedAt).getTime();
+        orders = (state.orders || []).filter(o => {
+          if(o.sessionId) return false;
+          const t = new Date(o.createdAt || 0).getTime();
+          return t >= s && t <= e;
+        });
+      }
+    }
+
+    // 2) 統計
+    const sales = orders.reduce((s,o)=>s+Number(o.total||0),0);
+    const count = orders.length;
+    const avg = count ? Math.round(sales/count) : 0;
+    const discount = orders.reduce((s,o) => {
+      const itemDis = (o.items||[]).reduce((ss, it) => {
+        if(it.productId === '_discount_'){
+          return ss + (Number(it.basePrice||0) + Number(it.extraPrice||0)) * Number(it.qty||1);
+        }
+        return ss;
+      }, 0);
+      return s + Math.abs(itemDis) + Number(o.discountAmount||0);
+    }, 0);
+
+    const typeMap = {}, payMap = {};
+    orders.forEach(o => {
+      const tk = o.orderType || '未分類';
+      typeMap[tk] = typeMap[tk] || {count:0, sales:0};
+      typeMap[tk].count++; typeMap[tk].sales += Number(o.total||0);
+      const pk = o.paymentMethod || '未設定';
+      payMap[pk] = (payMap[pk]||0) + Number(o.total||0);
+    });
+
+    // 3) 工作表 1：班次摘要
+    const summary = [
+      ['班次報表'],
+      ['班次ID', session.id || ''],
+      ['值班人員', session.staffId || ''],
+      ['結束人員', session.endStaffId || ''],
+      ['開班時間', fmtLocalDateTime(session.startedAt)],
+      ['結班時間', session.endedAt ? fmtLocalDateTime(session.endedAt) : '進行中'],
+      [],
+      ['營業額', sales],
+      ['訂單數', count],
+      ['客單價', avg],
+      ['折扣總額', discount],
+      [],
+      ['開班備用金', Number(session.openingCash || 0)],
+      ['應有現金', Number(session.expectedCash || 0)],
+      ['實收現金', Number(session.closingCash || 0)],
+      ['現金差異', Number(session.cashDiff || 0)],
+      ['備註', session.note || ''],
+      [],
+      ['── 訂單類型 ──'],
+      ['類型', '單數', '金額'],
+      ...Object.entries(typeMap).map(([k,v]) => [k, v.count, v.sales]),
+      [],
+      ['── 付款方式 ──'],
+      ['方式', '金額'],
+      ...Object.entries(payMap).map(([k,v]) => [k, v])
+    ];
+    const wsSummary = XLSX.utils.aoa_to_sheet(summary);
+    wsSummary['!cols'] = [{wch:14},{wch:20},{wch:14}];
+
+    // 4) 工作表 2：訂單明細
+    const detailHead = ['訂單編號','時間','類型','桌號','付款方式','狀態','商品(名稱×數量)','小計','折扣','總計'];
+    const detailRows = [detailHead];
+    orders.forEach(o => {
+      const itemsText = (o.items||[])
+        .filter(i => i.productId !== '_discount_')
+        .map(i => `${i.name}×${i.qty||1}`)
+        .join('\n');
+      const orderDis = (o.items||[]).reduce((ss, it) => {
+        if(it.productId === '_discount_'){
+          return ss + (Number(it.basePrice||0) + Number(it.extraPrice||0)) * Number(it.qty||1);
+        }
+        return ss;
+      }, 0);
+      detailRows.push([
+        o.orderNo || o.id,
+        fmtLocalDateTime(o.createdAt),
+        o.orderType || '',
+        o.tableNo || '',
+        o.paymentMethod || '',
+        o.status || '',
+        itemsText,
+        Number(o.subtotal || 0),
+        Math.abs(orderDis) + Number(o.discountAmount || 0),
+        Number(o.total || 0)
+      ]);
+    });
+    if(detailRows.length === 1) detailRows.push(['(無訂單)','','','','','','','','','']);
+    const wsDetail = XLSX.utils.aoa_to_sheet(detailRows);
+    wsDetail['!cols'] = [{wch:14},{wch:18},{wch:10},{wch:8},{wch:10},{wch:10},{wch:36},{wch:8},{wch:8},{wch:10}];
+
+    // 5) 寫檔
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, wsSummary, '班次摘要');
+    XLSX.utils.book_append_sheet(wb, wsDetail, '訂單明細');
+
+    const dateStr = (session.endedAt ? fmtLocalDateTime(session.endedAt) : fmtLocalDateTime(session.startedAt) || '').slice(0,10).replace(/-/g,'');
+    const fname = `班次報表_${session.staffId || 'unknown'}_${dateStr || new Date().toISOString().slice(0,10).replace(/-/g,'')}.xlsx`;
+    XLSX.writeFile(wb, fname);
+
+    if(!getCurrentSession()){
+      // 提示是匯出歷史班次
+      console.log('已匯出最近一個已結束班次：', session.id);
+    }
+  } catch (err) {
+    console.error('[exportCurrentReportCsv] 失敗：', err);
+    alert('匯出失敗：' + (err && err.message ? err.message : err));
+  }
 }
 
 // ──────────────────────────────────────────────
