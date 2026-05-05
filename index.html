@@ -149,7 +149,13 @@
 <section id="reportsView" class="view">
   <header class="topbar">
     <h1>報表</h1>
+    <div class="topbar-actions" style="display:flex;gap:8px;flex-wrap:wrap">
+      <button id="openHistorySessionsBtn" class="secondary-btn">📋 歷史紀錄</button>
+      <button id="reportExportBtn" class="secondary-btn">📥 匯出 Excel</button>
+      <button id="costManageBtn" class="secondary-btn">💰 成本管理</button>
+    </div>
   </header>
+
 
   <!-- 班次狀態列 -->
   <div id="sessionStatusBar" style="margin:10px 0;padding:14px;border-radius:10px;background:#f1f5f9;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
@@ -188,13 +194,7 @@
       <div id="hourAnalysis"></div>
     </div>
 
-    <!-- 操作列 -->
-    <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
-      <button id="openHistorySessionsBtn" class="secondary-btn">📋 歷史紀錄</button>
-      <button id="reportExportBtn" class="secondary-btn">📥 匯出 Excel</button>
-      <button id="costManageBtn" class="secondary-btn">💰 成本管理</button>
-
-    </div>
+    
   </div>
 </section>
 
