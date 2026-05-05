@@ -97,7 +97,7 @@ function sunmiPrintReceiptByFont(order, mode){
   const isKitchen = mode === 'kitchen';
   const isLabel = mode === 'label';
   const baseSize = isLabel
-    ? Math.max(16, Number(cfg.labelFontSize || 12) * 2)        // 設定值是 px，APK 用 pt，乘 2 接近
+    ? Math.max(16, Number(cfg.labelFontSize || 12) * 2)
     : Math.max(16, Number(cfg.receiptFontSize || 12) * 2);
   const bigSize = baseSize + 8;
   const smallSize = Math.max(14, baseSize - 4);
@@ -110,7 +110,6 @@ function sunmiPrintReceiptByFont(order, mode){
   }
 
   try {
-    // 抬頭
     if(fields.storeName && cfg.storeName) line(cfg.storeName, bigSize);
     if(isKitchen) line('** 廚房單 **', bigSize);
     if(isLabel) line('** 標籤 **', bigSize);
@@ -119,6 +118,78 @@ function sunmiPrintReceiptByFont(order, mode){
       if(fields.storeAddress && cfg.storeAddress) line('地址：' + cfg.storeAddress, smallSize);
     }
     line(sep, smallSize);
+
+    if(fields.orderNo) line('單號：' + (order.orderNo || order.id || ''), baseSize);
+    if(fields.dateTime) line('時間：' + fmtDate(order.createdAt), baseSize);
+    if(fields.orderType){
+      const t = (order.orderType || '') + (order.tableNo ? ' / ' + order.tableNo : '');
+      if(t.trim()) line('類型：' + t, baseSize);
+    }
+    if(fields.customerInfo){
+      const cName = order.customerName || '';
+      const cPhone = maskCustomerPhone(order.customerPhone) || '';
+      if(cName || cPhone) line('顧客：' + cName + (cPhone ? ' / ' + cPhone : ''), baseSize);
+    }
+    if(!isKitchen && !isLabel && fields.paymentMethod && order.paymentMethod){
+      line('付款：' + order.paymentMethod, baseSize);
+    }
+    line(sep, smallSize);
+
+    if(fields.items){
+      (order.items || []).forEach(it => {
+        const name = it.name || '';
+        const qty = Number(it.qty || 0);
+        const sel = fields.itemSelections !== false ? buildSelectionText(it) : '';
+        const note = it.note || '';
+        const unitPrice = Number(it.basePrice || 0) + Number(it.extraPrice || 0);
+        const lineTotal = unitPrice * qty;
+
+        if(isKitchen || isLabel){
+          line(name + (fields.itemQty ? ' x' + qty : ''), bigSize);
+        } else {
+          const left = name + (fields.itemQty ? ' x' + qty : '');
+          const right = fields.itemPrice !== false ? ('$' + lineTotal) : '';
+          line(right ? (left + '   ' + right) : left, baseSize);
+        }
+        if(sel) line('  ' + sel, smallSize);
+        if(fields.itemNote && note) line('  備註：' + note, smallSize);
+      });
+    }
+
+    if(fields.orderNote && order.customerNote){
+      line(sep, smallSize);
+      line('訂單備註：' + order.customerNote, baseSize);
+    }
+
+    if(!isKitchen && !isLabel){
+      let drewSep = false;
+      if(fields.subtotal){ line(sep, smallSize); drewSep = true; line('小計      $' + Number(order.subtotal || order.total || 0), baseSize); }
+      if(fields.discount && Number(order.discountAmount || 0) > 0){
+        if(!drewSep){ line(sep, smallSize); drewSep = true; }
+        line('折扣     -$' + Number(order.discountAmount), baseSize);
+      }
+      if(fields.total){
+        if(!drewSep){ line(sep, smallSize); drewSep = true; }
+        line('合計      $' + Number(order.total || 0), bigSize);
+      }
+      if(fields.footer && cfg.receiptFooter){
+        line(sep, smallSize);
+        line(cfg.receiptFooter, baseSize);
+      }
+    }
+
+    line(' ', smallSize);
+    line(' ', smallSize);
+    if(typeof sp.cutPaper === 'function'){
+      try { sp.cutPaper(); } catch(e) {}
+    }
+    return true;
+  } catch(e) {
+    console.warn('sunmiPrintReceiptByFont 失敗', e);
+    return false;
+  }
+}
+
 
     // 訂單資訊
     if(fields.orderNo) line('單號：' + (order.orderNo || order.id || ''), baseSize);
@@ -345,24 +416,21 @@ export function getReceiptHtml(order, mode){
 
   lines.push('<div class="sep"></div>');
 
-  // 品項
   if(fields.items){
     (order.items || []).forEach(it => {
       const name = escapeHtml(it.name || '');
       const qty = Number(it.qty || 0);
-      const sel = buildSelectionText(it);
+      const sel = fields.itemSelections !== false ? buildSelectionText(it) : '';
       const note = it.note || '';
       const unitPrice = Number(it.basePrice || 0) + Number(it.extraPrice || 0);
       const lineTotal = unitPrice * qty;
 
       let mainLine = '';
       if(isKitchen){
-        // 廚房單：商品大字，數量在後
         mainLine = `<div class="bold big-item">${name}${fields.itemQty ? ' x' + qty : ''}</div>`;
       } else {
-        // 顧客單：左商品 右金額
         const left = `${name}${fields.itemQty ? ' x' + qty : ''}`;
-        const right = fields.itemPrice ? money(lineTotal) : '';
+        const right = fields.itemPrice !== false ? money(lineTotal) : '';
         mainLine = `<div class="row"><span>${left}</span><span>${right}</span></div>`;
       }
       lines.push(mainLine);
@@ -391,7 +459,6 @@ export function getReceiptHtml(order, mode){
       lines.push(`<div class="center">${escapeHtml(cfg.receiptFooter)}</div>`);
     }
   } else {
-    // 廚房單結尾不放金額
     lines.push('<div class="sep"></div>');
   }
 
@@ -438,7 +505,6 @@ export function getLabelHtml(order){
   const customerPhoneMasked = maskCustomerPhone(order.customerPhone);
   const items = order.items || [];
 
-  // 一張標籤一個品項
   const labels = items.map(it => {
     const lines = [];
     if(fields.storeName) lines.push(`<div class="bold center">${escapeHtml(cfg.storeName)}</div>`);
@@ -455,7 +521,7 @@ export function getLabelHtml(order){
       const name = escapeHtml(it.name || '');
       const qty = Number(it.qty || 0);
       lines.push(`<div class="bold big-item">${name}${fields.itemQty ? ' x' + qty : ''}</div>`);
-      const sel = buildSelectionText(it);
+      const sel = fields.itemSelections !== false ? buildSelectionText(it) : '';
       if(sel) lines.push(`<div class="small">${escapeHtml(sel)}</div>`);
       if(fields.itemNote && it.note) lines.push(`<div class="small">備註：${escapeHtml(it.note)}</div>`);
     }
@@ -486,66 +552,6 @@ export function getLabelHtml(order){
   `;
 
   return `<!doctype html><html><head><meta charset="utf-8">${css}</head><body>${labels}</body></html>`;
-}
-
-// ============================================================
-// 班次報表專用 HTML（模仿廚房單版型，但抬頭改成報表）
-// ============================================================
-export function getSessionReportHtml(reportData){
-  const cfg = getPrintSettings();
-  const fontSize = Number(cfg.receiptFontSize || 12);
-  const paperWidthMm = Number(cfg.receiptPaperWidth || 58);
-  const offX = Number(cfg.receiptOffsetX || 0);
-  const offY = Number(cfg.receiptOffsetY || 0);
-
-  const lines = [];
-
-  // 抬頭：店名 + 報表標題
-  lines.push(`<div class="center bold big">${escapeHtml(cfg.storeName || '')}</div>`);
-  lines.push(`<div class="center bold big">${escapeHtml(reportData.title || '班次報表')}</div>`);
-  if(reportData.subtitle){
-    lines.push(`<div class="center small">${escapeHtml(reportData.subtitle)}</div>`);
-  }
-  lines.push('<div class="sep"></div>');
-
-  // 內容（一行一個 line.label）
-  (reportData.lines || []).forEach(line => {
-    const text = line.label || '';
-    if(text.startsWith('---') || text.startsWith('===')){
-      lines.push('<div class="sep"></div>');
-    } else if(text.startsWith('--') && text.endsWith('--')){
-      // 區塊標題加粗
-      lines.push(`<div class="bold">${escapeHtml(text)}</div>`);
-    } else {
-      lines.push(`<div>${escapeHtml(text)}</div>`);
-    }
-  });
-
-  lines.push('<div class="sep"></div>');
-
-  const css = `
-    <style>
-      @page { size: ${paperWidthMm}mm auto; margin: 0; }
-      html, body { margin: 0; padding: 0; }
-      body {
-        font-family: "PingFang TC","Microsoft JhengHei","Heiti TC", monospace, sans-serif;
-        font-size: ${fontSize}px;
-        width: ${paperWidthMm}mm;
-        padding: 4mm 3mm;
-        margin-left: ${offX}mm;
-        margin-top: ${offY}mm;
-        color: #000;
-      }
-      .center { text-align: center; }
-      .bold { font-weight: 700; }
-      .big { font-size: ${fontSize + 6}px; }
-      .small { font-size: ${fontSize - 2}px; }
-      .sep { border-top: 1px dashed #000; margin: 4px 0; }
-      div { line-height: 1.5; word-break: break-all; white-space: pre-wrap; }
-    </style>
-  `;
-
-  return `<!doctype html><html><head><meta charset="utf-8">${css}</head><body>${lines.join('')}</body></html>`;
 }
 
 // ============================================================
