@@ -6,6 +6,65 @@
 import { state, persistAll } from '../core/store.js';
 import { buildCartPreviewOrder, printOrderLabels, printOrderReceipt, printKitchenCopies, openCashDrawer, getPrintSettings, previewInModal, getReceiptHtml, getLabelHtml } from '../modules/print-service.js';
 
+// ── 列印欄位矩陣（顧客單 / 廚房單 / 標籤 各自勾選） ──
+const PRINT_FIELD_DEFS = [
+  { key:'storeName',      label:'店名' },
+  { key:'storePhone',     label:'電話' },
+  { key:'storeAddress',   label:'地址' },
+  { key:'orderNo',        label:'單號' },
+  { key:'dateTime',       label:'時間' },
+  { key:'orderType',      label:'類型 / 桌號' },
+  { key:'paymentMethod',  label:'付款方式' },
+  { key:'customerInfo',   label:'顧客資訊' },
+  { key:'itemSelections', label:'品項模組' },
+  { key:'itemNote',       label:'品項備註' },
+  { key:'itemPrice',      label:'品項金額' },
+  { key:'subtotal',       label:'小計' },
+  { key:'discount',       label:'折扣' },
+  { key:'total',          label:'合計' },
+  { key:'orderNote',      label:'訂單備註' },
+  { key:'footer',         label:'收據備註（頁尾）' }
+];
+const PRINT_KINDS = ['receipt','kitchen','label'];
+
+function renderPrintFieldsMatrix(){
+  var body = document.getElementById('printFieldsMatrixBody');
+  if(!body) return;
+  body.innerHTML = PRINT_FIELD_DEFS.map(function(def){
+    return ''+
+      '<tr style="border-top:1px solid #e2e8f0">'+
+        '<td style="padding:6px 8px">'+def.label+'</td>'+
+        '<td style="text-align:center"><input type="checkbox" id="pfm_receipt_'+def.key+'"></td>'+
+        '<td style="text-align:center"><input type="checkbox" id="pfm_kitchen_'+def.key+'"></td>'+
+        '<td style="text-align:center"><input type="checkbox" id="pfm_label_'+def.key+'"></td>'+
+      '</tr>';
+  }).join('');
+}
+
+function loadPrintFieldsMatrix(cfg){
+  PRINT_KINDS.forEach(function(kind){
+    var f = (cfg.fields && cfg.fields[kind]) || {};
+    PRINT_FIELD_DEFS.forEach(function(def){
+      var el = document.getElementById('pfm_'+kind+'_'+def.key);
+      if(el) el.checked = f[def.key] !== false;
+    });
+  });
+}
+
+function collectPrintFieldsMatrix(){
+  var out = { receipt:{}, kitchen:{}, label:{} };
+  PRINT_KINDS.forEach(function(kind){
+    PRINT_FIELD_DEFS.forEach(function(def){
+      var el = document.getElementById('pfm_'+kind+'_'+def.key);
+      out[kind][def.key] = !!(el && el.checked);
+    });
+    // 必須一直為 true 的欄位（系統需要才能正確列印品項）
+    out[kind].items = true;
+    out[kind].itemQty = true;
+  });
+  return out;
+}
+
 // ── 浮動視窗開關工具 ──
 function openModal(id) {
   var el = document.getElementById(id);
@@ -130,24 +189,12 @@ function loadPrintSettingsToForm() {
   if (el('printKitchenCopies')) el('printKitchenCopies').value = Number(cfg.kitchenCopies || 1);
   if (el('printAutoCheckout')) el('printAutoCheckout').checked = !!cfg.autoPrintCheckout;
   if (el('printAutoKitchen')) el('printAutoKitchen').checked = !!cfg.autoPrintKitchen;
-    // 回顯欄位勾選（套用全系統列印）
-  var f = (cfg.fields && cfg.fields.receipt) || {};
-  if (el('pfg_storeName'))      el('pfg_storeName').checked      = f.storeName      !== false;
-  if (el('pfg_storePhone'))     el('pfg_storePhone').checked     = f.storePhone     !== false;
-  if (el('pfg_storeAddress'))   el('pfg_storeAddress').checked   = f.storeAddress   !== false;
-  if (el('pfg_orderNo'))        el('pfg_orderNo').checked        = f.orderNo        !== false;
-  if (el('pfg_createdAt'))      el('pfg_createdAt').checked      = f.dateTime       !== false;
-  if (el('pfg_orderType'))      el('pfg_orderType').checked      = f.orderType      !== false;
-  if (el('pfg_paymentMethod'))  el('pfg_paymentMethod').checked  = f.paymentMethod  !== false;
-  if (el('pfg_customerInfo'))   el('pfg_customerInfo').checked   = f.customerInfo   !== false;
-  if (el('pfg_itemSelections')) el('pfg_itemSelections').checked = f.itemSelections !== false;
-  if (el('pfg_itemNote'))       el('pfg_itemNote').checked       = f.itemNote       !== false;
-  if (el('pfg_itemPrice'))      el('pfg_itemPrice').checked      = f.itemPrice      !== false;
-  if (el('pfg_totalSection'))   el('pfg_totalSection').checked   = f.total          !== false;
-  if (el('pfg_orderNote'))      el('pfg_orderNote').checked      = f.orderNote      !== false;
-  if (el('pfg_footer'))         el('pfg_footer').checked         = f.footer         !== false;
+      // 回顯欄位勾選（顧客單 / 廚房單 / 標籤 各自勾選）
+  renderPrintFieldsMatrix();
+  loadPrintFieldsMatrix(cfg);
 
 }
+
 
 // ── 即時接單：讀取欄位 ──
 function loadRealtimeSettingsToForm() {
@@ -418,38 +465,8 @@ export function initSettingsPage() {
     cfg.kitchenCopies = Math.max(1, Number(document.getElementById('printKitchenCopies')?.value) || 1);
     cfg.autoPrintCheckout = !!document.getElementById('printAutoCheckout')?.checked;
     cfg.autoPrintKitchen = !!document.getElementById('printAutoKitchen')?.checked;
-            // 儲存欄位勾選（套用到全系統列印：訂單查詢、結帳、線上接單都共用）
-    var pf = {
-      storeName:      !!document.getElementById('pfg_storeName')?.checked,
-      storePhone:     !!document.getElementById('pfg_storePhone')?.checked,
-      storeAddress:   !!document.getElementById('pfg_storeAddress')?.checked,
-      orderNo:        !!document.getElementById('pfg_orderNo')?.checked,
-      dateTime:       !!document.getElementById('pfg_createdAt')?.checked,
-      orderType:      !!document.getElementById('pfg_orderType')?.checked,
-      paymentMethod:  !!document.getElementById('pfg_paymentMethod')?.checked,
-      customerInfo:   !!document.getElementById('pfg_customerInfo')?.checked,
-      items:          true,
-      itemQty:        true,
-      itemSelections: !!document.getElementById('pfg_itemSelections')?.checked,
-      itemPrice:      !!document.getElementById('pfg_itemPrice')?.checked,
-      itemNote:       !!document.getElementById('pfg_itemNote')?.checked,
-      subtotal:       !!document.getElementById('pfg_totalSection')?.checked,
-      discount:       !!document.getElementById('pfg_totalSection')?.checked,
-      total:          !!document.getElementById('pfg_totalSection')?.checked,
-      orderNote:      !!document.getElementById('pfg_orderNote')?.checked,
-      footer:         !!document.getElementById('pfg_footer')?.checked
-    };
-    cfg.fields = {
-      receipt: Object.assign({}, pf),
-      kitchen: Object.assign({}, pf, {
-        storePhone:false, storeAddress:false, paymentMethod:false,
-        itemPrice:false, subtotal:false, discount:false, total:false, footer:false
-      }),
-      label: Object.assign({}, pf, {
-        storePhone:false, storeAddress:false, paymentMethod:false,
-        itemPrice:false, subtotal:false, discount:false, total:false, footer:false
-      })
-    };
+                // 儲存欄位勾選（顧客單 / 廚房單 / 標籤 各自獨立）
+    cfg.fields = collectPrintFieldsMatrix();
 
      persistAll();
 
