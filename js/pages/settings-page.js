@@ -130,6 +130,21 @@ function loadPrintSettingsToForm() {
   if (el('printKitchenCopies')) el('printKitchenCopies').value = Number(cfg.kitchenCopies || 1);
   if (el('printAutoCheckout')) el('printAutoCheckout').checked = !!cfg.autoPrintCheckout;
   if (el('printAutoKitchen')) el('printAutoKitchen').checked = !!cfg.autoPrintKitchen;
+  // 回顯欄位勾選
+  var f = (cfg.fields && cfg.fields.receipt) || {};
+  if (el('pf_storeName'))      el('pf_storeName').checked      = f.storeName     !== false;
+  if (el('pf_storePhone'))     el('pf_storePhone').checked     = f.storePhone    !== false;
+  if (el('pf_storeAddress'))   el('pf_storeAddress').checked   = f.storeAddress  !== false;
+  if (el('pf_orderNo'))        el('pf_orderNo').checked        = f.orderNo       !== false;
+  if (el('pf_createdAt'))      el('pf_createdAt').checked      = f.dateTime      !== false;
+  if (el('pf_orderType'))      el('pf_orderType').checked      = f.orderType     !== false;
+  if (el('pf_paymentMethod'))  el('pf_paymentMethod').checked  = f.paymentMethod !== false;
+  if (el('pf_itemSelections')) el('pf_itemSelections').checked = true;
+  if (el('pf_itemNote'))       el('pf_itemNote').checked       = f.itemNote      !== false;
+  if (el('pf_itemPrice'))      el('pf_itemPrice').checked      = f.itemPrice     !== false;
+  if (el('pf_totalSection'))   el('pf_totalSection').checked   = f.total         !== false;
+  if (el('pf_footer'))         el('pf_footer').checked         = f.footer        !== false;
+
 }
 
 // ── 即時接單：讀取欄位 ──
@@ -401,7 +416,33 @@ export function initSettingsPage() {
     cfg.kitchenCopies = Math.max(1, Number(document.getElementById('printKitchenCopies')?.value) || 1);
     cfg.autoPrintCheckout = !!document.getElementById('printAutoCheckout')?.checked;
     cfg.autoPrintKitchen = !!document.getElementById('printAutoKitchen')?.checked;
-    persistAll();
+        // 儲存欄位勾選（套用到全系統列印：訂單查詢、結帳、線上接單都共用）
+    var pf = {
+      storeName:     !!document.getElementById('pf_storeName')?.checked,
+      storePhone:    !!document.getElementById('pf_storePhone')?.checked,
+      storeAddress:  !!document.getElementById('pf_storeAddress')?.checked,
+      orderNo:       !!document.getElementById('pf_orderNo')?.checked,
+      dateTime:      !!document.getElementById('pf_createdAt')?.checked,
+      orderType:     !!document.getElementById('pf_orderType')?.checked,
+      paymentMethod: !!document.getElementById('pf_paymentMethod')?.checked,
+      customerInfo:  true,
+      items:         true,
+      itemQty:       true,
+      itemPrice:     !!document.getElementById('pf_itemPrice')?.checked,
+      itemNote:      !!document.getElementById('pf_itemNote')?.checked,
+      subtotal:      !!document.getElementById('pf_totalSection')?.checked,
+      discount:      !!document.getElementById('pf_totalSection')?.checked,
+      total:         !!document.getElementById('pf_totalSection')?.checked,
+      orderNote:     !!document.getElementById('pf_itemNote')?.checked,
+      footer:        !!document.getElementById('pf_footer')?.checked
+    };
+    cfg.fields = {
+      receipt: Object.assign({}, pf),
+      kitchen: Object.assign({}, pf, { paymentMethod:false, itemPrice:false, subtotal:false, discount:false, total:false, footer:false }),
+      label:   Object.assign({}, pf, { storePhone:false, storeAddress:false, paymentMethod:false, itemPrice:false, subtotal:false, discount:false, total:false, footer:false })
+    };
+
+     persistAll();
 
     // 同步到 APK
     if (hasSunmi() && window.SunmiPrinter.saveSettings) {
