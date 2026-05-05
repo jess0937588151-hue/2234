@@ -101,7 +101,13 @@ function sunmiPrintReceiptByFont(order, mode){
     : Math.max(16, Number(cfg.receiptFontSize || 12) * 2);
   const bigSize = baseSize + 8;
   const smallSize = Math.max(14, baseSize - 4);
-  const sep = '--------------------------------\n';
+  // 依紙寬與字體大小動態計算分隔線長度（避免換行）
+// 58mm 紙約 32 半形字（小字），字體放大時等比縮短
+const paperWidth = Number(cfg.receiptPaperWidth || 58);
+const baseCols = paperWidth >= 76 ? 42 : (paperWidth >= 70 ? 38 : 32);
+const sepLen = Math.max(8, Math.floor(baseCols * (24 / baseSize)));
+const sep = '-'.repeat(sepLen);
+
   const sp = window.SunmiPrinter;
 
   function line(text, size){
@@ -178,12 +184,13 @@ function sunmiPrintReceiptByFont(order, mode){
       }
     }
 
-    line(' ', smallSize);
+        // 結尾留白：只保留一行（原本兩行 + cutPaper 自走紙過長）
     line(' ', smallSize);
     if(typeof sp.cutPaper === 'function'){
       try { sp.cutPaper(); } catch(e) {}
     }
     return true;
+
   } catch(e) {
     console.warn('sunmiPrintReceiptByFont 失敗', e);
     return false;
@@ -197,7 +204,13 @@ function buildPlainTextFromOrder(order, mode){
   const isLabel = mode === 'label';
   const fields = cfg.fields[isKitchen ? 'kitchen' : (isLabel ? 'label' : 'receipt')];
   const lines = [];
-  const sep = '--------------------------------';
+  // 依紙寬與字體大小動態計算分隔線長度（避免換行）
+// 58mm 紙約 32 半形字（小字），字體放大時等比縮短
+const paperWidth = Number(cfg.receiptPaperWidth || 58);
+const baseCols = paperWidth >= 76 ? 42 : (paperWidth >= 70 ? 38 : 32);
+const sepLen = Math.max(8, Math.floor(baseCols * (24 / baseSize)));
+const sep = '-'.repeat(sepLen);
+
 
   if(fields.storeName && cfg.storeName) lines.push(cfg.storeName);
   if(isKitchen) lines.push('** 廚房單 **');
