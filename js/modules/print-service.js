@@ -184,8 +184,8 @@ const sep = '-'.repeat(sepLen);
       }
     }
 
-        // 結尾留白：只保留一行（原本兩行 + cutPaper 自走紙過長）
-    line(' ', smallSize);
+        // 結尾留白：只不保留需要時間入line(' ', smallSize);（原本兩行 + cutPaper 自走紙過長）
+    
     if(typeof sp.cutPaper === 'function'){
       try { sp.cutPaper(); } catch(e) {}
     }
