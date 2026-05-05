@@ -688,9 +688,24 @@ export function initSettingsPage() {
     if(html) openPreview(title, html);
   });
 
-  document.getElementById('previewReceiptPrintBtn')?.addEventListener('click', function(){ applyFormToConfig(); openFieldsModal('receipt'); });
-  document.getElementById('previewKitchenPrintBtn')?.addEventListener('click', function(){ applyFormToConfig(); openFieldsModal('kitchen'); });
-  document.getElementById('previewLabelPrintBtn')?.addEventListener('click', function(){ applyFormToConfig(); openFieldsModal('label'); });
+  document.getElementById('previewReceiptPrintBtn')?.addEventListener('click', function(){
+  applyFormToConfig();
+  var order = buildPreviewOrderLocal();
+  var html = getReceiptHtml(order, 'customer');
+  openPreview('預覽顧客單', html);
+});
+document.getElementById('previewKitchenPrintBtn')?.addEventListener('click', function(){
+  applyFormToConfig();
+  var order = buildPreviewOrderLocal();
+  var html = getReceiptHtml(order, 'kitchen');
+  openPreview('預覽廚房單', html);
+});
+document.getElementById('previewLabelPrintBtn')?.addEventListener('click', function(){
+  applyFormToConfig();
+  var order = buildPreviewOrderLocal();
+  var html = getLabelHtml(order);
+  openPreview('預覽標籤', html);
+});
 
   /** 把表單上目前填的值即時寫入設定（這樣預覽才會用到最新的數值） */
   function applyFormToConfig() {
