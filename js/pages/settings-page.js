@@ -130,20 +130,22 @@ function loadPrintSettingsToForm() {
   if (el('printKitchenCopies')) el('printKitchenCopies').value = Number(cfg.kitchenCopies || 1);
   if (el('printAutoCheckout')) el('printAutoCheckout').checked = !!cfg.autoPrintCheckout;
   if (el('printAutoKitchen')) el('printAutoKitchen').checked = !!cfg.autoPrintKitchen;
-  // 回顯欄位勾選
+    // 回顯欄位勾選（套用全系統列印）
   var f = (cfg.fields && cfg.fields.receipt) || {};
-  if (el('pf_storeName'))      el('pf_storeName').checked      = f.storeName     !== false;
-  if (el('pf_storePhone'))     el('pf_storePhone').checked     = f.storePhone    !== false;
-  if (el('pf_storeAddress'))   el('pf_storeAddress').checked   = f.storeAddress  !== false;
-  if (el('pf_orderNo'))        el('pf_orderNo').checked        = f.orderNo       !== false;
-  if (el('pf_createdAt'))      el('pf_createdAt').checked      = f.dateTime      !== false;
-  if (el('pf_orderType'))      el('pf_orderType').checked      = f.orderType     !== false;
-  if (el('pf_paymentMethod'))  el('pf_paymentMethod').checked  = f.paymentMethod !== false;
-  if (el('pf_itemSelections')) el('pf_itemSelections').checked = true;
-  if (el('pf_itemNote'))       el('pf_itemNote').checked       = f.itemNote      !== false;
-  if (el('pf_itemPrice'))      el('pf_itemPrice').checked      = f.itemPrice     !== false;
-  if (el('pf_totalSection'))   el('pf_totalSection').checked   = f.total         !== false;
-  if (el('pf_footer'))         el('pf_footer').checked         = f.footer        !== false;
+  if (el('pfg_storeName'))      el('pfg_storeName').checked      = f.storeName      !== false;
+  if (el('pfg_storePhone'))     el('pfg_storePhone').checked     = f.storePhone     !== false;
+  if (el('pfg_storeAddress'))   el('pfg_storeAddress').checked   = f.storeAddress   !== false;
+  if (el('pfg_orderNo'))        el('pfg_orderNo').checked        = f.orderNo        !== false;
+  if (el('pfg_createdAt'))      el('pfg_createdAt').checked      = f.dateTime       !== false;
+  if (el('pfg_orderType'))      el('pfg_orderType').checked      = f.orderType      !== false;
+  if (el('pfg_paymentMethod'))  el('pfg_paymentMethod').checked  = f.paymentMethod  !== false;
+  if (el('pfg_customerInfo'))   el('pfg_customerInfo').checked   = f.customerInfo   !== false;
+  if (el('pfg_itemSelections')) el('pfg_itemSelections').checked = f.itemSelections !== false;
+  if (el('pfg_itemNote'))       el('pfg_itemNote').checked       = f.itemNote       !== false;
+  if (el('pfg_itemPrice'))      el('pfg_itemPrice').checked      = f.itemPrice      !== false;
+  if (el('pfg_totalSection'))   el('pfg_totalSection').checked   = f.total          !== false;
+  if (el('pfg_orderNote'))      el('pfg_orderNote').checked      = f.orderNote      !== false;
+  if (el('pfg_footer'))         el('pfg_footer').checked         = f.footer         !== false;
 
 }
 
