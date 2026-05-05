@@ -418,30 +418,37 @@ export function initSettingsPage() {
     cfg.kitchenCopies = Math.max(1, Number(document.getElementById('printKitchenCopies')?.value) || 1);
     cfg.autoPrintCheckout = !!document.getElementById('printAutoCheckout')?.checked;
     cfg.autoPrintKitchen = !!document.getElementById('printAutoKitchen')?.checked;
-        // 儲存欄位勾選（套用到全系統列印：訂單查詢、結帳、線上接單都共用）
+            // 儲存欄位勾選（套用到全系統列印：訂單查詢、結帳、線上接單都共用）
     var pf = {
-      storeName:     !!document.getElementById('pf_storeName')?.checked,
-      storePhone:    !!document.getElementById('pf_storePhone')?.checked,
-      storeAddress:  !!document.getElementById('pf_storeAddress')?.checked,
-      orderNo:       !!document.getElementById('pf_orderNo')?.checked,
-      dateTime:      !!document.getElementById('pf_createdAt')?.checked,
-      orderType:     !!document.getElementById('pf_orderType')?.checked,
-      paymentMethod: !!document.getElementById('pf_paymentMethod')?.checked,
-      customerInfo:  true,
-      items:         true,
-      itemQty:       true,
-      itemPrice:     !!document.getElementById('pf_itemPrice')?.checked,
-      itemNote:      !!document.getElementById('pf_itemNote')?.checked,
-      subtotal:      !!document.getElementById('pf_totalSection')?.checked,
-      discount:      !!document.getElementById('pf_totalSection')?.checked,
-      total:         !!document.getElementById('pf_totalSection')?.checked,
-      orderNote:     !!document.getElementById('pf_itemNote')?.checked,
-      footer:        !!document.getElementById('pf_footer')?.checked
+      storeName:      !!document.getElementById('pfg_storeName')?.checked,
+      storePhone:     !!document.getElementById('pfg_storePhone')?.checked,
+      storeAddress:   !!document.getElementById('pfg_storeAddress')?.checked,
+      orderNo:        !!document.getElementById('pfg_orderNo')?.checked,
+      dateTime:       !!document.getElementById('pfg_createdAt')?.checked,
+      orderType:      !!document.getElementById('pfg_orderType')?.checked,
+      paymentMethod:  !!document.getElementById('pfg_paymentMethod')?.checked,
+      customerInfo:   !!document.getElementById('pfg_customerInfo')?.checked,
+      items:          true,
+      itemQty:        true,
+      itemSelections: !!document.getElementById('pfg_itemSelections')?.checked,
+      itemPrice:      !!document.getElementById('pfg_itemPrice')?.checked,
+      itemNote:       !!document.getElementById('pfg_itemNote')?.checked,
+      subtotal:       !!document.getElementById('pfg_totalSection')?.checked,
+      discount:       !!document.getElementById('pfg_totalSection')?.checked,
+      total:          !!document.getElementById('pfg_totalSection')?.checked,
+      orderNote:      !!document.getElementById('pfg_orderNote')?.checked,
+      footer:         !!document.getElementById('pfg_footer')?.checked
     };
     cfg.fields = {
       receipt: Object.assign({}, pf),
-      kitchen: Object.assign({}, pf, { paymentMethod:false, itemPrice:false, subtotal:false, discount:false, total:false, footer:false }),
-      label:   Object.assign({}, pf, { storePhone:false, storeAddress:false, paymentMethod:false, itemPrice:false, subtotal:false, discount:false, total:false, footer:false })
+      kitchen: Object.assign({}, pf, {
+        storePhone:false, storeAddress:false, paymentMethod:false,
+        itemPrice:false, subtotal:false, discount:false, total:false, footer:false
+      }),
+      label: Object.assign({}, pf, {
+        storePhone:false, storeAddress:false, paymentMethod:false,
+        itemPrice:false, subtotal:false, discount:false, total:false, footer:false
+      })
     };
 
      persistAll();
