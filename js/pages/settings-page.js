@@ -508,22 +508,25 @@ export function initSettingsPage() {
   }
   function moneyFmt(v){ return '$' + Number(v||0).toFixed(0); }
 
-  function getFieldFlags(){
-    return {
-      storeName:    document.getElementById('pf_storeName').checked,
-      storePhone:   document.getElementById('pf_storePhone').checked,
-      storeAddress: document.getElementById('pf_storeAddress').checked,
-      orderNo:      document.getElementById('pf_orderNo').checked,
-      createdAt:    document.getElementById('pf_createdAt').checked,
-      orderType:    document.getElementById('pf_orderType').checked,
-      paymentMethod:document.getElementById('pf_paymentMethod').checked,
-      itemSelections:document.getElementById('pf_itemSelections').checked,
-      itemNote:     document.getElementById('pf_itemNote').checked,
-      itemPrice:    document.getElementById('pf_itemPrice').checked,
-      totalSection: document.getElementById('pf_totalSection').checked,
-      footer:       document.getElementById('pf_footer').checked
-    };
-  }
+  function getFieldFlags(mode){
+  var kind = mode === 'kitchen' ? 'kitchen' : (mode === 'label' ? 'label' : 'receipt');
+  var f = (getPrintSettings().fields || {})[kind] || {};
+  return {
+    storeName: f.storeName !== false,
+    storePhone: f.storePhone !== false,
+    storeAddress: f.storeAddress !== false,
+    orderNo: f.orderNo !== false,
+    createdAt: f.dateTime !== false,
+    orderType: f.orderType !== false,
+    paymentMethod: f.paymentMethod !== false,
+    itemSelections: f.itemSelections !== false,
+    itemNote: f.itemNote !== false,
+    itemPrice: f.itemPrice !== false,
+    totalSection: (f.subtotal !== false) || (f.total !== false),
+    footer: f.footer !== false
+  };
+}
+
 
   function buildPreviewOrderLocal(){
     if (Array.isArray(state.cart) && state.cart.length) return buildCartPreviewOrder();
