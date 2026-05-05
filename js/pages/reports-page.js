@@ -879,29 +879,38 @@ function printSessionReport(session, opts, printWin){
   });
 }
 
+// ──────────────────────────────────────────────
+// 匯出 CSV（共用邏輯，相容 Sunmi T2 / Android WebView）
+//   csvDownload(filename, rows)
+//   - 有些 Android WebView 不支援 Blob 下載，這裡用 data URL 開新分頁
+//   - 若連 window.open 都被擋，就 fallback 顯示全螢幕 textarea 讓使用者長按複製
+// ──────────────────────────────────────────────
+function csvDownload(filename, rows){
+  const csv = '\uFEFF' + rows.map(r =>
+    r.map(c => `"${String(c == null ? '' : c).replace(/"/g,'""')}"`).join(',')
+  ).join('\n');
 
-function exportSessionCsv(session){
-  const orders = (state.orders || []).filter(o => o.sessionId === session.id);
-  const rows = [['訂單編號','時間','類型','付款','金額','折扣','桌號']];
-  orders.forEach(o => rows.push([
-    o.orderNo||o.id,
-    fmtLocalDateTime(o.createdAt),
-    o.orderType||'',
-    o.paymentMethod||'',
-    Number(o.total||0),
-    Number(o.discountAmount||0),
-    o.tableNo||''
-  ]));
-  const csv = '\uFEFF' + rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const dateStr = fmtLocalDateTime(session.endedAt || session.startedAt).slice(0,10);
-  downloadFile(`班次_${session.staffId}_${dateStr}.csv`, csv, 'text/csv');
+  const dataUrl = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  const w = window.open(dataUrl, '_blank');
+  if(w) return;
+
+  // fallback：開新分頁失敗 → 全螢幕顯示，使用者長按複製
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:99999;display:flex;flex-direction:column;padding:20px;box-sizing:border-box';
+  overlay.innerHTML = `
+    <div style="color:#fff;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+      <strong>${filename}</strong>
+      <button id="csvCloseBtn" style="padding:8px 16px;background:#ef4444;color:#fff;border:none;border-radius:6px">關閉</button>
+    </div>
+    <div style="color:#fff;font-size:13px;margin-bottom:10px">長按下方文字 → 全選 → 複製，貼到 Email 或記事本另存為 .csv</div>
+    <textarea readonly style="flex:1;width:100%;font-family:monospace;font-size:12px;padding:10px;border-radius:6px"></textarea>
+  `;
+  overlay.querySelector('textarea').value = csv;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#csvCloseBtn').onclick = () => overlay.remove();
 }
 
-
-
-
-// ──────────────────────────────────────────────
-// 匯出 Excel（.xlsx）
+// 報表頁頂部「📥 匯出 Excel」（今日全部訂單）
 function exportCurrentReportCsv(){
   const today = new Date().toISOString().slice(0,10);
   const rows = [['訂單號','時間','狀態','類型','桌號','付款','總計']];
@@ -916,27 +925,24 @@ function exportCurrentReportCsv(){
       o.paymentMethod || '',
       Number(o.total || 0)
     ]));
-  const csv = '\uFEFF' + rows.map(r =>
-    r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')
-  ).join('\n');
+  csvDownload(`today-report_${today}.csv`, rows);
+}
 
-  const dataUrl = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-  const w = window.open(dataUrl, '_blank');
-  if(!w){
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:99999;display:flex;flex-direction:column;padding:20px;box-sizing:border-box';
-    overlay.innerHTML = `
-      <div style="color:#fff;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
-        <strong>today-report_${today}.csv</strong>
-        <button id="csvCloseBtn" style="padding:8px 16px;background:#ef4444;color:#fff;border:none;border-radius:6px">關閉</button>
-      </div>
-      <div style="color:#fff;font-size:13px;margin-bottom:10px">長按下方文字 → 全選 → 複製，貼到 Email 或記事本另存為 .csv</div>
-      <textarea readonly style="flex:1;width:100%;font-family:monospace;font-size:12px;padding:10px;border-radius:6px"></textarea>
-    `;
-    overlay.querySelector('textarea').value = csv;
-    document.body.appendChild(overlay);
-    overlay.querySelector('#csvCloseBtn').onclick = () => overlay.remove();
-  }
+// 歷史紀錄裡某一班次的「📥 匯出 Excel」
+function exportSessionCsv(session){
+  const orders = (state.orders || []).filter(o => o.sessionId === session.id);
+  const rows = [['訂單編號','時間','類型','付款','金額','折扣','桌號']];
+  orders.forEach(o => rows.push([
+    o.orderNo || o.id,
+    fmtLocalDateTime(o.createdAt),
+    o.orderType || '',
+    o.paymentMethod || '',
+    Number(o.total || 0),
+    Number(o.discountAmount || 0),
+    o.tableNo || ''
+  ]));
+  const dateStr = fmtLocalDateTime(session.endedAt || session.startedAt).slice(0,10);
+  csvDownload(`班次_${session.staffId}_${dateStr}.csv`, rows);
 }
 
 
