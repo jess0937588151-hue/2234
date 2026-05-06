@@ -126,68 +126,41 @@ POST body 範例：
 - [x] `index.html` `<title>` 改為「餐廳 POS V20260602 列印橋接版」
 - [x] `service-worker.js` `CACHE_NAME` 升版為 `pos-v20260602-cache`
 
-### 🔧 進行中（v20260603 APK 商用化補強）
+### ✅ 已完成（接續）
 
-> 使用者已確認施工項目：1、3、4、5、6、7、8、9、11、12、14。**不做：2、10、13。**
-> 關鍵需求：因 Android 沒 console，**所有改動都必須整合 LogManager 寫日誌**，否則出問題 AI 無法遠端排錯。
+**第四階段：v20260603 APK 商用化補強（已完工 2026-05-06）**
 
-**第一輪（地基，先做這個）**
+> 使用者決定：項目 2、10、13 不做（原始排除）；項目 8 已完整實作健康檢查頁；項目 12（自動更新檢查）使用者決定維持手動更新流程不做。
 
-- [ ] **項目 14：LogManager.java（新檔）** — 全 APK 共用日誌中心
-  - 寫到 `/sdcard/Android/data/com.pos.sunmiprinter/files/logs/app-YYYY-MM-DD.txt`
-  - 每天一檔，保留 7 天自動清理
-  - 分級：d / i / w / e（e 等級額外存 errors.txt）
-  - 記憶體環形緩衝最近 200 筆給 /logs 端點與 MainActivity 用
-  - APK 啟動寫一筆「APK 啟動 v2.x.x」對時
-- [ ] **項目 1：PrintHttpServer 強制綁 127.0.0.1**
-  - 建構子改 `super("127.0.0.1", port);`
-  - 外部 Wi-Fi 裝置連不到，避免亂印 / 亂開錢箱
-- [ ] **項目 4：印表機狀態回報強化**
-  - `SunmiPrinterManager.getPrinterStatus()` 改回傳 `PrinterStatusInfo{connected, paperOut, coverOpen, overheat, raw}`
-  - `/ping` 回應加 `paperOut/coverOpen/overheat/lastPrintAt/lastPrintOk/apkVersion`
-  - `print-bridge.js` 偵測結果帶這些欄位
-  - `settings-page.js` 印表機狀態列顯示紅字警示「⚠ 缺紙 / ⚠ 蓋未關 / ❌ 上次列印失敗」
-  - 自動列印（D9/D10）失敗時必須能讓使用者立刻發現
+第一輪（地基）
+- [x] 項目 14：LogManager.java 日誌中心（檔案 + 記憶體 200 筆環形緩衝 + 7 天自動清理 + errors.txt 分檔，提供 getRecent/getRecentErrors/readFile/getLogDirPath/getAppSettings/getAppContext）
+- [x] 項目 1：PrintHttpServer 強制綁 127.0.0.1（建構子 super("127.0.0.1", port)）
+- [x] 項目 4：印表機狀態強化（SunmiPrinterManager.PrinterStatusInfo{connected, paperOut, coverOpen, overheat, cutterError, raw} 並提供 toJson()；/ping 回應加 paperOut/coverOpen/overheat/cutterError/sunmiRaw/lastPrintAt/lastPrintOk/lastPrintError/version）
 
-**第二輪（穩定性）**
+第二輪（穩定性）
+- [x] 項目 3：Foreground Service 常駐通知（PrintService.createNotificationChannel API 26+ 判斷、startForeground、updateNotification 隨服務狀態更新）。AndroidManifest 的 foregroundServiceType="dataSync" 已測試但因 compileSdk=28 不支援 AAPT 報錯已移除（Android 7.1.1 / API 25 不需此屬性，無功能影響；未來升 compileSdk≥29 再加回）
+- [x] 項目 5：PrintQueue.java 單線程列印佇列（Executors.newSingleThreadExecutor + daemon thread；submitAndWait 同步等待 30 秒上限；PrintService 生命週期掛 init/shutdown）。PrintHttpServer 三個 /print/* 與 /drawer/open 全部走 PrintQueue.submitAndWait
+- [x] 項目 6：列印失敗紀錄 + SettingsActivity 顯示「最後列印狀態」區塊（時間、成功/失敗、錯誤訊息、刷新按鈕）；AppSettings.recordPrintResult 整合到 SunmiPrinterManager 各列印方法、PrintHttpServer 各路由
+- [x] 項目 7：MainActivity.onCreate 呼叫 startForegroundService（API 26+ 用 startForegroundService，舊版用 startService），不再只依賴 BootReceiver
+- [x] 項目 8：MainActivity 健康檢查頁完整重做。四區塊：① APK 版本+服務狀態+本機 IP+啟停按鈕；② 三台印表機狀態（每 3 秒刷新，含 ⚠缺紙/⚠蓋未關/⚠過熱/⚠切刀異常/❌上次列印失敗 警示）；③ 最近 10 筆錯誤日誌（從 LogManager.getRecentErrors，無錯時顯示綠底「目前無錯誤紀錄」）；④ 四顆按鈕：🖨測試列印（呼叫 sunmiPrinter.printText）、⟳重啟服務（printService.restartHttpServer）、📋查看完整日誌（AlertDialog 顯示 LogManager 最近 50 筆 + 日誌路徑）、⚙設定
 
-- [ ] **項目 3：Foreground Service 常駐通知**
-  - `PrintService.onCreate()` 建立 NotificationChannel（API 26+ 判斷）
-  - `startForeground(1, notification)` 顯示「列印橋接服務運作中・埠 8080」
-  - 防止系統殺進程
-  - `AndroidManifest.xml` service 加 `android:foregroundServiceType="dataSync"`
-- [ ] **項目 5：PrintQueue.java（新檔）**
-  - `ExecutorService.newSingleThreadExecutor()` 序列化所有列印任務
-  - 防止同一秒收到多張線上單時搶印表機
-  - 三個 Manager 的列印呼叫全部包進 PrintQueue.submit()
-- [ ] **項目 6：列印失敗自動重試 + 失敗紀錄**
-  - 現有 retry() 已 3 次重試，補上失敗時 LogManager.e + 更新 AppSettings.lastPrintError
-  - 列印成功更新 lastPrintAt / lastPrintOk
-  - SettingsActivity 顯示「最後列印狀態」區塊
-- [ ] **項目 7：開機自動啟動補強**
-  - `MainActivity.onCreate()` 也呼叫 `ContextCompat.startForegroundService(...)`
-  - 不再只依賴 BootReceiver
-  - 老闆只要點一次 APK 圖示就會啟動
-- [ ] **項目 8：MainActivity 健康檢查頁**
-  - 畫面分四區：APK 版本＋Server 狀態 / 三台印表機狀態（每 3 秒刷新） / 最近 10 筆錯誤日誌 / 四個按鈕（測試列印、重啟服務、查看完整日誌、設定）
-  - 老闆截圖傳給 AI 就能看出問題
+第三輪（錦上添花）
+- [x] 項目 9：API Token 驗證（AppSettings.apiToken 首次啟動 UUID 隨機生成、resetAll 後自動重生；PrintHttpServer.checkToken 檢查 X-API-Token header 或 ?token= query；token 為空時不檢查向下相容；SettingsActivity 顯示 token + 複製按鈕 + 重新生成按鈕）
+- [x] 項目 11：APK 內建測試列印頁（PrintHttpServer 的 GET /test endpoint，內嵌 HTML 含 Ping / 印表機狀態 / 測試列印 / 開錢箱 / 最近日誌 5 顆按鈕，自動帶入 X-API-Token header）
 
-**第三輪（錦上添花）**
+不做（已確認）：
+- 項目 2、10、13：使用者明確排除
+- 項目 12：自動更新檢查 — 使用者決定維持手動更新（commit → Actions build → 手動下載 APK 給老闆），不做 UpdateChecker 與 GitHub Releases 整合
 
-- [ ] **項目 9：API Token 驗證**
-  - AppSettings 加 `apiToken` 欄位（首次啟動隨機生成 32 字元）
-  - 所有 /print/*、/drawer/open、/logs endpoint 檢查 header `X-API-Token`
-  - SettingsActivity 顯示 / 重新生成 token 按鈕
-  - 網頁端 settings-page.js 加 token 輸入框
-  - print-bridge.js fetch 帶 X-API-Token header
-- [ ] **項目 11：APK 內建測試列印頁**
-  - `assets/test-print.html`（新檔）
-  - PrintHttpServer 加 `GET /test` 端點服務這個 HTML
-  - 老闆在 Sunmi T2 Chrome 開 `http://127.0.0.1:8080/test` 就能驗證列印
-- [ ] **項目 12：自動更新檢查**
-  - `UpdateChecker.java`（新檔）
-  - 啟動時打 `https://api.github.com/repos/jess0937588151-hue/sunmi-pos-v2/releases/latest`
-  - 比對 BuildConfig.VERSION_NAME，發現新版本在 MainActivity 顯示「有新版可下載」
+關鍵踩雷紀錄（給下一個 AI）：
+1. compileSdk=28 環境下不可使用 android:foregroundServiceType 屬性，AAPT 會報 "attribute foregroundServiceType not found"。Android 7.1.1 也不需要此屬性。
+2. PrintHttpServer 建構子是 4 參數（port + 3 個 manager），不是 5 參數。AppSettings 透過 LogManager.getAppSettings() 取得，不在建構子傳 Context。
+3. SunmiPrinterManager 必須保留舊簽名（printText 回 boolean、printReceipt(title, body)、cutPaper() 回 boolean、buzzer() 無參數），因 PrintJsBridge 與 SettingsActivity 都依賴。新功能用 getPrinterStatusInfo() 與 PrinterStatusInfo 內部類別承載。
+4. BluetoothPrinterManager / NetworkPrinterManager 用 printPosReceipt(json)、openCashDrawer()，不是 printJson() 或 openDrawer()。
+5. LogManager.init(this) 必須寫在 PrintService.onCreate() 內，不可寫在類別欄位區（會 compile error）。
+6. PrintService.onCreate 已加 PrintQueue.init()、onDestroy 已加 PrintQueue.shutdown()。
+
+
 
 ### 📋 待辦（短期，下幾輪要處理）
 
@@ -316,5 +289,7 @@ app/build.gradle                     compileSdk 28 / minSdk 19 / targetSdk 25
 | 2026-05-06 | Claude (Anthropic) | 建立本文件，整理列印橋接架構與市售印表機規劃 |
 | 2026-05-06 | Claude (Anthropic) | v20260602 完工：分隔線動態長度、結尾留白縮為 1/3、現金付款才開錢箱、APK lineWrap(4/3)→lineWrap(1)、cache 升版至 pos-v20260602-cache、index 三模組 modal 加測試列印按鈕；確認 D9 線上訂單自動列印、D10 預約 30 分鐘前提醒已實作 |
 | 2026-05-06 | Claude (Anthropic) | 規劃 v20260603 APK 商用化補強：LogManager 日誌系統、HTTP Server 綁 127.0.0.1、印表機狀態強化、Foreground Service 常駐通知、列印佇列、健康檢查頁、API Token、測試列印頁、自動更新檢查 |
+| 2026-05-06 | Claude (Anthropic) | v20260603 完工：LogManager（檔案+記憶體+7天清理）、HTTP Server 綁 127.0.0.1、PrinterStatusInfo（紙/蓋/熱/切刀/lastPrint*）、Foreground Service 常駐通知、PrintQueue 單線程序列化、API Token 自動生成、/test 內建測試頁、SettingsActivity 顯示最後列印狀態與 token、MainActivity 重做為健康檢查頁（4 區塊+10 筆錯誤日誌+4 顆操作按鈕）。實機測試待進行。 |
+
 
 > 之後每次修改本檔請補一行，寫日期、AI 名稱（或使用者）、簡短說明。
