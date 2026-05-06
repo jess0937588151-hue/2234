@@ -469,9 +469,11 @@
     <div class="settings-modal-body">
       <div class="sm-section-title">印表機狀態</div>
       <div id="sunmiStatusBox" class="sm-info-box">偵測中...</div>
-      <div id="bridgeModeBox_sunmi" style="margin-top:6px;font-size:13px"></div>
+            <div id="bridgeModeBox_sunmi" style="margin-top:6px;font-size:13px"></div>
+      <button type="button" class="sm-btn" style="margin-top:8px" onclick="window.__bridgeTestPrint()">🖨 測試列印（彈系統對話框）</button>
 
       <div class="sm-section-title">測試功能</div>
+
       <div class="sm-btn-row">
         <button id="sunmiTestPrintBtn" class="sm-btn">測試列印</button>
         <button id="sunmiTestCutBtn" class="sm-btn">測試切紙</button>
@@ -496,9 +498,11 @@
     <div class="settings-modal-body">
       <div class="sm-section-title">連線狀態</div>
       <div id="btStatusBox" class="sm-info-box">未連線</div>
-      <div id="bridgeModeBox_bt" style="margin-top:6px;font-size:13px"></div>
+            <div id="bridgeModeBox_bt" style="margin-top:6px;font-size:13px"></div>
+      <button type="button" class="sm-btn" style="margin-top:8px" onclick="window.__bridgeTestPrint()">🖨 測試列印（彈系統對話框）</button>
 
       <div class="sm-section-title">已配對裝置</div>
+
       <div class="sm-form-group">
         <select id="btDeviceSelect" style="width:100%">
           <option value="">請先刷新裝置列表</option>
