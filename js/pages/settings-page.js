@@ -5,6 +5,7 @@
 
 import { state, persistAll } from '../core/store.js';
 import { buildCartPreviewOrder, printOrderLabels, printOrderReceipt, printKitchenCopies, openCashDrawer, getPrintSettings, previewInModal, getReceiptHtml, getLabelHtml } from '../modules/print-service.js';
+import { detectPrinters, clearDetectCache, getBridgeInfo, browserPrintHtml as bridgeBrowserPrint } from '../modules/print-bridge.js';
 
 // ── 列印欄位矩陣（顧客單 / 廚房單 / 標籤 各自勾選） ──
 const PRINT_FIELD_DEFS = [
@@ -99,75 +100,85 @@ function hasSunmi() {
   return !!(window.SunmiPrinter && window.SunmiPrinter.isPrinterReady);
 }
 
-function refreshSunmiStatus() {
+// ── 統一偵測：先 await detectPrinters() 再更新三個狀態框 ──
+async function refreshAllPrinterStatus() {
+  clearDetectCache();
+  const d = await detectPrinters(true);
+  refreshSunmiStatus(d);
+  refreshBtStatus(d);
+  refreshNetStatus(d);
+  refreshBridgeModeBox(d);
+}
+
+function refreshBridgeModeBox(d) {
+  // 在三個 modal 共用的位置顯示「現在走哪條路」
+  ['bridgeModeBox_sunmi','bridgeModeBox_bt','bridgeModeBox_net'].forEach(function(id){
+    var box = document.getElementById(id);
+    if (!box) return;
+    var info = getBridgeInfo();
+    if (d.mode === 'http') {
+      box.innerHTML = '<span class="sm-status connected">● 列印橋接：HTTP（'+info.base+'）v'+(d.version||'?')+'</span>';
+    } else if (d.mode === 'webview') {
+      box.innerHTML = '<span class="sm-status connected">● 列印橋接：WebView Bridge</span>';
+    } else {
+      box.innerHTML = '<span class="sm-status unknown">● 此裝置使用系統列印對話框（按下「測試列印」會彈出系統視窗讓你選印表機）</span>';
+    }
+  });
+}
+
+function refreshSunmiStatus(d) {
   var box = document.getElementById('sunmiStatusBox');
   if (!box) return;
-  if (!hasSunmi()) {
-    box.innerHTML = '<span class="sm-status disconnected">● 未偵測到 Sunmi 印表機</span>';
+  if (!d) { box.innerHTML = '<span class="sm-status unknown">● 偵測中…</span>'; return; }
+  if (d.mode === 'browser') {
+    box.innerHTML = '<span class="sm-status unknown">● 此裝置不適用 Sunmi 內建（請用系統列印對話框）</span>';
     return;
   }
-  var ready = window.SunmiPrinter.isPrinterReady();
-  var status = ready ? '已連線' : '未就緒';
-  var cls = ready ? 'connected' : 'disconnected';
-  var extra = '';
-  if (ready && window.SunmiPrinter.getPrinterStatus) {
-    var code = window.SunmiPrinter.getPrinterStatus();
-    var map = { 1:'正常', 2:'準備中', 3:'通訊異常', 4:'缺紙', 5:'過熱', 6:'開蓋', 7:'切刀異常', 505:'未連線' };
-    extra = ' / 狀態：' + (map[code] || '未知(' + code + ')');
+  if (d.sunmi) {
+    box.innerHTML = '<span class="sm-status connected">● 已連線</span>';
+  } else {
+    box.innerHTML = '<span class="sm-status disconnected">● 未連線（請確認 sunmi-pos-v2 APK 已啟動）</span>';
   }
-  box.innerHTML = '<span class="sm-status ' + cls + '">● ' + status + extra + '</span>';
 }
 
-// ── 藍牙印表機工具 ──
-function refreshBtStatus() {
+function refreshBtStatus(d) {
   var box = document.getElementById('btStatusBox');
   if (!box) return;
-  if (!hasSunmi() || !window.SunmiPrinter.isBtPrinterConnected) {
-    box.innerHTML = '<span class="sm-status unknown">● 無法偵測（需透過 APK）</span>';
+  if (!d) { box.innerHTML = '<span class="sm-status unknown">● 偵測中…</span>'; return; }
+  if (d.mode === 'browser') {
+    box.innerHTML = '<span class="sm-status unknown">● 此裝置不適用（請用系統列印對話框，或在主機上裝列印橋接 APK）</span>';
     return;
   }
-  var connected = window.SunmiPrinter.isBtPrinterConnected();
-  var addr = connected && window.SunmiPrinter.getBtConnectedAddress ? window.SunmiPrinter.getBtConnectedAddress() : '';
-  box.innerHTML = connected
-    ? '<span class="sm-status connected">● 已連線' + (addr ? ' / ' + addr : '') + '</span>'
+  box.innerHTML = d.bluetooth
+    ? '<span class="sm-status connected">● 已連線</span>'
     : '<span class="sm-status disconnected">● 未連線</span>';
 }
 
-function refreshBtDevices() {
-  var sel = document.getElementById('btDeviceSelect');
-  if (!sel || !hasSunmi() || !window.SunmiPrinter.getBtPrinters) return;
-  try {
-    var list = JSON.parse(window.SunmiPrinter.getBtPrinters());
-    sel.innerHTML = '';
-    if (!list.length) {
-      sel.innerHTML = '<option value="">無已配對裝置</option>';
-      return;
-    }
-    list.forEach(function(d) {
-      var opt = document.createElement('option');
-      opt.value = d.address;
-      opt.textContent = (d.name || 'Unknown') + ' / ' + d.address;
-      sel.appendChild(opt);
-    });
-  } catch (e) {
-    sel.innerHTML = '<option value="">讀取失敗</option>';
-  }
-}
-
-// ── 網路印表機工具 ──
-function refreshNetStatus() {
+function refreshNetStatus(d) {
   var box = document.getElementById('netStatusBox');
   if (!box) return;
-  if (!hasSunmi() || !window.SunmiPrinter.isNetPrinterConnected) {
-    box.innerHTML = '<span class="sm-status unknown">● 無法偵測（需透過 APK）</span>';
+  if (!d) { box.innerHTML = '<span class="sm-status unknown">● 偵測中…</span>'; return; }
+  if (d.mode === 'browser') {
+    box.innerHTML = '<span class="sm-status unknown">● 此裝置不適用（請用系統列印對話框，或在主機上裝列印橋接 APK）</span>';
     return;
   }
-  var connected = window.SunmiPrinter.isNetPrinterConnected();
-  var info = connected && window.SunmiPrinter.getNetConnectedInfo ? window.SunmiPrinter.getNetConnectedInfo() : '';
-  box.innerHTML = connected
-    ? '<span class="sm-status connected">● 已連線' + (info ? ' / ' + info : '') + '</span>'
+  box.innerHTML = d.network
+    ? '<span class="sm-status connected">● 已連線</span>'
     : '<span class="sm-status disconnected">● 未連線</span>';
 }
+
+// 提供「測試列印」按鈕用：產生一張簡單測試頁，走系統列印對話框
+window.__bridgeTestPrint = async function(){
+  var html = '<!doctype html><html><head><meta charset="utf-8"><style>'
+    + '@page{size:80mm auto;margin:0}'
+    + 'body{font-family:sans-serif;font-size:14px;width:80mm;padding:5mm;text-align:center}'
+    + 'h2{margin:0 0 8px}</style></head><body>'
+    + '<h2>列印測試</h2>'
+    + '<div>時間：' + new Date().toLocaleString() + '</div>'
+    + '<div style="margin-top:6mm">如果你看到這張紙或選到了印表機，<br>表示列印功能正常。</div>'
+    + '</body></html>';
+  await bridgeBrowserPrint(html);
+};
 
 // ── 列印設定：讀取欄位 ──
 function loadPrintSettingsToForm() {
@@ -395,23 +406,22 @@ export function initSettingsPage() {
   });
 
   // Sunmi 印表機
-  document.querySelector('[data-modal="modalSunmi"]')?.addEventListener('click', function() {
-    refreshSunmiStatus();
+   document.querySelector('[data-modal="modalSunmi"]')?.addEventListener('click', function() {
     openModal('modalSunmi');
+    refreshAllPrinterStatus();
   });
 
-  // 藍牙印表機
   document.querySelector('[data-modal="modalBluetooth"]')?.addEventListener('click', function() {
-    refreshBtStatus();
-    refreshBtDevices();
     openModal('modalBluetooth');
+    refreshAllPrinterStatus();
+    refreshBtDevices();
   });
 
-  // 網路印表機
   document.querySelector('[data-modal="modalNetwork"]')?.addEventListener('click', function() {
-    refreshNetStatus();
     openModal('modalNetwork');
+    refreshAllPrinterStatus();
   });
+
 
   // 即時接單
   document.querySelector('[data-modal="modalRealtime"]')?.addEventListener('click', function() {
