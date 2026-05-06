@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pos-v20260607a-cache';
+const CACHE_NAME = 'pos-v20260606-debug-cache';
 const ASSETS = [
   './',
   './index.html',
@@ -28,6 +28,7 @@ const ASSETS = [
   './js/modules/product-category-manager.js',
   './js/modules/product-module-manager.js',
   './js/modules/print-service.js',
+  './js/modules/print-bridge.js',
   './js/modules/realtime-order-service.js',
   './js/modules/google-backup-service.js',
   './assets/icon-192.png',
@@ -52,6 +53,9 @@ self.addEventListener('fetch', (event) => {
   // Firebase CDN 和外部 API 不做快取
   const url = new URL(event.request.url);
   if (url.origin !== location.origin) return;
+
+  // 127.0.0.1 APK 端不做快取（避免攔截到 ping/print）
+  if (url.hostname === '127.0.0.1' || url.hostname === 'localhost') return;
 
   event.respondWith(
     fetch(event.request).then((response) => {
