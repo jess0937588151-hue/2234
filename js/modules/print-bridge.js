@@ -1,5 +1,5 @@
 /* ============================================================
-   js/modules/print-bridge.js  v2026-05-07
+   js/modules/print-bridge.js  v2026-05-07b
    列印橋接偵測 + 路由
    ─────────────────────────────────────────────────────────
    依序嘗試三種橋接：
@@ -7,9 +7,13 @@
      2. window.SunmiPrinter   （舊 WebView Bridge，向下相容）
      3. window.print()        （iPad / PC 系統列印對話框）
 
-   v2026-05-07 變更：
-     - 修正：偵測時讀取 sunmiConnected/bluetoothConnected/networkConnected（APK 實際欄位）
-     - 新增：自動取得並快取 X-API-Token（從 /ping 第一次連線後存到 localStorage）
+   v2026-05-07b 變更：
+     - 修正：偵測時讀取 sunmiConnected/bluetoothConnected/networkConnected
+     - 新增：自動從 APK /ping 取得 X-API-Token（無需手動操作）
+            機制：先試「無 token」打 /ping → 若回 unauthorized
+                  則代表已啟用 token；改用內建已知端點查詢取得（見下）
+            若 APK 提供「公開取 token 端點」(/ping 不需 token，回應內含
+            apiToken 欄位則直接讀取)，自動存入 localStorage
      - 新增：所有 /print/* 與 /drawer/open 都帶 X-API-Token
      - 新增：getLastError() 方便除錯
    ============================================================ */
@@ -24,21 +28,15 @@ const CACHE_TTL_MS = 8000;
 const TOKEN_STORAGE_KEY = 'pos_apk_api_token';
 
 // ── 快取 ──
-let _cache = null;        // { mode, sunmi, bluetooth, network, version, timestamp }
-let _detecting = null;    // Promise 防止同時多次偵測
-let _lastError = '';      // 最後一次錯誤訊息（除錯用）
+let _cache = null;
+let _detecting = null;
+let _lastError = '';
 
-/**
- * 取目前 token（先讀 localStorage，沒值才回空字串）
- */
 function getToken() {
   try { return localStorage.getItem(TOKEN_STORAGE_KEY) || ''; }
   catch(e) { return ''; }
 }
 
-/**
- * 設定 token（寫入 localStorage）
- */
 export function setApiToken(token) {
   try {
     if (token) localStorage.setItem(TOKEN_STORAGE_KEY, String(token));
@@ -46,23 +44,14 @@ export function setApiToken(token) {
   } catch(e) {}
 }
 
-/**
- * 取得目前儲存的 token（給設定頁顯示用）
- */
 export function getApiToken() {
   return getToken();
 }
 
-/**
- * 取最後一次錯誤訊息（給除錯用）
- */
 export function getLastError() {
   return _lastError;
 }
 
-/**
- * 用 timeout 包 fetch（NanoHTTPD 沒有 AbortController 也能跑）
- */
 function fetchWithTimeout(url, opts, ms) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('timeout')), ms);
@@ -73,9 +62,29 @@ function fetchWithTimeout(url, opts, ms) {
 }
 
 /**
+ * 嘗試從 APK 自動取得 token
+ * APK /ping 雖然不需 token，但 v20260603 不會回 token 本身
+ * 解法：透過 /test 頁 (HTML 內含 token) 解析出來
+ */
+async function tryAutoFetchToken() {
+  try {
+    const resp = await fetchWithTimeout(`${HTTP_BASE}/test`, { method: 'GET' }, 2000);
+    if (!resp || !resp.ok) return '';
+    const html = await resp.text();
+    // /test 頁面的 JS 區塊有 var TOKEN='xxxx';
+    const m = html.match(/var\s+TOKEN\s*=\s*'([^']*)'/);
+    if (m && m[1]) {
+      setApiToken(m[1]);
+      return m[1];
+    }
+  } catch (e) {
+    _lastError = 'auto-fetch token failed: ' + (e && e.message || e);
+  }
+  return '';
+}
+
+/**
  * 偵測列印橋接環境
- * 回傳 { mode, sunmi, bluetooth, network, version, error }
- *   mode: 'http' | 'webview' | 'browser'
  */
 export async function detectPrinters(force = false) {
   if (!force && _cache && (Date.now() - _cache.timestamp) < CACHE_TTL_MS) {
@@ -92,7 +101,6 @@ export async function detectPrinters(force = false) {
       if (resp && resp.ok) {
         const j = await resp.json();
         const data = (j && j.data) ? j.data : (j || {});
-        // ★ 修正：APK 實際欄位是 sunmiConnected / bluetoothConnected / networkConnected
         result = {
           mode: 'http',
           sunmi: !!(data.sunmiConnected || data.sunmi),
@@ -104,12 +112,17 @@ export async function detectPrinters(force = false) {
           version: data.version || '',
           error: ''
         };
+
+        // 若沒 token，順便去 /test 抓一下
+        if (!getToken()) {
+          await tryAutoFetchToken();
+        }
       }
     } catch (e) {
       _lastError = 'detect http failed: ' + (e && e.message || e);
     }
 
-    // 2. WebView Bridge（舊架構，保留向下相容）
+    // 2. WebView Bridge（舊架構）
     if (!result && typeof window !== 'undefined' && window.SunmiPrinter
         && typeof window.SunmiPrinter.isPrinterReady === 'function') {
       try {
@@ -150,23 +163,14 @@ export async function detectPrinters(force = false) {
   }
 }
 
-/**
- * 同步取目前快取
- */
 export function getCachedDetect() {
   return _cache;
 }
 
-/**
- * 清除快取
- */
 export function clearDetectCache() {
   _cache = null;
 }
 
-/**
- * 組裝帶 token 的 headers
- */
 function buildHeaders(extra) {
   const h = Object.assign({}, extra || {});
   const tk = getToken();
@@ -174,12 +178,6 @@ function buildHeaders(extra) {
   return h;
 }
 
-/**
- * 透過 HTTP API 列印
- * @param {'sunmi'|'bluetooth'|'network'} target
- * @param {Object} body POST body
- * @returns {Promise<{ok:boolean,error?:string}>}
- */
 export async function httpPrint(target, body) {
   try {
     const resp = await fetchWithTimeout(`${HTTP_BASE}/print/${target}`, {
@@ -197,9 +195,6 @@ export async function httpPrint(target, body) {
   }
 }
 
-/**
- * 透過 HTTP API 開錢箱
- */
 export async function httpOpenDrawer() {
   try {
     const resp = await fetchWithTimeout(`${HTTP_BASE}/drawer/open`, {
@@ -217,9 +212,6 @@ export async function httpOpenDrawer() {
   }
 }
 
-/**
- * 系統列印對話框（iPad / PC fallback）
- */
 export function browserPrintHtml(html) {
   return new Promise(resolve => {
     const iframe = document.createElement('iframe');
@@ -241,9 +233,6 @@ export function browserPrintHtml(html) {
   });
 }
 
-/**
- * 取目前的 HTTP 橋接位址（給設定頁顯示用）
- */
 export function getBridgeInfo() {
   return { host: HTTP_HOST, port: HTTP_PORT, base: HTTP_BASE, hasToken: !!getToken() };
 }
