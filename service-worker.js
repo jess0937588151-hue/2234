@@ -19,7 +19,6 @@ const ASSETS = [
   './js/pages/pos-page.js',
   './js/pages/orders-page.js',
   './js/pages/reports-page.js',
-  './js/pages/import-page.js',
   './js/pages/products-page.js',
   './js/pages/settings-page.js',
   './js/modules/cart-service.js',
