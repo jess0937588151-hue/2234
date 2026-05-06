@@ -196,24 +196,6 @@ export async function httpPrint(target, body) {
 }
 
 
-export async function httpPrint(target, body) {
-  try {
-    const resp = await fetchWithTimeout(`${HTTP_BASE}/print/${target}`, {
-      method: 'POST',
-      headers: buildHeaders({ 'Content-Type': 'application/json; charset=utf-8' }),
-      body: JSON.stringify(body || {})
-    }, 8000);
-    const j = await resp.json();
-    if (!j.ok) _lastError = 'httpPrint ' + target + ' failed: ' + (j.error || 'unknown');
-    return { ok: !!j.ok, error: j.error || '' };
-  } catch (e) {
-    const msg = String(e && e.message || e);
-    _lastError = 'httpPrint ' + target + ' exception: ' + msg;
-    return { ok: false, error: msg };
-  }
-}
-
-
 export async function httpOpenDrawer() {
   try {
     const resp = await fetchWithTimeout(`${HTTP_BASE}/drawer/open`, {
