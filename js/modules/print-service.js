@@ -565,7 +565,7 @@ export async function printOrderReceipt(order, mode){
   const html = getReceiptHtml(order, realMode === 'kitchen' ? 'kitchen' : 'customer');
 
   // 確保有最新偵測結果
-  await detectPrinters();
+  await detectPrinters(true);
   const d = getDetect();
 
   // ── HTTP 模式 ──
@@ -613,7 +613,7 @@ export async function printKitchenCopies(order){
   const payload = buildBridgePayload(order, 'kitchen');
   const html = getReceiptHtml(order, 'kitchen');
 
-  await detectPrinters();
+  await detectPrinters(true);
   const d = getDetect();
 
   for (let i = 0; i < copies; i++) {
@@ -654,7 +654,7 @@ export async function printOrderLabels(order){
   const payload = buildBridgePayload(order, 'label');
   const html = getLabelHtml(order);
 
-  await detectPrinters();
+  await detectPrinters(true);
   const d = getDetect();
 
   if (d && d.mode === 'http') {
