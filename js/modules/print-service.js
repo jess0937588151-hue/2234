@@ -185,8 +185,13 @@ const sep = '-'.repeat(sepLen);
       }
     }
 
-        // 結尾留白：只不保留需要時間入line(' ', smallSize);（原本兩行 + cutPaper 自走紙過長）
-    
+        // 結尾留白：原本兩行 → 改為動態 1/3（無條件進位至少 1 行）
+    // 切紙器本身會自動走紙，所以這裡只需要少量緩衝
+    const tailBlankLines = Math.max(1, Math.ceil(2 / 3));   // = 1 行
+    for (let i = 0; i < tailBlankLines; i++) {
+      line(' ', smallSize);
+    }
+
     if(typeof sp.cutPaper === 'function'){
       try { sp.cutPaper(); } catch(e) {}
     }
@@ -205,12 +210,11 @@ function buildPlainTextFromOrder(order, mode){
   const isLabel = mode === 'label';
   const fields = cfg.fields[isKitchen ? 'kitchen' : (isLabel ? 'label' : 'receipt')];
   const lines = [];
-  // 依紙寬與字體大小動態計算分隔線長度（避免換行）
-// 58mm 紙約 32 半形字（小字），字體放大時等比縮短
-const paperWidth = Number(cfg.receiptPaperWidth || 58);
-const baseCols = paperWidth >= 76 ? 42 : (paperWidth >= 70 ? 38 : 32);
-const sepLen = Math.max(8, Math.floor(baseCols * (24 / baseSize)));
-const sep = '-'.repeat(sepLen);
+  // 依紙寬動態計算分隔線長度（純文字模式，固定基礎字寬）
+  // 58mm ≈ 32 半形字，76mm ≈ 42 半形字
+  const paperWidth = Number(cfg.receiptPaperWidth || 58);
+  const sepLen = paperWidth >= 76 ? 42 : (paperWidth >= 70 ? 38 : 32);
+  const sep = '-'.repeat(sepLen);
 
 
   if(fields.storeName && cfg.storeName) lines.push(cfg.storeName);
@@ -276,7 +280,6 @@ const sep = '-'.repeat(sepLen);
     }
   }
 
-  lines.push('');
   lines.push('');
   return lines.join('\n');
 }
