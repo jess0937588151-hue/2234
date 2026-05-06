@@ -688,7 +688,7 @@ export async function printOrderLabels(order){
 // 錢箱
 // ============================================================
 export async function openCashDrawer(){
-  await detectPrinters();
+  await detectPrinters(true);
   const d = getDetect();
 
   if (d && d.mode === 'http') {
