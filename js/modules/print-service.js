@@ -570,18 +570,19 @@ export async function printOrderReceipt(order, mode){
 
   // ── HTTP 模式 ──
   if (d && d.mode === 'http') {
-    if (d.sunmi) {
-      const r = await httpPrint('sunmi', { payload });
+        if (d.sunmi) {
+      const r = await httpPrint('sunmi', payload);
       if (r.ok) return { route:'http-sunmi', ok:true };
     }
     if (d.bluetooth) {
-      const r = await httpPrint('bluetooth', { payload });
+      const r = await httpPrint('bluetooth', payload);
       if (r.ok) return { route:'http-bluetooth', ok:true };
     }
     if (d.network) {
-      const r = await httpPrint('network', { payload });
+      const r = await httpPrint('network', payload);
       if (r.ok) return { route:'http-network', ok:true };
     }
+
     // 全失敗 → 落到瀏覽器列印
   }
 
@@ -619,15 +620,16 @@ export async function printKitchenCopies(order){
     let printed = false;
 
     if (d && d.mode === 'http') {
-      if (d.sunmi) {
-        const r = await httpPrint('sunmi', { payload }); if (r.ok) printed = true;
+            if (d.sunmi) {
+        const r = await httpPrint('sunmi', payload); if (r.ok) printed = true;
       }
       if (!printed && d.bluetooth) {
-        const r = await httpPrint('bluetooth', { payload }); if (r.ok) printed = true;
+        const r = await httpPrint('bluetooth', payload); if (r.ok) printed = true;
       }
       if (!printed && d.network) {
-        const r = await httpPrint('network', { payload }); if (r.ok) printed = true;
+        const r = await httpPrint('network', payload); if (r.ok) printed = true;
       }
+
     } else if (d && d.mode === 'webview') {
       const jsonStr = JSON.stringify(payload);
       if (sunmiPrintReceiptByFont(order, 'kitchen')) printed = true;
@@ -656,15 +658,16 @@ export async function printOrderLabels(order){
   const d = getDetect();
 
   if (d && d.mode === 'http') {
-    if (d.sunmi) {
-      const r = await httpPrint('sunmi', { payload }); if (r.ok) return { route:'http-sunmi', ok:true };
+        if (d.sunmi) {
+      const r = await httpPrint('sunmi', payload); if (r.ok) return { route:'http-sunmi', ok:true };
     }
     if (d.bluetooth) {
-      const r = await httpPrint('bluetooth', { payload }); if (r.ok) return { route:'http-bluetooth', ok:true };
+      const r = await httpPrint('bluetooth', payload); if (r.ok) return { route:'http-bluetooth', ok:true };
     }
     if (d.network) {
-      const r = await httpPrint('network', { payload }); if (r.ok) return { route:'http-network', ok:true };
+      const r = await httpPrint('network', payload); if (r.ok) return { route:'http-network', ok:true };
     }
+
   } else if (d && d.mode === 'webview') {
     const jsonStr = JSON.stringify(payload);
     if (sunmiPrintReceiptByFont(order, 'label')) return { route:'sunmi-font', ok:true };
