@@ -178,49 +178,30 @@ function buildHeaders(extra) {
   return h;
 }
 
-/**
- * 把 UTF-8 字串轉成「ISO-8859-1 兼容」的字串
- *
- * 用途：APK 端 sunmi-pos-v2 使用 NanoHTTPD 2.3.1，其 parseBody 與
- *       getInputStream().toString() 預設用 ISO-8859-1 解 POST body，
- *       直接送 UTF-8 會在 APK 端被拆成亂碼字元（中文變 ◆）。
- *
- * 原理：先把字串編成 UTF-8 bytes，再把每個 byte 當成 latin-1 字元
- *       打包成新字串送出。fetch 預設以 latin-1 安全範圍送 body，
- *       NanoHTTPD 收到後用 ISO-8859-1 還原 → 剛好得到原本的 UTF-8 byte 序列
- *       → JSONObject 把它當 UTF-8 解 → 還原中文。
- *
- * ⚠️ 未來若 APK 換成 OkHttp / Ktor / 其他正常以 UTF-8 解 body 的 server，
- *    請把 httpPrint 內的 safeBody 換回 jsonStr，並移除此函式。
- *
- * 影響範圍：
- *   - /print/sunmi    ✅ 必要（修正中文亂碼）
- *   - /print/bluetooth ✅ 必要（同上；藍牙機本身需另做 UTF-8→GB18030 轉碼，
- *                        但那是 APK 端 BluetoothPrinterManager 的事，與此函式無關）
- *   - /print/network   ✅ 必要（同藍牙）
- *   - /drawer/open     ✅ body 是空 JSON {}，無中文，加不加效果一樣
- *   - 瀏覽器 fallback  ✅ 不經過此函式，無影響
- */
-function utf8ToLatin1(str) {
-  const bytes = new TextEncoder().encode(str);
-  let out = '';
-  for (let i = 0; i < bytes.length; i++) {
-    out += String.fromCharCode(bytes[i]);
+export async function httpPrint(target, body) {
+  try {
+    const resp = await fetchWithTimeout(`${HTTP_BASE}/print/${target}`, {
+      method: 'POST',
+      headers: buildHeaders({ 'Content-Type': 'application/json; charset=utf-8' }),
+      body: JSON.stringify(body || {})
+    }, 8000);
+    const j = await resp.json();
+    if (!j.ok) _lastError = 'httpPrint ' + target + ' failed: ' + (j.error || 'unknown');
+    return { ok: !!j.ok, error: j.error || '' };
+  } catch (e) {
+    const msg = String(e && e.message || e);
+    _lastError = 'httpPrint ' + target + ' exception: ' + msg;
+    return { ok: false, error: msg };
   }
-  return out;
 }
 
 
 export async function httpPrint(target, body) {
   try {
-    // 先 JSON.stringify，再用 UTF-8→Latin1 轉換，避開 NanoHTTPD ISO-8859-1 bug
-    const jsonStr = JSON.stringify(body || {});
-    const safeBody = utf8ToLatin1(jsonStr);
-
     const resp = await fetchWithTimeout(`${HTTP_BASE}/print/${target}`, {
       method: 'POST',
       headers: buildHeaders({ 'Content-Type': 'application/json; charset=utf-8' }),
-      body: safeBody
+      body: JSON.stringify(body || {})
     }, 8000);
     const j = await resp.json();
     if (!j.ok) _lastError = 'httpPrint ' + target + ' failed: ' + (j.error || 'unknown');
