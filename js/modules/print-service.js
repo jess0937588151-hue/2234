@@ -185,12 +185,8 @@ const sep = '-'.repeat(sepLen);
       }
     }
 
-        // 結尾留白：原本兩行 → 改為動態 1/3（無條件進位至少 1 行）
-    // 切紙器本身會自動走紙，所以這裡只需要少量緩衝
-    const tailBlankLines = Math.max(1, Math.ceil(2 / 3));   // = 1 行
-    for (let i = 0; i < tailBlankLines; i++) {
-      line(' ', smallSize);
-    }
+     // 結尾留白：原本兩行 → 1/3 ≈ 1 行（切紙器本身會自走紙）
+    line(' ', smallSize);
 
     if(typeof sp.cutPaper === 'function'){
       try { sp.cutPaper(); } catch(e) {}
@@ -210,11 +206,13 @@ function buildPlainTextFromOrder(order, mode){
   const isLabel = mode === 'label';
   const fields = cfg.fields[isKitchen ? 'kitchen' : (isLabel ? 'label' : 'receipt')];
   const lines = [];
-  // 依紙寬動態計算分隔線長度（純文字模式，固定基礎字寬）
-  // 58mm ≈ 32 半形字，76mm ≈ 42 半形字
+
+  // 純文字模式：依紙寬決定半形字數（沒有字體放大概念，所以不用 baseSize）
+  // 58mm ≈ 32 字、70mm ≈ 38 字、80mm ≈ 42 字
   const paperWidth = Number(cfg.receiptPaperWidth || 58);
   const sepLen = paperWidth >= 76 ? 42 : (paperWidth >= 70 ? 38 : 32);
   const sep = '-'.repeat(sepLen);
+
 
 
   if(fields.storeName && cfg.storeName) lines.push(cfg.storeName);
@@ -280,6 +278,7 @@ function buildPlainTextFromOrder(order, mode){
     }
   }
 
+  // 結尾空白：兩行 → 1/3 ≈ 1 行
   lines.push('');
   return lines.join('\n');
 }
@@ -558,40 +557,6 @@ function buildBridgePayload(order, mode){
 }
 
 // ============================================================
-// 瀏覽器 fallback：用隱藏 iframe 列印
-// ============================================================
-function browserPrintHtml(html){
-  return new Promise(resolve => {
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentDocument || iframe.contentWindow.document;
-    doc.open();
-    doc.write(html);
-    doc.close();
-
-    iframe.onload = () => {
-      try { iframe.contentWindow.focus(); iframe.contentWindow.print(); }
-      catch(e) { console.error('browserPrint failed:', e); }
-      setTimeout(() => {
-        try { document.body.removeChild(iframe); } catch(e){}
-        resolve(true);
-      }, 1500);
-    };
-    // 某些 WebView 不會觸發 onload
-    setTimeout(() => {
-      try { iframe.contentWindow.focus(); iframe.contentWindow.print(); } catch(e){}
-    }, 500);
-  });
-}
-
-// ============================================================
 // 主路由：顧客單
 // ============================================================
 export async function printOrderReceipt(order, mode){
@@ -828,7 +793,7 @@ export async function printSessionReportViaBridge(reportData){
     @page{size:58mm auto;margin:0}
     body{font-family:"PingFang TC",sans-serif;font-size:13px;width:58mm;padding:3mm;margin:0;color:#000;white-space:pre-wrap;word-break:break-all}
   </style></head><body>${escapeHtml(body)}</body></html>`;
-  await browserPrintHtml(html);
+    await bridgeBrowserPrint(html);
   return { route:'browser', ok:true };
 }
 
