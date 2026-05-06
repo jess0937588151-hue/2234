@@ -1,170 +1,229 @@
-# AI 協作備忘錄（POS 專案）
+# POS 專案 AI 接手說明書
 
-> 本檔目的：跨對話讓 AI 助手快速理解專案現況、避免重複問已知資訊。
-> 新對話開始時，第一句話貼這份檔案的 raw 網址 + 你想做的事即可。
-> Raw URL: `https://raw.githubusercontent.com/jess0937588151-hue/2234/main/aiREADME.md`
+> 給每一個新接手的 AI：**動手前先讀完這份文件**，禁止憑記憶或猜測修改。所有改動完成後請更新「進度紀錄」段落。
 
 ---
 
-## 1. 專案 Repo
+## 一、專案組成
 
-| 用途 | 網址 |
-|---|---|
-| 網頁主程式（目前在用） | https://github.com/jess0937588151-hue/2234 |
-| APK 端（包 WebView） | https://github.com/jess0937588151-hue/sunmi-pos-v2 |
-| 舊版可參考（功能相對乾淨） | https://github.com/jess0937588151-hue/2332 |
-| 部署網址（GitHub Pages） | https://jess0937588151-hue.github.io/2234/ |
-
----
-
-## 2. 使用環境（重要）
-
-- **主要裝置**：Sunmi T2 安卓平板
-  - Android 7.1.1（API 25）
-  - 記憶體 2GB（**寫程式時注意記憶體佔用**）
-- **APK 版本**：versionName 4.0（versionCode 4，2026-04-27）
-- **次要裝置**：iPad（用瀏覽器開部署網址）
-- **APK 編譯**：GitHub Actions 自動編譯（`.github/workflows/build.yml`）
-
-### WebView 已知限制（API 25 + Android 7.1.1）
-
-| 限制 | 影響 | 繞過方式 |
+| 角色 | Repo | 部署/用途 |
 |---|---|---|
-| `window.open()` 預設被擋（沒設 setSupportMultipleWindows） | 新分頁、彈出視窗失效 | 網頁端用 DOM overlay 取代 |
-| `<a download>` / Blob URL 下載失效（沒設 setDownloadListener） | CSV/Excel 匯出按了沒反應 | 網頁端用 textarea + 複製到剪貼簿取代 |
-| Google OAuth 嵌入式 WebView 被 Google 政策封鎖 | Firebase / Drive 登入失敗（顯示「不符合 Google 規範」） | 改用 Email+密碼登入或放棄 |
+| 網頁主程式 | https://github.com/jess0937588151-hue/2234 | 部署於 https://jess0937588151-hue.github.io/2234/ |
+| Sunmi 列印橋接 APK | https://github.com/jess0937588151-hue/sunmi-pos-v2 | 純後台 HTTP Server，僅在 Sunmi T2 上安裝 |
+| 舊版參考 | https://github.com/jess0937588151-hue/2332 | 已知可正常使用的版本，遇到回歸問題時對照 |
+| 多店看板（規劃中） | 尚未建立 | 老闆用，跨店即時營業狀況 |
 
 ---
 
-## 3. 每日使用功能（全部都在用）
+## 二、執行環境
 
-- 點餐 / 結帳
-- 廚房單列印
-- 收據列印
-- 標籤列印
-- 線上點餐（Firebase 即時接單）
-- 預約 30 分鐘提醒
-- Google Drive 備份
-- 報表匯出
-- 訂單查詢
+**主裝置：Sunmi T2**
+- Android 7.1.1（API 25）
+- 2 GB RAM
+- 80 mm 熱感紙
+- 內建熱感印表機 + 錢箱
+- 安裝 sunmi-pos-v2 APK（純後台列印橋接，無 WebView UI）
+- 用 Chrome 直接開 https://jess0937588151-hue.github.io/2234/
 
-**所有功能都是每天必用，沒有「次要」可以犧牲**。
+**備援裝置：**
+- iPad（Safari）— 主要看訂單與簡單操作，列印走系統列印對話框
+- Windows 電腦（Chrome）— 完整功能，列印走系統列印對話框
+- 其他 Android（未來可能安裝 2234 打包後的 APK）
 
----
-
-## 4. 印表機配置
-
-- **紙寬**：80mm
-- **內建 Sunmi 印表機**：印全部單（收據／廚房／標籤都印）
-- **外接藍牙印表機**：完整備援，印全部單
-- **外接網路印表機**：完整備援，印全部單
-
-備援邏輯：iPad 開時走藍牙／網路；Sunmi T2 開時走內建。
+**關鍵限制：**
+- iPad/Safari 不支援 Web Bluetooth、WebUSB、Service Worker 部分行為
+- Sunmi T2 Android 7.1.1 不支援部分新 API
+- WebView 內 OAuth 被 Google 封鎖（disallowed_useragent）→ 因此採純後台架構
 
 ---
 
-## 5. AI 助手協作守則（請嚴格遵守）
+## 三、列印架構（重要）
 
-1. **不要猜原因**。每次回答前先用 crawler 工具讀取相關檔案，看到實際程式碼再說。
-2. **每次只改一個檔案的一個函式**，除非使用者明確同意大改。
-3. **修改前先報告**：要改哪個檔案、哪一段、為什麼。等使用者同意才動手。
-4. **同一頁面同一功能要一次改完**（例如報表頁兩個匯出按鈕一起改，不要分兩次）。
-5. **不要叫使用者按 F12**：使用者用 Sunmi T2 安卓平板，沒有 F12。
-6. **錯誤訊息以 app.js 內建的紅色橫條為準**（畫面最下方會顯示）。
-7. **不要假設使用者懂程式**：給步驟要明確（哪個檔、哪一行、貼什麼）。
-8. **CSV / Excel 不要玩文字遊戲**：使用者要的是「Excel 雙擊能開的檔」，CSV 加 BOM 就行，不需要強推 .xlsx。
-9. **WebView 限制要記住**：不要再寫 `window.open`、`<a download>`、`Blob` 下載、Google OAuth。
+```
+            ┌─────────────────────────────────────┐
+            │        2234 網頁（瀏覽器）          │
+            │   js/modules/print-bridge.js        │
+            │   依序嘗試 3 種橋接：               │
+            │     1. HTTP 127.0.0.1:8080  (T2/未來新APK)│
+            │     2. window.SunmiPrinter   (舊 WebView 殼，已停用) │
+            │     3. window.print()        (iPad/PC)│
+            └─────────────────────────────────────┘
+                          │
+       ┌──────────────────┼──────────────────┐
+       ▼                  ▼                  ▼
+  Sunmi T2:          iPad/PC:          未來 2234 打包 APK:
+  HTTP API          系統列印對話框       本機 HTTP Server
+  ↓                                    ↓
+  sunmi-pos-v2 APK                     市售出單機模組（未做）
+  ├ Sunmi 內建（AIDL）                ├ 藍牙 ESC/POS
+  ├ 藍牙 ESC/POS                      ├ 網路 ESC/POS (TCP 9100)
+  └ 網路 ESC/POS (TCP 9100)           └ USB ESC/POS (USB Host)
+```
 
----
-
-## 6. 已修正的事項
-
-### 網頁端（2234）
-
-- [x] 報表頁三個按鈕（歷史紀錄／匯出／成本管理）搬到頁首 topbar
-- [x] 歷史班次紀錄讀取路徑修正（`state.reports.sessions`）
-- [x] 列印欄位三欄獨立勾選（receipt / kitchen / label 矩陣）
-- [x] `getFieldFlags(mode)` 改讀 `cfg.fields[mode]`
-- [x] 收據分隔線動態長度（避免換行）
-- [x] 收據結尾留白減少（部分，硬體限制無法完全消除）
-- [x] CSV 匯出改用 overlay 文字框 + 複製到剪貼簿（相容 Android WebView）
-
-### APK 端（sunmi-pos-v2）
-
-（暫無）
+**關鍵設計原則：網頁端的偵測邏輯不認牌子、不認機型，只問「本機 127.0.0.1:8080 有沒有橋接服務在跑」。** 所以未來打包新 APK 時，網頁端不需要改，新 APK 自動會被網頁的偵測辨認到。
 
 ---
 
-## 7. 待修事項（依優先順序）
+## 四、HTTP Server API 規格（sunmi-pos-v2 已實作；未來新 APK 必須遵守相同規格）
 
-### 🔴 高優（影響每日使用）
+**位址：** `http://127.0.0.1:8080`（埠號可在 APK 設定頁修改）
+**所有回應：** `{"ok": true/false, "data": ..., "error": "..."}`
+**所有 Endpoint 必含 CORS header**
 
-1. **Google 登入無法使用**（Firebase + Drive 兩個都掛）
-   - 根因：Google 政策禁止嵌入式 WebView 跑 OAuth
-   - 候選方案 A：Firebase 改 Email+密碼登入，密碼寫死在 JS（最小改動，**只動網頁**）
-   - 候選方案 B：Drive 備份改成「Email 寄 CSV 附件」（用 `mailto:` 連結）
-   - 候選方案 C：放棄 Drive，改本機儲存
-   - **使用者偏好**：能不改 APK 最好；最好直接寫死帳密自動登入
-   - **狀態**：方案 A 可行，待開工
-2. **收據結尾留白還是太多**
-   - 已嘗試前端刪空白行但效果有限
-   - 真正解法：改 APK 端 `SunmiPrinterManager.java` 的 `cutPaper()` 走紙距離
-   - 或改用 ESC/POS 指令 `[0x1B,0x4A,n]` 自訂走紙
+| Method | Path | 用途 |
+|---|---|---|
+| GET | `/ping` | 心跳，回 version 與三種印表機連線狀態 |
+| GET | `/printer/status` | 詳細印表機狀態 |
+| POST | `/print/sunmi` | Sunmi 內建列印（新 APK 不需要） |
+| POST | `/print/bluetooth` | 藍牙 ESC/POS 列印 |
+| POST | `/print/network` | 網路 ESC/POS 列印 |
+| POST | `/drawer/open` | 開錢箱（依優先順序：Sunmi > 藍牙 > 網路） |
 
-### 🟡 中優
-
-3. **APK WebView 設定下載／彈窗支援**（一勞永逸解決匯出問題）
-   - 改 `MainActivity.java` 加 `setDownloadListener` + `setSupportMultipleWindows(true)`
-   - 改完後網頁端可以恢復用 `Blob` + `<a download>`
-4. **開錢箱條件邏輯**：確認只在現金付款時才開
-5. **線上接單背景觸發**：APK 殺掉後預約 30 分提醒能否準時觸發
-6. **設定頁 `getFieldFlags()` 死碼清理**（B1/B2/B4，不影響功能但留著佔空間）
-
-### 🟢 低優
-
-7. 熱銷 TOP10 詳細展開效果
-8. 成本管理功能（A2）：商品成本輸入 + 班次成本/利潤計算
+POST body 範例：
+```json
+{
+  "payload": { "shopName":"...", "items":[...], "total":100, "mode":"receipt" },
+  "openDrawer": false
+}
+```
 
 ---
 
-## 8. 主要檔案速查（網頁端 2234）
+## 五、進度紀錄
 
-| 檔案 | 內容 |
-|---|---|
-| `index.html` | UI 結構、所有 modal、xlsx CDN 載入 |
-| `service-worker.js` | PWA 快取（CACHE_NAME 改字串會強制更新） |
-| `js/app.js` | 入口、初始化、全域錯誤紅條、Google 登入入口 |
-| `js/core/store.js` | state 結構、預設值、persistAll |
-| `js/core/utils.js` | downloadFile、escapeHtml、money、fmtLocalDateTime |
-| `js/pages/pos-page.js` | 點餐結帳、商品選項配置 |
-| `js/pages/orders-page.js` | 訂單查詢、線上待確認、待付款、已完成 |
-| `js/pages/reports-page.js` | 報表、班次、匯出 CSV、列印報表 |
-| `js/pages/products-page.js` | 商品管理、分類、模組 |
-| `js/pages/settings-page.js` | 列印設定、Sunmi、藍牙、網路、即時接單、Drive 備份 |
-| `js/modules/print-service.js` | 列印核心（Sunmi Bridge 呼叫） |
-| `js/modules/realtime-order-service.js` | Firebase 即時接單、POS Google 登入 |
-| `js/modules/google-backup-service.js` | Drive 備份、登入 |
-| `js/modules/report-session.js` | 班次（開/結班、累計） |
+### ✅ 已完成
+
+- [x] APK 重構為純後台 HTTP Server 架構（NanoHTTPD on 127.0.0.1）
+- [x] APK PrintHttpServer.java line 57 OPTIONS preflight 編譯錯誤已修
+- [x] APK 三種印表機 Manager 完成（Sunmi/藍牙/網路），可獨立連線、列印、開錢箱
+- [x] 設定頁三欄勾選矩陣（receipt/kitchen/label 各自勾選欄位）
+- [x] reports-page.js 報表匯出改用 overlay 顯示 CSV（Sunmi T2 WebView 限制）
+
+### 🔧 進行中（本輪）
+
+- [ ] **網頁端 ↔ APK HTTP Server 接通**
+  - 新增 `js/modules/print-bridge.js`（三層橋接偵測）
+  - 改寫 `js/modules/print-service.js`（列印路由走 bridge）
+  - 改寫 `js/pages/settings-page.js`（三區塊偵測改走 bridge，iPad/PC 顯示「系統列印模式」）
+
+### 📋 待辦（短期，下幾輪要處理）
+
+| 優先 | 項目 | 影響範圍 | 細節 |
+|---|---|---|---|
+| 高 | 廚房單/收據結尾留白過長 | sunmi-pos-v2 SunmiPrinterManager.java | cutPaper 前送紙太多，調整 ESC/POS `[0x1B,0x4A,n]` |
+| 高 | 開錢箱僅在現金付款時觸發 | print-service.js + APK | 結帳邏輯加判斷 |
+| 中 | Google 登入失敗（Drive + Firebase） | 網頁或 APK | 顯示 disallowed_useragent；解法：Custom Tabs 或改 Firebase Email 固定密碼 |
+| 中 | 線上訂單自動列印（D9） | sunmi-pos-v2 加背景監聽 | 收到 Firebase 推播時自動印廚房 + 收據 |
+| 中 | 預約訂單前 30 分鐘自動印廚房（D10） | sunmi-pos-v2 AlarmManager | 需背景排程 |
+
+### 🔮 待辦（長期，未來規劃）
+
+#### A. 2234 打包成獨立 APK（含市售印表機列印模組）
+
+**目的：** 讓非 Sunmi 的 Android 裝置也能完整使用本系統，連硬體出單機。
+
+**規格（給以後做的 AI）：**
+- WebView 載入 https://jess0937588151-hue.github.io/2234/（或內嵌離線版）
+- **同時** 跑後台 NanoHTTPD on 127.0.0.1:8080，協定與 sunmi-pos-v2 完全相同
+- 列印模組需含三類市售出單機：
+  - **藍牙 ESC/POS**：列出已配對裝置 / 連線 / 測試列印（搬 sunmi-pos-v2/BluetoothPrinterManager.java）
+  - **網路 ESC/POS**：手動輸 IP:9100 或掃描區網 / 連線測試（搬 sunmi-pos-v2/NetworkPrinterManager.java）
+  - **USB ESC/POS**：UsbManager 列出裝置 / 要求權限 / BulkTransfer 送 ESC/POS（新增 UsbPrinterManager.java）
+- 不含 Sunmi 內建（因為這個 APK 不限定跑在 Sunmi）
+- 設定頁 UI 與目前 sunmi-pos-v2/SettingsActivity.java 一致
+- WebView 內 Google 登入需用 Custom Tabs 跳外部瀏覽器
+- WebView 需設 DownloadListener 處理 CSV/Excel 下載
+- 需處理 USB Host 權限、藍牙權限（API 25 與 API 31+ 不同）
+
+**Android 平台已知限制（不要嘗試突破）：**
+- 不可能整合 HP/Epson/Canon 的 Windows 私有驅動（Android 無對等驅動概念）
+- 非 ESC/POS 印表機（A4 雷射/噴墨）只能透過 Mopria/IPP，列印品質與功能受限
+
+#### B. 多店即時營業看板網站
+
+- 老闆用，輸入店家代碼 / 帳號可看多家店即時班次狀況
+- 資料源：Firebase（每店上傳當日 sales/count/sessions）
+- 可放 2234 同 repo 的 `dashboard.html` 或獨立新 repo（待決定）
+- 需要 Firebase 登入機制（與主 POS 同一個 project 或新建）
+
+#### C. POS 新功能 / 流程改善（可待用戶提出時補充）
+
+- _（這個段落留給未來補充）_
 
 ---
 
-## 9. 主要檔案速查（APK 端 sunmi-pos-v2）
+## 六、關鍵檔案地圖
 
-| 檔案 | 內容 |
-|---|---|
-| `app/build.gradle` | versionName/Code、minSdk 19、targetSdk 25 |
-| `app/src/main/AndroidManifest.xml` | 權限、Activity 註冊 |
-| `app/src/main/java/com/pos/sunmiprinter/MainActivity.java` | WebView 設定、Sunmi 綁定、登入入口 |
-| `app/src/main/java/com/pos/sunmiprinter/SettingsActivity.java` | APK 內設定頁（網址、藍牙、網路） |
-| `app/src/main/java/com/pos/sunmiprinter/AppSettings.java` | 設定持久化 |
-| `app/src/main/java/com/pos/sunmiprinter/printer/SunmiPrinterManager.java` | Sunmi AIDL 印表機（cutPaper、走紙） |
-| `app/src/main/java/com/pos/sunmiprinter/printer/BluetoothPrinterManager.java` | 藍牙印表機 |
-| `app/src/main/java/com/pos/sunmiprinter/printer/NetworkPrinterManager.java` | 網路印表機 |
-| `app/src/main/java/com/pos/sunmiprinter/web/PrintJsBridge.java` | JS Bridge（網頁呼叫 Sunmi） |
-| `app/src/main/assets/inject-bridge.js` | 啟動時注入網頁的橋接 JS |
-| `.github/workflows/build.yml` | GitHub Actions 自動編譯 |
+### 網頁（jess0937588151-hue/2234）
+
+```
+index.html                          主頁面 + 各 view 區塊
+js/app.js                           入口、初始化、Service Worker 註冊
+service-worker.js                   PWA 快取（修改時記得改 CACHE_NAME 觸發更新）
+js/core/store.js                    全域 state 與持久化
+js/core/utils.js                    格式化、下載等工具
+js/modules/print-bridge.js          ★ 列印橋接偵測（HTTP/WebView/系統）
+js/modules/print-service.js          列印主服務（getReceiptHtml / printOrderReceipt 等）
+js/modules/order-service.js          訂單建立/結帳
+js/modules/cart-service.js           購物車
+js/modules/realtime-order-service.js Firebase 線上單監聽
+js/modules/customer-service.js       顧客資料、電話遮罩
+js/modules/report-session.js         班次/報表
+js/modules/google-backup-service.js  Google Drive 備份
+js/pages/pos-page.js                 點餐頁
+js/pages/orders-page.js              訂單查詢
+js/pages/reports-page.js             報表（含 CSV overlay 匯出）
+js/pages/products-page.js            商品管理
+js/pages/settings-page.js            設定頁（含印表機偵測 UI）
+```
+
+### APK（jess0937588151-hue/sunmi-pos-v2）
+
+```
+app/src/main/java/com/pos/sunmiprinter/
+  MainActivity.java                  服務狀態頁
+  SettingsActivity.java              APK 設定頁（埠號、印表機設定）
+  AppSettings.java                   SharedPreferences 包裝
+  PrintService.java                  Foreground Service（持有三個 Manager + HttpServer）
+  PrintHttpServer.java               NanoHTTPD 路由器
+  printer/
+    SunmiPrinterManager.java         AIDL 綁定 + 列印
+    BluetoothPrinterManager.java     藍牙 ESC/POS
+    NetworkPrinterManager.java       網路 ESC/POS
+    SunmiCallbackAdapter.java        Sunmi 回調轉接
+app/src/main/AndroidManifest.xml     需 INTERNET、BLUETOOTH、FOREGROUND_SERVICE、RECEIVE_BOOT_COMPLETED
+app/build.gradle                     compileSdk 28 / minSdk 19 / targetSdk 25
+```
 
 ---
 
-## 10. 下次新對話建議起手式
+## 七、給下一個 AI 的工作守則
 
+1. **改前先 fetch 真實檔案**：不准憑記憶猜程式碼長相，每次都要從 raw.githubusercontent.com 拉最新版確認。
+2. **一次一個檔案**：commit 訊息標明影響範圍與目的。
+3. **編譯失敗看 GitHub Actions log**：抓真正的錯誤行號與型別訊息，不要憑錯誤文字猜。
+4. **不要新增本 README 未列出的功能**：新需求請先請使用者更新本檔。
+5. **改完更新本檔的「進度紀錄」段落**：把已完成項打勾，新發現的待辦補進待辦清單。
+6. **回傳給使用者的訊息要明確指示「改哪個檔案、貼到哪一段」**：使用者不寫程式，不要丟一段 code 沒講放哪。
+7. **遇到 Service Worker 快取問題**：修改 `service-worker.js` 開頭的 `CACHE_NAME` 字串強制更新。
+8. **對於使用者裝置限制（Sunmi T2 / Android 7.1.1 / 2GB / WebView）保持警覺**：不要用 ES2022+ 語法、不要假設有 DevTools。
+
+---
+
+## 八、使用者偏好（重要）
+
+- 不會寫程式，不要丟程式碼片段不告訴他放哪
+- 主要使用 Sunmi T2，所有方案先以 T2 能用為準
+- 偏好「最小改動、能用就好」
+- 不喜歡反覆猜測與文字遊戲，要求一次到位
+- 修不好寧可保留可用的舊邏輯，不要破壞性改動
+
+---
+
+## 九、版本紀錄
+
+| 日期 | 修改者 | 內容 |
+|---|---|---|
+| 2026-05-06 | Claude (Anthropic) | 建立本文件，整理列印橋接架構與市售印表機規劃 |
+
+> 之後每次修改本檔請補一行，寫日期、AI 名稱（或使用者）、簡短說明。
