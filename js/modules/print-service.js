@@ -9,8 +9,6 @@
 
 import { state, persistAll } from '../core/store.js';
 import { maskCustomerPhone } from './customer-service.js';
-import { state, persistAll } from '../core/store.js';
-import { maskCustomerPhone } from './customer-service.js';
 import { detectPrinters, getCachedDetect, httpPrint, httpOpenDrawer, browserPrintHtml as bridgeBrowserPrint } from './print-bridge.js';
 
 // ============================================================
