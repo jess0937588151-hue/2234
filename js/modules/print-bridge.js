@@ -179,48 +179,25 @@ function buildHeaders(extra) {
 }
 
 export async function httpPrint(target, body) {
-  const jsonStr = JSON.stringify(body || {});
   try {
-    const utf8Bytes = new TextEncoder().encode(jsonStr);
-    window.__lastPrintJson = jsonStr;
-    window.__lastPrintBytes = utf8Bytes.length;
-  } catch(e) {}
-
-  let respText = '';
-  let result = { ok: false, error: '' };
-  try {
+    const jsonStr = JSON.stringify(body || {});
+    // 用 Blob 包成 text/plain，避免 NanoHTTPD 對 application/json 走 parseBody 砍掉中文
+    const blob = new Blob([jsonStr], { type: 'text/plain;charset=utf-8' });
     const resp = await fetchWithTimeout(`${HTTP_BASE}/print/${target}`, {
       method: 'POST',
-      headers: buildHeaders({ 'Content-Type': 'application/json; charset=utf-8' }),
-      body: jsonStr
+      headers: buildHeaders(),
+      body: blob
     }, 8000);
-    respText = await resp.text();
-    let j = {};
-    try { j = JSON.parse(respText); } catch(e) {}
-    if (!j.ok) _lastError = 'httpPrint ' + target + ' failed: ' + (j.error || respText || 'unknown');
-    result = { ok: !!j.ok, error: j.error || '' };
+    const j = await resp.json();
+    if (!j.ok) _lastError = 'httpPrint ' + target + ' failed: ' + (j.error || 'unknown');
+    return { ok: !!j.ok, error: j.error || '' };
   } catch (e) {
     const msg = String(e && e.message || e);
     _lastError = 'httpPrint ' + target + ' exception: ' + msg;
-    respText = 'EXCEPTION: ' + msg;
-    result = { ok: false, error: msg };
+    return { ok: false, error: msg };
   }
-
-  // ===== 螢幕上顯示送出的 JSON 與 server 回應（5 秒後消失）=====
-  try {
-    let box = document.getElementById('__printDebugBox');
-    if (!box) {
-      box = document.createElement('div');
-      box.id = '__printDebugBox';
-      box.style.cssText = 'position:fixed;top:8px;right:8px;max-width:60vw;max-height:70vh;overflow:auto;background:#fff7ed;border:2px solid #ea580c;color:#000;padding:8px;font-size:11px;font-family:monospace;z-index:99999;white-space:pre-wrap;word-break:break-all;line-height:1.4';
-      box.onclick = function(){ box.remove(); };
-      document.body.appendChild(box);
-    }
-    box.textContent = '[' + target + '] len=' + (window.__lastPrintBytes||0) + '\n\n=== JSON ===\n' + jsonStr.slice(0, 1500) + '\n\n=== RESP ===\n' + respText.slice(0, 500) + '\n\n(點此關閉)';
-  } catch(e) {}
-
-  return result;
 }
+
 
 
 
