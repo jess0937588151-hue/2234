@@ -178,12 +178,33 @@ function buildHeaders(extra) {
   return h;
 }
 
+/**
+ * 把 UTF-8 字串轉成「ISO-8859-1 兼容」的字串
+ * 用途：NanoHTTPD parseBody 會用 ISO-8859-1 解 body，
+ *      若直接送 UTF-8 中文，APK 端拿到的會是亂碼。
+ *      先把 UTF-8 bytes 逐 byte 轉成 latin-1 字元送出去，
+ *      APK 端 ISO-8859-1 解碼後 byte 序列剛好是原本的 UTF-8。
+ */
+function utf8ToLatin1(str) {
+  // TextEncoder 一律輸出 UTF-8 bytes
+  const bytes = new TextEncoder().encode(str);
+  let out = '';
+  for (let i = 0; i < bytes.length; i++) {
+    out += String.fromCharCode(bytes[i]);
+  }
+  return out;
+}
+
 export async function httpPrint(target, body) {
   try {
+    // 先 JSON.stringify，再用 UTF-8→Latin1 轉換，避開 NanoHTTPD ISO-8859-1 bug
+    const jsonStr = JSON.stringify(body || {});
+    const safeBody = utf8ToLatin1(jsonStr);
+
     const resp = await fetchWithTimeout(`${HTTP_BASE}/print/${target}`, {
       method: 'POST',
-      headers: buildHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(body || {})
+      headers: buildHeaders({ 'Content-Type': 'application/json; charset=utf-8' }),
+      body: safeBody
     }, 8000);
     const j = await resp.json();
     if (!j.ok) _lastError = 'httpPrint ' + target + ' failed: ' + (j.error || 'unknown');
@@ -194,6 +215,7 @@ export async function httpPrint(target, body) {
     return { ok: false, error: msg };
   }
 }
+
 
 export async function httpOpenDrawer() {
   try {
