@@ -179,14 +179,27 @@ function buildHeaders(extra) {
 }
 
 export async function httpPrint(target, body) {
+  const jsonStr = JSON.stringify(body || {});
+  // 偵錯：把 JSON 與 UTF-8 byte 長度印到 console
+  try {
+    const utf8Bytes = new TextEncoder().encode(jsonStr);
+    console.log('[print-bridge] →', target, 'len=', utf8Bytes.length, 'json=', jsonStr);
+    window.__lastPrintJson = jsonStr;
+    window.__lastPrintBytes = utf8Bytes.length;
+  } catch(e) {}
+
   try {
     const resp = await fetchWithTimeout(`${HTTP_BASE}/print/${target}`, {
       method: 'POST',
       headers: buildHeaders({ 'Content-Type': 'application/json; charset=utf-8' }),
-      body: JSON.stringify(body || {})
+      body: jsonStr
     }, 8000);
-    const j = await resp.json();
-    if (!j.ok) _lastError = 'httpPrint ' + target + ' failed: ' + (j.error || 'unknown');
+    const text = await resp.text();
+    console.log('[print-bridge] ←', target, 'status=', resp.status, 'resp=', text);
+    window.__lastPrintResp = text;
+    let j = {};
+    try { j = JSON.parse(text); } catch(e) {}
+    if (!j.ok) _lastError = 'httpPrint ' + target + ' failed: ' + (j.error || text || 'unknown');
     return { ok: !!j.ok, error: j.error || '' };
   } catch (e) {
     const msg = String(e && e.message || e);
@@ -194,6 +207,7 @@ export async function httpPrint(target, body) {
     return { ok: false, error: msg };
   }
 }
+
 
 
 export async function httpOpenDrawer() {
