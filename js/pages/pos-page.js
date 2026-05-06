@@ -382,8 +382,9 @@ function finalizeOrder(paymentMethod){
 
         // 開錢箱（依設定 openDrawer，且僅結帳時）
      if(order && paymentMethod === '現金'){
-    try { openCashDrawer(); } catch(e) { console.error('開錢箱失敗:', e); }
+    openCashDrawer().catch(function(e){ console.error('開錢箱失敗:', e); });
 }
+
 
 // 列印顧客單（路由內部會自動選 Sunmi/藍牙/網路/瀏覽器）
 if(order && paymentMethod !== '待付款' && printConfig.autoPrintCheckout){
@@ -409,7 +410,9 @@ if(order && printConfig.autoPrintKitchen){
 
     // 開錢箱（僅現金付款）
 if(order && paymentMethod === '現金'){
-    try { openCashDrawer(); } catch(e) { console.error('開錢箱失敗:', e); }
+    openCashDrawer().catch(function(e){ console.error('開錢箱失敗:', e); });
+}
+
 }
 
 // 列印顧客單（路由內部會自動選 Sunmi/藍牙/網路/瀏覽器）
