@@ -238,17 +238,6 @@ export async function httpPrint(target, body) {
   const utf8Bytes = new TextEncoder().encode(jsonStr);
   __bridgeLog('httpPrint → ' + target + ' url=' + HTTP_BASE + '/print/' + target + ' bodyLen=' + utf8Bytes.length);
   __bridgeLog('httpPrint body head=' + jsonStr.slice(0, 200));
-     // 找出 shopName 那段印出來，看中文有沒有壞
-  var idx = jsonStr.indexOf('"shopName"');
-  if (idx >= 0) __bridgeLog('httpPrint shopName slice=' + jsonStr.slice(idx, idx + 80));
-  // 印 shopName 後面前 20 字的 codepoint，跟 APK 對得上
-  if (idx >= 0) {
-    var sample = jsonStr.slice(idx, idx + 80);
-    var cps = '';
-    for (var k = 0; k < Math.min(sample.length, 40); k++) cps += sample.charCodeAt(k).toString(16) + ' ';
-    __bridgeLog('httpPrint shopName codepoints(first40)=' + cps);
-  }
-
   __bridgeLog('httpPrint hasToken=' + (getApiToken() ? 'yes' : 'no'));
 
   const t0 = Date.now();
