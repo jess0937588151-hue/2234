@@ -236,9 +236,20 @@ function buildHeaders(extra) {
 export async function httpPrint(target, body) {
   const jsonStr = JSON.stringify(body || {});
   const utf8Bytes = new TextEncoder().encode(jsonStr);
-  __bridgeLog('httpPrint → ' + target + ' url=' + HTTP_BASE + '/print/' + target + ' bodyLen=' + utf8Bytes.length);
-  __bridgeLog('httpPrint body head=' + jsonStr.slice(0, 200));
-  __bridgeLog('httpPrint hasToken=' + (getApiToken() ? 'yes' : 'no'));
+  plog('httpPrint → ' + target + ' url=' + HTTP_BASE + '/print/' + target + ' bodyLen=' + utf8Bytes.length);
+  plog('httpPrint body head=' + jsonStr.slice(0, 200));
+
+  // 找出 shopName 那段印出來，看中文有沒有壞
+  var idx = jsonStr.indexOf('"shopName"');
+  if (idx >= 0) {
+    var sample = jsonStr.slice(idx, idx + 80);
+    plog('httpPrint shopName slice=' + sample);
+    var cps = '';
+    for (var k = 0; k < Math.min(sample.length, 40); k++) cps += sample.charCodeAt(k).toString(16) + ' ';
+    plog('httpPrint shopName codepoints(first40)=' + cps);
+  }
+
+  plog('httpPrint hasToken=' + (getApiToken() ? 'yes' : 'no'));
 
   const t0 = Date.now();
   let respText = '';
@@ -249,16 +260,16 @@ export async function httpPrint(target, body) {
       body: utf8Bytes
     }, 8000);
     const dt = Date.now() - t0;
-    __bridgeLog('httpPrint ← ' + target + ' status=' + resp.status + ' time=' + dt + 'ms');
+    plog('httpPrint ← ' + target + ' status=' + resp.status + ' time=' + dt + 'ms');
     respText = await resp.text();
-    __bridgeLog('httpPrint resp=' + respText.slice(0, 200));
+    plog('httpPrint resp=' + respText.slice(0, 200));
     let j = {};
     try { j = JSON.parse(respText); } catch(e) {}
     if (!j.ok) _lastError = 'httpPrint ' + target + ' failed: ' + (j.error || respText || 'unknown');
     return { ok: !!j.ok, error: j.error || '' };
   } catch (e) {
     const msg = String(e && e.message || e);
-    __bridgeLog('httpPrint EXC ' + target + ' ' + msg);
+    plog('httpPrint EXC ' + target + ' ' + msg);
     _lastError = 'httpPrint ' + target + ' exception: ' + msg;
     return { ok: false, error: msg };
   }
