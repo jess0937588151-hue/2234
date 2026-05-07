@@ -222,7 +222,35 @@ v20260606 完工：拿到完整 web + APK log 證據鏈，確認 NanoHTTPD parse
 - [ ] 依 log 結果鎖定問題、提出最小修正
 
 ---
+### v20260606 已完成（列印與錢箱回歸 + token 同步）
 
+實機驗證結果：收據、廚房單、預覽單中文完全正確，錢箱經 sunmi 路徑開啟成功。
+
+**真正根因**：APK 每次重啟/重裝會用 UUID 重新生成 API token，但 Web 端 localStorage 還存著舊 token，所有 /print/* 與 /drawer/open 都被 APK checkToken 擋掉回 unauthorized，前端 fallback 到 window.print() 跳 PDF 對話框。先前誤判為「NanoHTTPD parseBody 把中文吃成 ?」，繞了多輪，實際上請求根本沒進到 readBody。
+
+**最終修法（兩處）**：
+
+1. APK `app/src/main/java/com/pos/sunmiprinter/PrintHttpServer.java` 的 `handlePing()` 在回應 JSON 加上 `"token":"..."` 欄位（/ping 本來就免驗證，等於免費把 token 公開給本機 web）：
+   ```java
+   data.append("\"token\":\"").append(escape(settings != null ? settings.getApiToken() : "")).append("\",");
+
+Web js/modules/print-bridge.js：
+detectPrinters 收到 /ping 回應時，若 data.token 與 localStorage 不一致就自動 setApiToken(data.token) 同步
+httpPrint / httpOpenDrawer 收到 401/403/unauthorized 時呼叫 detectPrinters(true) 重抓 token，再重試一次
+移除原本依賴 /test HTML 解析 token 的 tryAutoFetchToken 路徑（容易被 CORS / 連線競爭打成 Failed to fetch）
+踩雷紀錄：
+
+不要相信「中文變 ?」的表象，先看 APK log 是不是 unauthorized（請求根本沒進 readBody）
+/ping 是 token 同步的天然管道：免驗證、Web 端本來就會呼叫、cache TTL 8 秒
+APK 重裝後 token 會換，這是 v20260603 加 API Token 驗證後的副作用；任何依賴 token 的 endpoint 都要有自動重抓機制
+readBody 從 InputStream 直接讀 byte 用 UTF-8 解碼的修法已經保留（雖然這次不是主因，但對未來 application/json POST 仍是正確做法）
+一併保留的保活措施（v20260606）：
+
+PrintService 取得 PARTIAL_WAKE_LOCK 防止螢幕關閉時 NanoHTTPD 接收延遲
+AndroidManifest 加 WAKE_LOCK 與 REQUEST_IGNORE_BATTERY_OPTIMIZATIONS 權限
+Copy
+**Commit message**：
+docs(aiREADME): record v20260606 完工 — token 同步是真正根因，readBody UTF-8 修法保留
 ## 八、待辦
 
 ### 短期
