@@ -571,6 +571,19 @@ export function initPOSPage(){
   if(posNavBtn){
     posNavBtn.addEventListener('click', refreshPosLockState);
   }
+    // 首頁側邊「開啟錢箱」按鈕
+  const _drawerBtn = document.getElementById('openCashDrawerBtn');
+  if(_drawerBtn){
+    _drawerBtn.addEventListener('click', async ()=>{
+      try{
+        const ok = await openCashDrawer();
+        if(!ok) alert('開啟錢箱失敗：未偵測到可用印表機，請確認 Sunmi 服務是否運行');
+      }catch(e){
+        alert('開啟錢箱失敗：' + (e.message || e));
+      }
+    });
+  }
+
   // 開/結班後可呼叫 window.refreshPosLockState 以即時更新
   window.refreshPosLockState = refreshPosLockState;
 
