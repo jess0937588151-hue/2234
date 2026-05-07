@@ -234,34 +234,36 @@ function buildHeaders(extra) {
 }
 
 export async function httpPrint(target, body) {
+  const jsonStr = JSON.stringify(body || {});
+  const utf8Bytes = new TextEncoder().encode(jsonStr);
+  __bridgeLog('httpPrint → ' + target + ' url=' + HTTP_BASE + '/print/' + target + ' bodyLen=' + utf8Bytes.length);
+  __bridgeLog('httpPrint body head=' + jsonStr.slice(0, 200));
+  __bridgeLog('httpPrint hasToken=' + (getApiToken() ? 'yes' : 'no'));
+
+  const t0 = Date.now();
+  let respText = '';
   try {
-    const jsonStr = JSON.stringify(body || {});
-    const url = `${HTTP_BASE}/print/${target}`;
-    plog('httpPrint → ' + target + ' url=' + url + ' bodyLen=' + jsonStr.length);
-    plog('httpPrint body head=' + jsonStr.slice(0, 200));
-    plog('httpPrint hasToken=' + (getToken() ? 'yes' : 'no'));
-    const blob = new Blob([jsonStr], { type: 'text/plain;charset=utf-8' });
-    const t0 = Date.now();
-    const resp = await fetchWithTimeout(url, {
+    const resp = await fetchWithTimeout(`${HTTP_BASE}/print/${target}`, {
       method: 'POST',
-      headers: buildHeaders(),
-      body: blob
+      headers: buildHeaders({ 'Content-Type': 'application/octet-stream' }),
+      body: utf8Bytes
     }, 8000);
     const dt = Date.now() - t0;
-    const text = await resp.text();
-    plog('httpPrint ← ' + target + ' status=' + resp.status + ' time=' + dt + 'ms');
-    plog('httpPrint resp=' + text.slice(0, 200));
+    __bridgeLog('httpPrint ← ' + target + ' status=' + resp.status + ' time=' + dt + 'ms');
+    respText = await resp.text();
+    __bridgeLog('httpPrint resp=' + respText.slice(0, 200));
     let j = {};
-    try { j = JSON.parse(text); } catch(e) {}
-    if (!j.ok) _lastError = 'httpPrint ' + target + ' failed: ' + (j.error || text || 'unknown');
+    try { j = JSON.parse(respText); } catch(e) {}
+    if (!j.ok) _lastError = 'httpPrint ' + target + ' failed: ' + (j.error || respText || 'unknown');
     return { ok: !!j.ok, error: j.error || '' };
   } catch (e) {
     const msg = String(e && e.message || e);
+    __bridgeLog('httpPrint EXC ' + target + ' ' + msg);
     _lastError = 'httpPrint ' + target + ' exception: ' + msg;
-    plog('httpPrint EXCEPTION ' + target + ': ' + msg);
     return { ok: false, error: msg };
   }
 }
+
 
 export async function httpOpenDrawer() {
   try {
