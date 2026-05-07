@@ -528,37 +528,75 @@ function isNetReady(){
 
 function buildBridgePayload(order, mode){
   const cfg = getPrintSettings();
-  const fields = cfg.fields[mode === 'kitchen' ? 'kitchen' : (mode === 'label' ? 'label' : 'receipt')];
-  return {
+  const kind = mode === 'kitchen' ? 'kitchen' : (mode === 'label' ? 'label' : 'receipt');
+  const fields = cfg.fields[kind];
+  const isKitchen = kind === 'kitchen';
+  const isLabel = kind === 'label';
+
+  // ── 依 fields 勾選結果，未勾選 → 傳空字串/空陣列，APK 看到空就不印 ──
+  const payload = {
     mode,
     fields,
     openDrawer: false,
-    shopName: cfg.storeName || '',
-    shopPhone: cfg.storePhone || '',
-    shopAddress: cfg.storeAddress || '',
-    footer: cfg.receiptFooter || '',
-    orderNumber: String(order.orderNo || order.id || ''),
-    dateTime: fmtDate(order.createdAt),
-    orderType: order.orderType || '',
+
+    // 店家資訊（廚房單/標籤本來就不印電話地址）
+    shopName:    fields.storeName    ? (cfg.storeName    || '') : '',
+    shopPhone:  (fields.storePhone   && !isKitchen && !isLabel) ? (cfg.storePhone   || '') : '',
+    shopAddress:(fields.storeAddress && !isKitchen && !isLabel) ? (cfg.storeAddress || '') : '',
+
+    // 副標：廚房單 / 標籤 才需要
+    subtitle: isKitchen ? '** 廚房單 **' : (isLabel ? '** 標籤 **' : ''),
+
+    // 頁尾
+    footer: (fields.footer && !isKitchen && !isLabel) ? (cfg.receiptFooter || '') : '',
+
+    // 訂單資訊
+    orderNumber: fields.orderNo  ? String(order.orderNo || order.id || '') : '',
+    dateTime:    fields.dateTime ? fmtDate(order.createdAt) : '',
+    orderType:   fields.orderType
+                   ? ((order.orderType || '') + (order.tableNo ? ' / ' + order.tableNo : '')).trim()
+                   : '',
     tableNo: order.tableNo || '',
-    paymentMethod: order.paymentMethod || '',
-    customerName: order.customerName || '',
-    customerPhoneMasked: maskCustomerPhone(order.customerPhone),
-    customerNote: order.customerNote || '',
-    items: (order.items || []).map(it => ({
-      name: it.name || '',
-      qty: Number(it.qty || 0),
-      basePrice: Number(it.basePrice || 0),
-      extraPrice: Number(it.extraPrice || 0),
-      price: (Number(it.basePrice || 0) + Number(it.extraPrice || 0)) * Number(it.qty || 0),
-      options: buildSelectionText(it),
-      note: it.note || ''
-    })),
-    subtotal: Number(order.subtotal || 0),
-    discountAmount: Number(order.discountAmount || 0),
-    total: Number(order.total || 0)
+
+    // 付款方式（僅顧客單）
+    paymentMethod: (fields.paymentMethod && !isKitchen && !isLabel)
+                     ? (order.paymentMethod || '') : '',
+
+    // 顧客資訊
+    customerName:        fields.customerInfo ? (order.customerName || '') : '',
+    customerPhoneMasked: fields.customerInfo ? (maskCustomerPhone(order.customerPhone) || '') : '',
+
+    // 訂單備註
+    customerNote: fields.orderNote ? (order.customerNote || '') : '',
+
+    // 品項
+    items: fields.items
+      ? (order.items || []).map(it => {
+          const base  = Number(it.basePrice  || 0);
+          const extra = Number(it.extraPrice || 0);
+          const qty   = Number(it.qty || 0);
+          return {
+            name: it.name || '',
+            qty:  fields.itemQty   !== false ? qty : 1,
+            basePrice: base,
+            extraPrice: extra,
+            // 顧客單要金額才送，廚房/標籤或關閉金額時填 0
+            price: (!isKitchen && !isLabel && fields.itemPrice !== false)
+                     ? (base + extra) * qty : 0,
+            options: fields.itemSelections !== false ? buildSelectionText(it) : '',
+            note:    fields.itemNote       !== false ? (it.note || '') : ''
+          };
+        })
+      : [],
+
+    // 金額（僅顧客單）
+    subtotal:       (fields.subtotal && !isKitchen && !isLabel) ? Number(order.subtotal || 0)       : 0,
+    discountAmount: (fields.discount && !isKitchen && !isLabel) ? Number(order.discountAmount || 0) : 0,
+    total:          (fields.total    && !isKitchen && !isLabel) ? Number(order.total || 0)          : 0
   };
+  return payload;
 }
+
 
 // ============================================================
 // 主路由：顧客單
