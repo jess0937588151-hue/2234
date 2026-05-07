@@ -1,5 +1,5 @@
-/* 中文備註：列印服務模組（v2.1.25）。
- * 變更：
+/* 中文備註：列印服務模組（v2.1.25-debug）。
+ * 變更：純加 log，零邏輯變更
  *   1. 顧客電話自動遮罩（保留店家電話完整）
  *   2. fields 欄位過濾（顧客單/廚房單/標籤獨立勾選）
  *   3. 統一列印路徑：Sunmi > 藍牙 > 網路 > 瀏覽器
@@ -10,6 +10,30 @@
 import { state, persistAll } from '../core/store.js';
 import { maskCustomerPhone } from './customer-service.js';
 import { detectPrinters, getCachedDetect, httpPrint, httpOpenDrawer, browserPrintHtml as bridgeBrowserPrint } from './print-bridge.js';
+
+// ── 內部 log（同步寫進 window.__printLog 與 console）──
+function pslog(msg) {
+  const ts = new Date().toISOString().slice(11, 23);
+  const line = '[' + ts + '][print-service] ' + msg;
+  try { console.log(line); } catch(e) {}
+  try {
+    if (typeof window !== 'undefined') {
+      if (!window.__printLog) window.__printLog = [];
+      window.__printLog.push(line);
+      if (window.__printLog.length > 200) window.__printLog.shift();
+      // 也丟到螢幕浮動框（如果 print-bridge 已建立）
+      const body = document.getElementById('__printLogBody');
+      if (body) {
+        const div = document.createElement('div');
+        div.textContent = line;
+        body.appendChild(div);
+        while (body.childNodes.length > 30) body.removeChild(body.firstChild);
+        const box = document.getElementById('__printLogBox');
+        if (box) box.scrollTop = box.scrollHeight;
+      }
+    }
+  } catch(e) {}
+}
 
 // ============================================================
 // 設定取得
@@ -38,7 +62,6 @@ export function getPrintSettings(){
   if(!state.settings) state.settings = {};
   if(!state.settings.printConfig) state.settings.printConfig = {};
   const cfg = state.settings.printConfig;
-  // 補齊預設值
   cfg.storeName = cfg.storeName || '我的店';
   cfg.storePhone = cfg.storePhone || '';
   cfg.storeAddress = cfg.storeAddress || '';
@@ -55,7 +78,6 @@ export function getPrintSettings(){
   cfg.kitchenCopies = Math.max(1, Number(cfg.kitchenCopies || 1));
   if (typeof cfg.openDrawer === 'undefined') cfg.openDrawer = false;
   if (!cfg.fields) cfg.fields = JSON.parse(JSON.stringify(DEFAULT_FIELDS));
-  // 補齊缺少的子欄位
   ['receipt','kitchen','label'].forEach(kind => {
     if(!cfg.fields[kind]) cfg.fields[kind] = JSON.parse(JSON.stringify(DEFAULT_FIELDS[kind]));
     Object.keys(DEFAULT_FIELDS[kind]).forEach(f => {
@@ -89,8 +111,7 @@ function fmtDate(s){
   if(!s) return '';
   return String(s).replace('T',' ').slice(0,16);
 }
-// 用 printTextWithFont 逐行印出，可控制字體大小，最後切紙
-// 回傳 true 表示已成功送出 Sunmi 列印
+
 function sunmiPrintReceiptByFont(order, mode){
   if(!hasSunmi() || typeof window.SunmiPrinter.printTextWithFont !== 'function') return false;
   const cfg = getPrintSettings();
@@ -102,12 +123,10 @@ function sunmiPrintReceiptByFont(order, mode){
     : Math.max(16, Number(cfg.receiptFontSize || 12) * 2);
   const bigSize = baseSize + 8;
   const smallSize = Math.max(14, baseSize - 4);
-  // 依紙寬與字體大小動態計算分隔線長度（避免換行）
-// 58mm 紙約 32 半形字（小字），字體放大時等比縮短
-const paperWidth = Number(cfg.receiptPaperWidth || 58);
-const baseCols = paperWidth >= 76 ? 42 : (paperWidth >= 70 ? 38 : 32);
-const sepLen = Math.max(8, Math.floor(baseCols * (24 / baseSize)));
-const sep = '-'.repeat(sepLen);
+  const paperWidth = Number(cfg.receiptPaperWidth || 58);
+  const baseCols = paperWidth >= 76 ? 42 : (paperWidth >= 70 ? 38 : 32);
+  const sepLen = Math.max(8, Math.floor(baseCols * (24 / baseSize)));
+  const sep = '-'.repeat(sepLen);
 
   const sp = window.SunmiPrinter;
 
@@ -185,7 +204,6 @@ const sep = '-'.repeat(sepLen);
       }
     }
 
-     // 結尾留白：原本兩行 → 1/3 ≈ 1 行（切紙器本身會自走紙）
     line(' ', smallSize);
 
     if(typeof sp.cutPaper === 'function'){
@@ -199,7 +217,6 @@ const sep = '-'.repeat(sepLen);
   }
 }
 
-// 把訂單轉成純文字（給 Sunmi printText 用，避免 CSS 被當文字印出）
 function buildPlainTextFromOrder(order, mode){
   const cfg = getPrintSettings();
   const isKitchen = mode === 'kitchen';
@@ -207,13 +224,9 @@ function buildPlainTextFromOrder(order, mode){
   const fields = cfg.fields[isKitchen ? 'kitchen' : (isLabel ? 'label' : 'receipt')];
   const lines = [];
 
-  // 純文字模式：依紙寬決定半形字數（沒有字體放大概念，所以不用 baseSize）
-  // 58mm ≈ 32 字、70mm ≈ 38 字、80mm ≈ 42 字
   const paperWidth = Number(cfg.receiptPaperWidth || 58);
   const sepLen = paperWidth >= 76 ? 42 : (paperWidth >= 70 ? 38 : 32);
   const sep = '-'.repeat(sepLen);
-
-
 
   if(fields.storeName && cfg.storeName) lines.push(cfg.storeName);
   if(isKitchen) lines.push('** 廚房單 **');
@@ -278,13 +291,12 @@ function buildPlainTextFromOrder(order, mode){
     }
   }
 
-  // 結尾空白：兩行 → 1/3 ≈ 1 行
   lines.push('');
   return lines.join('\n');
 }
 
 // ============================================================
-// 預覽 modal（配合 index.html 既有元素）
+// 預覽 modal
 // ============================================================
 export function previewInModal(html){
   const modal = document.getElementById('printPreviewModal');
@@ -313,7 +325,7 @@ export function previewInModal(html){
 }
 
 // ============================================================
-// HTML 產生（顧客單 / 廚房單）
+// HTML 產生
 // ============================================================
 export function getReceiptHtml(order, mode){
   const cfg = getPrintSettings();
@@ -430,9 +442,6 @@ export function getReceiptHtml(order, mode){
   return `<!doctype html><html><head><meta charset="utf-8">${css}</head><body>${lines.join('')}</body></html>`;
 }
 
-// ============================================================
-// 標籤 HTML
-// ============================================================
 export function getLabelHtml(order){
   const cfg = getPrintSettings();
   const fields = cfg.fields.label;
@@ -495,9 +504,8 @@ export function getLabelHtml(order){
 }
 
 // ============================================================
-// ── 列印橋接判斷（透過 print-bridge.js 統一）──
 function getDetect(){
-  return getCachedDetect();   // 可能為 null，呼叫前請先 await detectPrinters()
+  return getCachedDetect();
 }
 function hasSunmi(){
   const d = getDetect();
@@ -518,16 +526,12 @@ function isNetReady(){
   return !!(d && d.network);
 }
 
-
-// ============================================================
-// 把訂單轉成 APK Bridge 用的 JSON（含 fields 與 maskedPhone）
-// ============================================================
 function buildBridgePayload(order, mode){
   const cfg = getPrintSettings();
   const fields = cfg.fields[mode === 'kitchen' ? 'kitchen' : (mode === 'label' ? 'label' : 'receipt')];
   return {
-    mode,                                     // 'receipt' | 'kitchen' | 'label'
-    fields,                                   // 欄位勾選
+    mode,
+    fields,
     openDrawer: false,
     shopName: cfg.storeName || '',
     shopPhone: cfg.storePhone || '',
@@ -539,7 +543,7 @@ function buildBridgePayload(order, mode){
     tableNo: order.tableNo || '',
     paymentMethod: order.paymentMethod || '',
     customerName: order.customerName || '',
-    customerPhoneMasked: maskCustomerPhone(order.customerPhone),    // ← 已遮罩
+    customerPhoneMasked: maskCustomerPhone(order.customerPhone),
     customerNote: order.customerNote || '',
     items: (order.items || []).map(it => ({
       name: it.name || '',
@@ -560,34 +564,40 @@ function buildBridgePayload(order, mode){
 // 主路由：顧客單
 // ============================================================
 export async function printOrderReceipt(order, mode){
+  pslog('printOrderReceipt CALL mode=' + mode + ' orderNo=' + (order && (order.orderNo || order.id)));
   const realMode = mode === 'kitchen' ? 'kitchen' : 'receipt';
   const payload = buildBridgePayload(order, realMode);
   const html = getReceiptHtml(order, realMode === 'kitchen' ? 'kitchen' : 'customer');
 
-  // 確保有最新偵測結果
   await detectPrinters(true);
   const d = getDetect();
+  pslog('printOrderReceipt detect mode=' + (d && d.mode) + ' sunmi=' + (d && d.sunmi)
+    + ' bt=' + (d && d.bluetooth) + ' net=' + (d && d.network));
 
-  // ── HTTP 模式 ──
   if (d && d.mode === 'http') {
-        if (d.sunmi) {
+    if (d.sunmi) {
+      pslog('printOrderReceipt → http-sunmi');
       const r = await httpPrint('sunmi', payload);
+      pslog('printOrderReceipt http-sunmi result ok=' + r.ok + ' err=' + r.error);
       if (r.ok) return { route:'http-sunmi', ok:true };
     }
     if (d.bluetooth) {
+      pslog('printOrderReceipt → http-bluetooth');
       const r = await httpPrint('bluetooth', payload);
+      pslog('printOrderReceipt http-bluetooth result ok=' + r.ok + ' err=' + r.error);
       if (r.ok) return { route:'http-bluetooth', ok:true };
     }
     if (d.network) {
+      pslog('printOrderReceipt → http-network');
       const r = await httpPrint('network', payload);
+      pslog('printOrderReceipt http-network result ok=' + r.ok + ' err=' + r.error);
       if (r.ok) return { route:'http-network', ok:true };
     }
-
-    // 全失敗 → 落到瀏覽器列印
+    pslog('printOrderReceipt http all failed, fallback browser');
   }
 
-  // ── WebView Bridge 模式（舊架構） ──
   if (d && d.mode === 'webview') {
+    pslog('printOrderReceipt → webview');
     const jsonStr = JSON.stringify(payload);
     if (sunmiPrintReceiptByFont(order, realMode)) return { route:'sunmi-font', ok:true };
     if (window.SunmiPrinter?.isBtPrinterConnected?.() && window.SunmiPrinter.btPrintReceipt) {
@@ -598,16 +608,16 @@ export async function printOrderReceipt(order, mode){
     }
   }
 
-  // ── 瀏覽器系統列印對話框（iPad / PC） ──
+  pslog('printOrderReceipt → browser fallback');
   await bridgeBrowserPrint(html);
   return { route:'browser', ok:true };
 }
 
-
 // ============================================================
-// 主路由：廚房單（依設定份數列印）
+// 主路由：廚房單
 // ============================================================
 export async function printKitchenCopies(order){
+  pslog('printKitchenCopies CALL orderNo=' + (order && (order.orderNo || order.id)));
   const cfg = getPrintSettings();
   const copies = Math.max(1, Number(cfg.kitchenCopies || 1));
   const payload = buildBridgePayload(order, 'kitchen');
@@ -615,21 +625,25 @@ export async function printKitchenCopies(order){
 
   await detectPrinters(true);
   const d = getDetect();
+  pslog('printKitchenCopies detect mode=' + (d && d.mode) + ' copies=' + copies);
 
   for (let i = 0; i < copies; i++) {
     let printed = false;
+    pslog('printKitchenCopies copy ' + (i+1) + '/' + copies);
 
     if (d && d.mode === 'http') {
-            if (d.sunmi) {
+      if (d.sunmi) {
         const r = await httpPrint('sunmi', payload); if (r.ok) printed = true;
+        pslog('  http-sunmi ok=' + r.ok + ' err=' + r.error);
       }
       if (!printed && d.bluetooth) {
         const r = await httpPrint('bluetooth', payload); if (r.ok) printed = true;
+        pslog('  http-bluetooth ok=' + r.ok + ' err=' + r.error);
       }
       if (!printed && d.network) {
         const r = await httpPrint('network', payload); if (r.ok) printed = true;
+        pslog('  http-network ok=' + r.ok + ' err=' + r.error);
       }
-
     } else if (d && d.mode === 'webview') {
       const jsonStr = JSON.stringify(payload);
       if (sunmiPrintReceiptByFont(order, 'kitchen')) printed = true;
@@ -641,33 +655,42 @@ export async function printKitchenCopies(order){
       }
     }
 
-    if (!printed) await bridgeBrowserPrint(html);
+    if (!printed) {
+      pslog('  → browser fallback');
+      await bridgeBrowserPrint(html);
+    }
   }
   return { ok:true, copies };
 }
 
-
 // ============================================================
-// 主路由：標籤（APK 沒專屬標籤 API，走 printPosReceipt 或瀏覽器）
+// 主路由：標籤
 // ============================================================
 export async function printOrderLabels(order){
+  pslog('printOrderLabels CALL orderNo=' + (order && (order.orderNo || order.id)));
   const payload = buildBridgePayload(order, 'label');
   const html = getLabelHtml(order);
 
   await detectPrinters(true);
   const d = getDetect();
+  pslog('printOrderLabels detect mode=' + (d && d.mode));
 
   if (d && d.mode === 'http') {
-        if (d.sunmi) {
-      const r = await httpPrint('sunmi', payload); if (r.ok) return { route:'http-sunmi', ok:true };
+    if (d.sunmi) {
+      const r = await httpPrint('sunmi', payload);
+      pslog('printOrderLabels http-sunmi ok=' + r.ok + ' err=' + r.error);
+      if (r.ok) return { route:'http-sunmi', ok:true };
     }
     if (d.bluetooth) {
-      const r = await httpPrint('bluetooth', payload); if (r.ok) return { route:'http-bluetooth', ok:true };
+      const r = await httpPrint('bluetooth', payload);
+      pslog('printOrderLabels http-bluetooth ok=' + r.ok + ' err=' + r.error);
+      if (r.ok) return { route:'http-bluetooth', ok:true };
     }
     if (d.network) {
-      const r = await httpPrint('network', payload); if (r.ok) return { route:'http-network', ok:true };
+      const r = await httpPrint('network', payload);
+      pslog('printOrderLabels http-network ok=' + r.ok + ' err=' + r.error);
+      if (r.ok) return { route:'http-network', ok:true };
     }
-
   } else if (d && d.mode === 'webview') {
     const jsonStr = JSON.stringify(payload);
     if (sunmiPrintReceiptByFont(order, 'label')) return { route:'sunmi-font', ok:true };
@@ -679,24 +702,29 @@ export async function printOrderLabels(order){
     }
   }
 
+  pslog('printOrderLabels → browser fallback');
   await bridgeBrowserPrint(html);
   return { route:'browser', ok:true };
 }
-
 
 // ============================================================
 // 錢箱
 // ============================================================
 export async function openCashDrawer(){
+  pslog('openCashDrawer CALL');
   await detectPrinters(true);
   const d = getDetect();
+  pslog('openCashDrawer detect mode=' + (d && d.mode) + ' sunmi=' + (d && d.sunmi));
 
   if (d && d.mode === 'http') {
+    pslog('openCashDrawer → http');
     const r = await httpOpenDrawer();
+    pslog('openCashDrawer http result ok=' + r.ok + ' err=' + r.error);
     return r.ok;
   }
 
   if (d && d.mode === 'webview') {
+    pslog('openCashDrawer → webview');
     if (isSunmiReady() && window.SunmiPrinter.openCashDrawer) {
       try { return window.SunmiPrinter.openCashDrawer(); } catch(e) { return false; }
     }
@@ -708,13 +736,10 @@ export async function openCashDrawer(){
     }
   }
 
-  // browser 模式無法開錢箱
+  pslog('openCashDrawer → browser mode, cannot open drawer, return false');
   return false;
 }
 
-// ============================================================
-// 預覽用：依購物車組假訂單
-// ============================================================
 export function buildCartPreviewOrder(){
   const items = Array.isArray(state.cart) ? state.cart : [];
   const subtotal = items.reduce((s, it) => s + (Number(it.basePrice || 0) + Number(it.extraPrice || 0)) * Number(it.qty || 0), 0);
@@ -732,26 +757,18 @@ export function buildCartPreviewOrder(){
     total: subtotal
   };
 }
-/**
- * 班次報表專用：把報表資料包成 Sunmi Bridge 接受的「假訂單」格式列印
- * @param {Object} reportData - 班次報表資料
- * @param {Array<{label:string, value:string|number}>} reportData.lines - 每行內容
- * @param {string} reportData.title - 報表標題
- * @param {string} reportData.subtitle - 副標（人員/日期）
- */
+
 export async function printSessionReportViaBridge(reportData){
   const lines = reportData.lines || [];
   const title = reportData.title || '班次報表';
   const subtitle = reportData.subtitle || '';
 
-  // 組成單一純文字字串（每行一個 \n）
   let body = title + '\n';
   if(subtitle) body += subtitle + '\n';
   body += '--------------------------------\n';
   lines.forEach(line => { body += (line.label || '') + '\n'; });
   body += '\n\n\n';
 
-  // 1) Sunmi printText（單一字串就好，不用 setAlignment / setFontSize）
   if(hasSunmi() && typeof window.SunmiPrinter.printText === 'function'){
     try {
       const ok = window.SunmiPrinter.printText(body);
@@ -761,7 +778,6 @@ export async function printSessionReportViaBridge(reportData){
       if(ok !== false) return { route:'sunmi-text', ok:true };
     } catch(e) { console.warn('Sunmi printText 失敗：', e); }
   }
-  // 1b) 退回 printReceipt(title, body)
   if(hasSunmi() && typeof window.SunmiPrinter.printReceipt === 'function'){
     try {
       const ok = window.SunmiPrinter.printReceipt(title, body);
@@ -769,7 +785,6 @@ export async function printSessionReportViaBridge(reportData){
     } catch(e) {}
   }
 
-  // 2) 藍牙
   if(hasSunmi()
      && typeof window.SunmiPrinter.isBtPrinterConnected === 'function'
      && window.SunmiPrinter.isBtPrinterConnected()
@@ -780,7 +795,6 @@ export async function printSessionReportViaBridge(reportData){
     } catch(e) {}
   }
 
-  // 3) 網路
   if(hasSunmi()
      && typeof window.SunmiPrinter.isNetPrinterConnected === 'function'
      && window.SunmiPrinter.isNetPrinterConnected()
@@ -791,15 +805,10 @@ export async function printSessionReportViaBridge(reportData){
     } catch(e) {}
   }
 
-  // 4) 瀏覽器 fallback
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
     @page{size:58mm auto;margin:0}
     body{font-family:"PingFang TC",sans-serif;font-size:13px;width:58mm;padding:3mm;margin:0;color:#000;white-space:pre-wrap;word-break:break-all}
   </style></head><body>${escapeHtml(body)}</body></html>`;
-    await bridgeBrowserPrint(html);
+  await bridgeBrowserPrint(html);
   return { route:'browser', ok:true };
 }
-
-
-
-
