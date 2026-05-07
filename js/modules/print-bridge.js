@@ -1,7 +1,8 @@
 /* ============================================================
-   js/modules/print-bridge.js  v2026-05-07-token-retry
+   js/modules/print-bridge.js  v2026-05-07-token-sync
    列印橋接偵測 + 路由
-   修正：unauthorized 時自動重抓 token 並重試一次
+   修正：/ping 回應若帶 token 則自動同步到 localStorage，
+        unauthorized 時呼叫 detectPrinters(true) 重抓 token 再重試
    ============================================================ */
 
 const HTTP_HOST = '127.0.0.1';
@@ -15,7 +16,6 @@ let _cache = null;
 let _detecting = null;
 let _lastError = '';
 
-// ── 螢幕浮動 log 框 ──
 if (typeof window !== 'undefined') {
   window.__printLog = window.__printLog || [];
 }
@@ -104,27 +104,6 @@ function fetchWithTimeout(url, opts, ms) {
   });
 }
 
-async function tryAutoFetchToken() {
-  try {
-    plog('tryAutoFetchToken: GET /test');
-    const resp = await fetchWithTimeout(`${HTTP_BASE}/test`, { method: 'GET' }, 2000);
-    plog('tryAutoFetchToken: status=' + (resp ? resp.status : 'null'));
-    if (!resp || !resp.ok) return '';
-    const html = await resp.text();
-    const m = html.match(/var\s+TOKEN\s*=\s*'([^']*)'/);
-    if (m && m[1]) {
-      setApiToken(m[1]);
-      plog('tryAutoFetchToken: got token len=' + m[1].length);
-      return m[1];
-    }
-    plog('tryAutoFetchToken: token not found in /test html');
-  } catch (e) {
-    _lastError = 'auto-fetch token failed: ' + (e && e.message || e);
-    plog('tryAutoFetchToken EXCEPTION: ' + _lastError);
-  }
-  return '';
-}
-
 export async function detectPrinters(force = false) {
   if (!force && _cache && (Date.now() - _cache.timestamp) < CACHE_TTL_MS) {
     plog('detectPrinters: cache hit mode=' + _cache.mode);
@@ -150,6 +129,18 @@ export async function detectPrinters(force = false) {
         let j = {};
         try { j = JSON.parse(text); } catch(e) { plog('detectPrinters: JSON.parse failed'); }
         const data = (j && j.data) ? j.data : (j || {});
+
+        // /ping  token  localStorage 
+        if (data.token && typeof data.token === 'string' && data.token.length > 0) {
+          const cur = getToken();
+          if (cur !== data.token) {
+            plog('detectPrinters: token changed, sync from /ping (old len=' + cur.length + ' new len=' + data.token.length + ')');
+            setApiToken(data.token);
+          } else {
+            plog('detectPrinters: token matches /ping');
+          }
+        }
+
         result = {
           mode: 'http',
           sunmi: !!(data.sunmiConnected || data.sunmi),
@@ -164,11 +155,6 @@ export async function detectPrinters(force = false) {
         plog('detectPrinters: HTTP OK mode=http sunmi=' + result.sunmi
           + ' bt=' + result.bluetooth + ' net=' + result.network
           + ' ver=' + result.version);
-
-        if (!getToken()) {
-          plog('detectPrinters: no token in storage, try auto fetch');
-          await tryAutoFetchToken();
-        }
       }
     } catch (e) {
       _lastError = 'detect http failed: ' + (e && e.message || e);
@@ -234,14 +220,12 @@ function buildHeaders(extra) {
   return h;
 }
 
-// 判斷回應是否為「token 失效」
 function isUnauthorized(status, respText) {
   if (status === 401 || status === 403) return true;
   if (typeof respText === 'string' && respText.toLowerCase().indexOf('unauthorized') >= 0) return true;
   return false;
 }
 
-// 單次送出 /print/{target}
 async function _doHttpPrint(target, utf8Bytes) {
   const t0 = Date.now();
   const resp = await fetchWithTimeout(`${HTTP_BASE}/print/${target}`, {
@@ -276,12 +260,17 @@ export async function httpPrint(target, body) {
   try {
     let r = await _doHttpPrint(target, utf8Bytes);
 
-    // unauthorized → 重抓 token 後重試一次
+    // unauthorized →  detectPrinters(true)  /ping  token 
     if (isUnauthorized(r.status, r.text)) {
-      plog('httpPrint unauthorized, refetch token and retry once');
-      const newTk = await tryAutoFetchToken();
+      plog('httpPrint unauthorized, refresh token via /ping and retry once');
+      clearDetectCache();
+      await detectPrinters(true);
+      const newTk = getToken();
       if (newTk) {
+        plog('httpPrint retry with new token len=' + newTk.length);
         r = await _doHttpPrint(target, utf8Bytes);
+      } else {
+        plog('httpPrint no token after refresh, giving up');
       }
     }
 
@@ -320,10 +309,15 @@ export async function httpOpenDrawer() {
     let r = await _doHttpOpenDrawer();
 
     if (isUnauthorized(r.status, r.text)) {
-      plog('httpOpenDrawer unauthorized, refetch token and retry once');
-      const newTk = await tryAutoFetchToken();
+      plog('httpOpenDrawer unauthorized, refresh token via /ping and retry once');
+      clearDetectCache();
+      await detectPrinters(true);
+      const newTk = getToken();
       if (newTk) {
+        plog('httpOpenDrawer retry with new token len=' + newTk.length);
         r = await _doHttpOpenDrawer();
+      } else {
+        plog('httpOpenDrawer no token after refresh, giving up');
       }
     }
 
