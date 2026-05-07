@@ -1,6 +1,7 @@
 /* ============================================================
-   js/modules/print-bridge.js  v2026-05-07-debug
-   列印橋接偵測 + 路由（純加 log，零邏輯變更）
+   js/modules/print-bridge.js  v2026-05-07-token-retry
+   列印橋接偵測 + 路由
+   修正：unauthorized 時自動重抓 token 並重試一次
    ============================================================ */
 
 const HTTP_HOST = '127.0.0.1';
@@ -233,13 +234,34 @@ function buildHeaders(extra) {
   return h;
 }
 
+// 判斷回應是否為「token 失效」
+function isUnauthorized(status, respText) {
+  if (status === 401 || status === 403) return true;
+  if (typeof respText === 'string' && respText.toLowerCase().indexOf('unauthorized') >= 0) return true;
+  return false;
+}
+
+// 單次送出 /print/{target}
+async function _doHttpPrint(target, utf8Bytes) {
+  const t0 = Date.now();
+  const resp = await fetchWithTimeout(`${HTTP_BASE}/print/${target}`, {
+    method: 'POST',
+    headers: buildHeaders({ 'Content-Type': 'application/octet-stream' }),
+    body: utf8Bytes
+  }, 8000);
+  const dt = Date.now() - t0;
+  const respText = await resp.text();
+  plog('httpPrint ← ' + target + ' status=' + resp.status + ' time=' + dt + 'ms');
+  plog('httpPrint resp=' + respText.slice(0, 200));
+  return { status: resp.status, text: respText };
+}
+
 export async function httpPrint(target, body) {
   const jsonStr = JSON.stringify(body || {});
   const utf8Bytes = new TextEncoder().encode(jsonStr);
   plog('httpPrint → ' + target + ' url=' + HTTP_BASE + '/print/' + target + ' bodyLen=' + utf8Bytes.length);
   plog('httpPrint body head=' + jsonStr.slice(0, 200));
 
-  // 找出 shopName 那段印出來，看中文有沒有壞
   var idx = jsonStr.indexOf('"shopName"');
   if (idx >= 0) {
     var sample = jsonStr.slice(idx, idx + 80);
@@ -251,21 +273,21 @@ export async function httpPrint(target, body) {
 
   plog('httpPrint hasToken=' + (getApiToken() ? 'yes' : 'no'));
 
-  const t0 = Date.now();
-  let respText = '';
   try {
-    const resp = await fetchWithTimeout(`${HTTP_BASE}/print/${target}`, {
-      method: 'POST',
-      headers: buildHeaders({ 'Content-Type': 'application/octet-stream' }),
-      body: utf8Bytes
-    }, 8000);
-    const dt = Date.now() - t0;
-    plog('httpPrint ← ' + target + ' status=' + resp.status + ' time=' + dt + 'ms');
-    respText = await resp.text();
-    plog('httpPrint resp=' + respText.slice(0, 200));
+    let r = await _doHttpPrint(target, utf8Bytes);
+
+    // unauthorized → 重抓 token 後重試一次
+    if (isUnauthorized(r.status, r.text)) {
+      plog('httpPrint unauthorized, refetch token and retry once');
+      const newTk = await tryAutoFetchToken();
+      if (newTk) {
+        r = await _doHttpPrint(target, utf8Bytes);
+      }
+    }
+
     let j = {};
-    try { j = JSON.parse(respText); } catch(e) {}
-    if (!j.ok) _lastError = 'httpPrint ' + target + ' failed: ' + (j.error || respText || 'unknown');
+    try { j = JSON.parse(r.text); } catch(e) {}
+    if (!j.ok) _lastError = 'httpPrint ' + target + ' failed: ' + (j.error || r.text || 'unknown');
     return { ok: !!j.ok, error: j.error || '' };
   } catch (e) {
     const msg = String(e && e.message || e);
@@ -275,25 +297,39 @@ export async function httpPrint(target, body) {
   }
 }
 
+async function _doHttpOpenDrawer() {
+  const url = `${HTTP_BASE}/drawer/open`;
+  const t0 = Date.now();
+  const resp = await fetchWithTimeout(url, {
+    method: 'POST',
+    headers: buildHeaders({ 'Content-Type': 'application/json' }),
+    body: '{}'
+  }, 5000);
+  const dt = Date.now() - t0;
+  const text = await resp.text();
+  plog('httpOpenDrawer ← status=' + resp.status + ' time=' + dt + 'ms');
+  plog('httpOpenDrawer resp=' + text.slice(0, 200));
+  return { status: resp.status, text };
+}
 
 export async function httpOpenDrawer() {
   try {
-    const url = `${HTTP_BASE}/drawer/open`;
-    plog('httpOpenDrawer → url=' + url);
+    plog('httpOpenDrawer → url=' + HTTP_BASE + '/drawer/open');
     plog('httpOpenDrawer hasToken=' + (getToken() ? 'yes' : 'no'));
-    const t0 = Date.now();
-    const resp = await fetchWithTimeout(url, {
-      method: 'POST',
-      headers: buildHeaders({ 'Content-Type': 'application/json' }),
-      body: '{}'
-    }, 5000);
-    const dt = Date.now() - t0;
-    const text = await resp.text();
-    plog('httpOpenDrawer ← status=' + resp.status + ' time=' + dt + 'ms');
-    plog('httpOpenDrawer resp=' + text.slice(0, 200));
+
+    let r = await _doHttpOpenDrawer();
+
+    if (isUnauthorized(r.status, r.text)) {
+      plog('httpOpenDrawer unauthorized, refetch token and retry once');
+      const newTk = await tryAutoFetchToken();
+      if (newTk) {
+        r = await _doHttpOpenDrawer();
+      }
+    }
+
     let j = {};
-    try { j = JSON.parse(text); } catch(e) {}
-    if (!j.ok) _lastError = 'httpOpenDrawer failed: ' + (j.error || text || 'unknown');
+    try { j = JSON.parse(r.text); } catch(e) {}
+    if (!j.ok) _lastError = 'httpOpenDrawer failed: ' + (j.error || r.text || 'unknown');
     return { ok: !!j.ok, error: j.error || '' };
   } catch (e) {
     const msg = String(e && e.message || e);
