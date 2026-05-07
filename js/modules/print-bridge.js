@@ -1,8 +1,10 @@
 /* ============================================================
-   js/modules/print-bridge.js  v2026-05-07-token-sync
+   js/modules/print-bridge.js  v2026-05-08-floating-toggle
    列印橋接偵測 + 路由
-   修正：/ping 回應若帶 token 則自動同步到 localStorage，
-        unauthorized 時呼叫 detectPrinters(true) 重抓 token 再重試
+   修正：
+   - /ping 回應若帶 token 自動同步到 localStorage
+   - unauthorized 時 detectPrinters(true) 重抓 token 再重試
+   - log 框改為右下角小圓鈕 🔍，點擊展開/收起
    ============================================================ */
 
 const HTTP_HOST = '127.0.0.1';
@@ -20,33 +22,63 @@ if (typeof window !== 'undefined') {
   window.__printLog = window.__printLog || [];
 }
 
-function logBox() {
-  if (typeof document === 'undefined') return null;
-  let box = document.getElementById('__printLogBox');
-  if (box) return box;
-  box = document.createElement('div');
-  box.id = '__printLogBox';
-  box.style.cssText = [
-    'position:fixed','top:8px','right:8px','width:360px','max-height:60vh',
-    'overflow:auto','background:#ff8c00','color:#fff','font:11px/1.4 monospace',
-    'padding:6px 8px','border:2px solid #b35c00','border-radius:6px',
-    'z-index:2147483647','box-shadow:0 2px 8px rgba(0,0,0,.3)',
-    'white-space:pre-wrap','word-break:break-all'
-  ].join(';');
-  const close = document.createElement('div');
-  close.textContent = '✕';
-  close.style.cssText = 'position:absolute;top:2px;right:6px;cursor:pointer;font-weight:700;font-size:14px';
-  close.onclick = () => { box.style.display = 'none'; };
-  const title = document.createElement('div');
-  title.textContent = '[print-bridge log]';
-  title.style.cssText = 'font-weight:700;margin-bottom:4px';
-  const body = document.createElement('div');
-  body.id = '__printLogBody';
-  box.appendChild(close);
-  box.appendChild(title);
-  box.appendChild(body);
-  document.body.appendChild(box);
-  return box;
+// ============================================================
+// log 框 UI：右下角小圓鈕，點擊切換展開
+// ============================================================
+function ensureLogUI() {
+  if (typeof document === 'undefined' || !document.body) return null;
+  let panel = document.getElementById('__printLogBox');
+  let btn = document.getElementById('__printLogBtn');
+  if (panel && btn) return { panel, btn };
+
+  // 浮動圓鈕
+  if (!btn) {
+    btn = document.createElement('div');
+    btn.id = '__printLogBtn';
+    btn.textContent = '🔍';
+    btn.title = '除錯日誌';
+    btn.style.cssText = [
+      'position:fixed','right:12px','bottom:12px','width:40px','height:40px',
+      'border-radius:50%','background:#ff8c00','color:#fff',
+      'font-size:20px','line-height:40px','text-align:center','cursor:pointer',
+      'box-shadow:0 2px 8px rgba(0,0,0,.3)','z-index:2147483647',
+      'user-select:none'
+    ].join(';');
+    btn.onclick = () => {
+      const p = document.getElementById('__printLogBox');
+      if (!p) return;
+      p.style.display = (p.style.display === 'none' || !p.style.display) ? 'block' : 'none';
+    };
+    document.body.appendChild(btn);
+  }
+
+  // log 面板（預設隱藏）
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = '__printLogBox';
+    panel.style.cssText = [
+      'position:fixed','right:12px','bottom:60px','width:360px','max-height:60vh',
+      'overflow:auto','background:#ff8c00','color:#fff','font:11px/1.4 monospace',
+      'padding:6px 8px','border:2px solid #b35c00','border-radius:6px',
+      'z-index:2147483646','box-shadow:0 2px 8px rgba(0,0,0,.3)',
+      'white-space:pre-wrap','word-break:break-all','display:none'
+    ].join(';');
+    const close = document.createElement('div');
+    close.textContent = '✕';
+    close.style.cssText = 'position:absolute;top:2px;right:6px;cursor:pointer;font-weight:700;font-size:14px';
+    close.onclick = () => { panel.style.display = 'none'; };
+    const title = document.createElement('div');
+    title.textContent = '[print-bridge log]';
+    title.style.cssText = 'font-weight:700;margin-bottom:4px';
+    const body = document.createElement('div');
+    body.id = '__printLogBody';
+    panel.appendChild(close);
+    panel.appendChild(title);
+    panel.appendChild(body);
+    document.body.appendChild(panel);
+  }
+
+  return { panel, btn };
 }
 
 function plog(msg) {
@@ -61,16 +93,15 @@ function plog(msg) {
     }
   } catch(e) {}
   try {
-    const box = logBox();
-    if (!box) return;
-    box.style.display = 'block';
+    const ui = ensureLogUI();
+    if (!ui) return;
     const body = document.getElementById('__printLogBody');
     if (!body) return;
     const div = document.createElement('div');
     div.textContent = line;
     body.appendChild(div);
-    while (body.childNodes.length > 30) body.removeChild(body.firstChild);
-    box.scrollTop = box.scrollHeight;
+    while (body.childNodes.length > 50) body.removeChild(body.firstChild);
+    ui.panel.scrollTop = ui.panel.scrollHeight;
   } catch(e) {}
 }
 
@@ -130,7 +161,6 @@ export async function detectPrinters(force = false) {
         try { j = JSON.parse(text); } catch(e) { plog('detectPrinters: JSON.parse failed'); }
         const data = (j && j.data) ? j.data : (j || {});
 
-        // /ping  token  localStorage 
         if (data.token && typeof data.token === 'string' && data.token.length > 0) {
           const cur = getToken();
           if (cur !== data.token) {
@@ -260,7 +290,6 @@ export async function httpPrint(target, body) {
   try {
     let r = await _doHttpPrint(target, utf8Bytes);
 
-    // unauthorized →  detectPrinters(true)  /ping  token 
     if (isUnauthorized(r.status, r.text)) {
       plog('httpPrint unauthorized, refresh token via /ping and retry once');
       clearDetectCache();
