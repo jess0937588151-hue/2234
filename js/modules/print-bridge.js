@@ -360,39 +360,6 @@ export async function httpOpenDrawer() {
   }
 }
 
-
-export async function httpOpenDrawer() {
-  try {
-    plog('httpOpenDrawer → url=' + HTTP_BASE + '/drawer/open');
-    plog('httpOpenDrawer hasToken=' + (getToken() ? 'yes' : 'no'));
-
-    let r = await _doHttpOpenDrawer();
-
-    if (isUnauthorized(r.status, r.text)) {
-      plog('httpOpenDrawer unauthorized, refresh token via /ping and retry once');
-      clearDetectCache();
-      await detectPrinters(true);
-      const newTk = getToken();
-      if (newTk) {
-        plog('httpOpenDrawer retry with new token len=' + newTk.length);
-        r = await _doHttpOpenDrawer();
-      } else {
-        plog('httpOpenDrawer no token after refresh, giving up');
-      }
-    }
-
-    let j = {};
-    try { j = JSON.parse(r.text); } catch(e) {}
-    if (!j.ok) _lastError = 'httpOpenDrawer failed: ' + (j.error || r.text || 'unknown');
-    return { ok: !!j.ok, error: j.error || '' };
-  } catch (e) {
-    const msg = String(e && e.message || e);
-    _lastError = 'httpOpenDrawer exception: ' + msg;
-    plog('httpOpenDrawer EXCEPTION: ' + msg);
-    return { ok: false, error: msg };
-  }
-}
-
 export function browserPrintHtml(html) {
   plog('browserPrintHtml: fallback to system print dialog');
   return new Promise(resolve => {
