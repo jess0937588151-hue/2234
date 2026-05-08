@@ -315,20 +315,51 @@ export async function httpPrint(target, body) {
   }
 }
 
-async function _doHttpOpenDrawer() {
-  const url = `${HTTP_BASE}/drawer/open`;
-  const t0 = Date.now();
-  const resp = await fetchWithTimeout(url, {
-    method: 'POST',
-    headers: buildHeaders({ 'Content-Type': 'application/json' }),
-    body: '{}'
-  }, 5000);
-  const dt = Date.now() - t0;
-  const text = await resp.text();
-  plog('httpOpenDrawer ← status=' + resp.status + ' time=' + dt + 'ms');
-  plog('httpOpenDrawer resp=' + text.slice(0, 200));
-  return { status: resp.status, text };
+export async function httpOpenDrawer() {
+  async function attempt(label) {
+    plog('httpOpenDrawer ' + label + ' → url=' + HTTP_BASE + '/drawer/open');
+    plog('httpOpenDrawer ' + label + ' hasToken=' + (getToken() ? 'yes' : 'no'));
+
+    let r = await _doHttpOpenDrawer();
+
+    if (isUnauthorized(r.status, r.text)) {
+      plog('httpOpenDrawer ' + label + ' unauthorized, refresh token via /ping and retry once');
+      clearDetectCache();
+      await detectPrinters(true);
+      const newTk = getToken();
+      if (newTk) {
+        plog('httpOpenDrawer ' + label + ' retry with new token len=' + newTk.length);
+        r = await _doHttpOpenDrawer();
+      } else {
+        plog('httpOpenDrawer ' + label + ' no token after refresh, giving up');
+      }
+    }
+
+    let j = {};
+    try { j = JSON.parse(r.text); } catch(e) {}
+    if (!j.ok) _lastError = 'httpOpenDrawer failed: ' + (j.error || r.text || 'unknown');
+    return { ok: !!j.ok, error: j.error || '' };
+  }
+
+  // 第一次嘗試
+  try {
+    return await attempt('try1');
+  } catch (e) {
+    const msg = String(e && e.message || e);
+    plog('httpOpenDrawer try1 EXCEPTION: ' + msg + ' → retry after 200ms');
+    // socket 死掉時，等 200ms 讓瀏覽器釋放舊連線，再重試一次
+    await new Promise(res => setTimeout(res, 200));
+    try {
+      return await attempt('try2');
+    } catch (e2) {
+      const msg2 = String(e2 && e2.message || e2);
+      _lastError = 'httpOpenDrawer exception: ' + msg2;
+      plog('httpOpenDrawer try2 EXCEPTION: ' + msg2);
+      return { ok: false, error: msg2 };
+    }
+  }
 }
+
 
 export async function httpOpenDrawer() {
   try {
