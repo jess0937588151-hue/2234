@@ -750,16 +750,19 @@ export async function printOrderLabels(order){
 // ============================================================
 export async function openCashDrawer(){
   pslog('openCashDrawer CALL');
-  await detectPrinters(true);
-  const d = getDetect();
-  pslog('openCashDrawer detect mode=' + (d && d.mode) + ' sunmi=' + (d && d.sunmi));
 
-  if (d && d.mode === 'http') {
-    pslog('openCashDrawer → http');
+  // 直接打 HTTP，不先 detect（避免連續按 /ping 撞到 socket 未釋放）
+  try {
     const r = await httpOpenDrawer();
     pslog('openCashDrawer http result ok=' + r.ok + ' err=' + r.error);
-    return r.ok;
+    if (r.ok) return true;
+  } catch(e) {
+    pslog('openCashDrawer http exception: ' + (e && e.message || e));
   }
+
+  // HTTP 失敗才退回 webview / 快取 detect
+  const d = getCachedDetect() || await detectPrinters(false);
+  pslog('openCashDrawer fallback detect mode=' + (d && d.mode));
 
   if (d && d.mode === 'webview') {
     pslog('openCashDrawer → webview');
@@ -777,6 +780,7 @@ export async function openCashDrawer(){
   pslog('openCashDrawer → browser mode, cannot open drawer, return false');
   return false;
 }
+
 
 export function buildCartPreviewOrder(){
   const items = Array.isArray(state.cart) ? state.cart : [];
