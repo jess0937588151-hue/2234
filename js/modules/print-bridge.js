@@ -269,6 +269,20 @@ async function _doHttpPrint(target, utf8Bytes) {
   plog('httpPrint resp=' + respText.slice(0, 200));
   return { status: resp.status, text: respText };
 }
+async function _doHttpOpenDrawer() {
+  const url = `${HTTP_BASE}/drawer/open`;
+  const t0 = Date.now();
+  const resp = await fetchWithTimeout(url, {
+    method: 'POST',
+    headers: buildHeaders({ 'Content-Type': 'application/json' }),
+    body: '{}'
+  }, 5000);
+  const dt = Date.now() - t0;
+  const text = await resp.text();
+  plog('httpOpenDrawer ← status=' + resp.status + ' time=' + dt + 'ms');
+  plog('httpOpenDrawer resp=' + text.slice(0, 200));
+  return { status: resp.status, text };
+}
 
 export async function httpPrint(target, body) {
   const jsonStr = JSON.stringify(body || {});
