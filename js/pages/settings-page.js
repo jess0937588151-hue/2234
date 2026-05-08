@@ -17,6 +17,8 @@ const PRINT_FIELD_DEFS = [
   { key:'orderType',      label:'類型 / 桌號' },
   { key:'paymentMethod',  label:'付款方式' },
   { key:'customerInfo',   label:'顧客資訊' },
+  { key:'items',          label:'品項（名稱）' },
+  { key:'itemQty',        label:'數量' },
   { key:'itemSelections', label:'品項模組' },
   { key:'itemNote',       label:'品項備註' },
   { key:'itemPrice',      label:'品項金額' },
@@ -59,10 +61,7 @@ function collectPrintFieldsMatrix(){
       var el = document.getElementById('pfm_'+kind+'_'+def.key);
       out[kind][def.key] = !!(el && el.checked);
     });
-    // 必須一直為 true 的欄位（系統需要才能正確列印品項）
-    out[kind].items = true;
-    out[kind].itemQty = true;
-  });
+      });
   return out;
 }
 
