@@ -126,7 +126,7 @@ export function getLastError() {
   return _lastError;
 }
 
-function fetchWithTimeout(url, opts, ms) {
+function fetchOnce(url, opts, ms) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('timeout ' + ms + 'ms')), ms);
     fetch(url, opts)
@@ -134,6 +134,20 @@ function fetchWithTimeout(url, opts, ms) {
       .catch(e => { clearTimeout(timer); reject(e); });
   });
 }
+
+function fetchWithTimeout(url, opts, ms) {
+  return fetchOnce(url, opts, ms).catch(async (e) => {
+    const msg = String(e && e.message || e);
+    // 只對「socket 死掉」類型的錯誤重試一次（瀏覽器拿到死的 keep-alive 連線）
+    if (msg.indexOf('Failed to fetch') >= 0 || msg.indexOf('NetworkError') >= 0) {
+      plog('fetchWithTimeout: ' + msg + ' → retry once after 250ms');
+      await new Promise(res => setTimeout(res, 250));
+      return fetchOnce(url, opts, ms);
+    }
+    throw e;
+  });
+}
+
 
 export async function detectPrinters(force = false) {
   if (!force && _cache && (Date.now() - _cache.timestamp) < CACHE_TTL_MS) {
