@@ -152,3 +152,48 @@ export function stopDashboardPublish(){
     heartbeatTimer = null;
   }
 }
+// ============================================================
+// 隱藏設定入口：在頁面任何位置快速點 5 下（2 秒內）叫出設定 prompt
+// 設計給 T2 等無法操作網址列、無 console 的裝置
+// ============================================================
+(function setupHiddenConfigTrigger(){
+  if(typeof window === 'undefined') return;
+  let clickCount = 0;
+  let lastClickAt = 0;
+  document.addEventListener('click', (ev)=>{
+    const now = Date.now();
+    if(now - lastClickAt > 2000) clickCount = 0;
+    lastClickAt = now;
+    // 只計算點到頁首 logo / title 區（避免結帳按鈕被亂觸發）
+    const target = ev.target;
+    if(!target) return;
+    const tag = (target.tagName || '').toLowerCase();
+    const isHeader = tag === 'h1' || tag === 'h2' ||
+                     (target.closest && target.closest('header')) ||
+                     (target.id === 'pageTitle');
+    if(!isHeader) return;
+    clickCount++;
+    if(clickCount >= 5){
+      clickCount = 0;
+      openDashboardConfigPrompt();
+    }
+  }, true);
+})();
+
+function openDashboardConfigPrompt(){
+  const cfg = ensureDashboardConfig();
+  const sid = prompt('店鋪 ID（英數，例 store-001）\n目前：' + (cfg.storeId || '未設定'), cfg.storeId || '');
+  if(sid === null) return;
+  const sname = prompt('店鋪名稱（顯示在看板）\n目前：' + (cfg.storeName || ''), cfg.storeName || '');
+  if(sname === null) return;
+  if(!state.settings) state.settings = {};
+  state.settings.dashboard = {
+    enabled: true,
+    storeId: String(sid).trim(),
+    storeName: String(sname).trim()
+  };
+  persistAll();
+  alert('已設定店鋪：' + state.settings.dashboard.storeId + ' / ' + state.settings.dashboard.storeName + '\n即將重新整理');
+  location.reload();
+}
+
