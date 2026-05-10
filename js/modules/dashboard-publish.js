@@ -13,7 +13,7 @@
  *   dashboards/{storeId}/today       { date, salesTotal, orderCount, avgTicket }
  *   dashboards/{storeId}/session     { staffId, startedAt, openingCash, currentCash }  ← 沒班次時為 null
  */
-import { state } from '../core/store.js';
+import { state, persistAll } from '../core/store.js';
 import { getCurrentSession, calcSessionStats } from './report-session.js';
 import { _getRef, _dbApi } from './realtime-order-service.js';
 import { persistAll } from '../core/store.js';   
