@@ -23,6 +23,8 @@ import {
   getRealtimeConfig,
   startReservationReminderLoop
 } from './modules/realtime-order-service.js';
+import { startDashboardPublish, publishDashboardNow } from './modules/dashboard-publish.js';
+
 
 import {
   signInGoogleDrive,
@@ -349,3 +351,5 @@ startGoogleAutoBackup();
 autoStartRealtimeListener();
 startReservationReminderLoop();
 setupPWA();
+startDashboardPublish();
+window.publishDashboardNow = publishDashboardNow;
