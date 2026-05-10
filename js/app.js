@@ -353,3 +353,10 @@ startReservationReminderLoop();
 setupPWA();
 startDashboardPublish();
 window.publishDashboardNow = publishDashboardNow;
+
+// 任何 view 刷新（含結帳、開/結班）後即時推一次看板資料
+const _origRefreshAllViews = window.refreshAllViews;
+window.refreshAllViews = function(){
+  _origRefreshAllViews();
+  try { publishDashboardNow(); } catch(e) { console.warn('publishDashboardNow failed', e); }
+};
