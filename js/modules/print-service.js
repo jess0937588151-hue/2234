@@ -573,23 +573,37 @@ function buildBridgePayload(order, mode){
     // 訂單備註
     customerNote: fields.orderNote ? (order.customerNote || '') : '',
 
-    // 品項
+        // 品項
     items: fields.items
-      ? (order.items || []).map(it => {
+      ? (order.items || []).flatMap(it => {
           const base  = Number(it.basePrice  || 0);
           const extra = Number(it.extraPrice || 0);
-          const qty   = Number(it.qty || 0);
-          return {
+          const qty   = Math.max(1, Number(it.qty || 0));
+
+          // 標籤模式：每個 qty 展開成一個獨立 item（每張一份），APK 看到 N 個 item 就印 N 張
+          if(isLabel){
+            return Array.from({ length: qty }, () => ({
+              name: it.name || '',
+              qty: 1,
+              basePrice: base,
+              extraPrice: extra,
+              price: 0,
+              options: fields.itemSelections !== false ? buildSelectionText(it) : '',
+              note:    fields.itemNote       !== false ? (it.note || '') : ''
+            }));
+          }
+
+          // 顧客單 / 廚房單：原樣保留 qty
+          return [{
             name: it.name || '',
             qty:  fields.itemQty   !== false ? qty : 1,
             basePrice: base,
             extraPrice: extra,
-            // 顧客單要金額才送，廚房/標籤或關閉金額時填 0
-            price: (!isKitchen && !isLabel && fields.itemPrice !== false)
+            price: (!isKitchen && fields.itemPrice !== false)
                      ? (base + extra) * qty : 0,
             options: fields.itemSelections !== false ? buildSelectionText(it) : '',
             note:    fields.itemNote       !== false ? (it.note || '') : ''
-          };
+          }];
         })
       : [],
 
