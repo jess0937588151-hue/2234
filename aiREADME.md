@@ -189,8 +189,8 @@ index.html productConfigModal：在 itemQtyInput 兩側加 #qtyMinusBtn / #qtyPl
 七、待辦
 短期
 優先	項目	影響範圍	細節
-中	Google 登入失敗	網頁或 APK	Custom Tabs 或 Firebase Email 登入；目前用 Web 直接開繞過
-已不做（明確排除）
+- Google 登入失敗：APK 改純後台架構後，使用者改用一般瀏覽器（非 WebView）開網頁，Google OAuth 不再被 disallowed_useragent 擋。問題消失，不需處理。
+
 APK 被 T2 系統殺掉：使用者改用「Web 直接開」，不再依賴 APK 開 WebView
 自動更新檢查：維持手動更新
 長期
