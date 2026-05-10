@@ -16,6 +16,7 @@
 import { state } from '../core/store.js';
 import { getCurrentSession, calcSessionStats } from './report-session.js';
 import { _getRef, _dbApi } from './realtime-order-service.js';
+import { persistAll } from '../core/store.js';   
 
 const HEARTBEAT_INTERVAL_MS = 30 * 1000;
 let heartbeatTimer = null;
@@ -23,16 +24,47 @@ let heartbeatTimer = null;
 // ============================================================
 // 設定
 // ============================================================
+
+
+// 中文備註：支援用 URL 設定 storeId，例：
+//   https://.../2234/?storeId=store-001&storeName=1號店
+// T2 沒 console，這是唯一可行的設定入口。設定一次寫入 localStorage 後，
+// 之後不必再帶 query string。也可以用 ?dashboard=off 暫時停用。
+function applyDashboardConfigFromURL(){
+  try{
+    const params = new URLSearchParams(location.search);
+    const sid = params.get('storeId');
+    const sname = params.get('storeName');
+    const sw = params.get('dashboard');   // 'off' = 停用
+    if(!sid && !sname && !sw) return false;
+    if(!state.settings) state.settings = {};
+    const cur = state.settings.dashboard || {};
+    state.settings.dashboard = {
+      enabled: sw === 'off' ? false : (typeof cur.enabled === 'boolean' ? cur.enabled : true),
+      storeId: sid ? String(sid).trim() : String(cur.storeId || '').trim(),
+      storeName: sname ? String(sname).trim() : String(cur.storeName || '').trim()
+    };
+    persistAll();
+    return true;
+  }catch(e){
+    console.warn('[dashboard-publish] applyDashboardConfigFromURL failed', e);
+    return false;
+  }
+}
+
 export function ensureDashboardConfig(){
   if(!state.settings) state.settings = {};
+  // 先處理 URL query（首次進站才有效）
+  applyDashboardConfigFromURL();
   const cur = state.settings.dashboard || {};
   state.settings.dashboard = {
     enabled: typeof cur.enabled === 'boolean' ? cur.enabled : true,
-    storeId: String(cur.storeId || '').trim(),       // 例：store-001
+    storeId: String(cur.storeId || '').trim(),
     storeName: String(cur.storeName || '').trim() || (state.settings.storeName || '未命名店')
   };
   return state.settings.dashboard;
 }
+
 
 function todayKey(){
   const d = new Date();
