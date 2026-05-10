@@ -454,28 +454,32 @@ export function getLabelHtml(order){
   const customerPhoneMasked = maskCustomerPhone(order.customerPhone);
   const items = order.items || [];
 
-  const labels = items.map(it => {
-    const lines = [];
-    if(fields.storeName) lines.push(`<div class="bold center">${escapeHtml(cfg.storeName)}</div>`);
-    if(fields.orderNo) lines.push(`<div class="small">${escapeHtml(order.orderNo || order.id || '')}</div>`);
-    if(fields.dateTime) lines.push(`<div class="small">${escapeHtml(fmtDate(order.createdAt))}</div>`);
-    if(fields.orderType) lines.push(`<div class="small">${escapeHtml(order.orderType || '')}</div>`);
-    if(fields.customerInfo){
-      const cName = order.customerName ? escapeHtml(order.customerName) : '';
-      const cPhone = customerPhoneMasked ? escapeHtml(customerPhoneMasked) : '';
-      if(cName || cPhone) lines.push(`<div class="small">${cName}${cPhone ? ' / ' + cPhone : ''}</div>`);
-    }
-
-    if(fields.items){
-      const name = escapeHtml(it.name || '');
-      const qty = Number(it.qty || 0);
-      lines.push(`<div class="bold big-item">${name}${fields.itemQty ? ' x' + qty : ''}</div>`);
-      const sel = fields.itemSelections !== false ? buildSelectionText(it) : '';
-      if(sel) lines.push(`<div class="small">${escapeHtml(sel)}</div>`);
-      if(fields.itemNote && it.note) lines.push(`<div class="small">備註：${escapeHtml(it.note)}</div>`);
-    }
-    return `<div class="label">${lines.join('')}</div>`;
+    const labels = items.flatMap(it => {
+    const qty = Math.max(1, Number(it.qty || 0));
+    const oneLabel = () => {
+      const lines = [];
+      if(fields.storeName) lines.push(`<div class="bold center">${escapeHtml(cfg.storeName)}</div>`);
+      if(fields.orderNo) lines.push(`<div class="small">${escapeHtml(order.orderNo || order.id || '')}</div>`);
+      if(fields.dateTime) lines.push(`<div class="small">${escapeHtml(fmtDate(order.createdAt))}</div>`);
+      if(fields.orderType) lines.push(`<div class="small">${escapeHtml(order.orderType || '')}</div>`);
+      if(fields.customerInfo){
+        const cName = order.customerName ? escapeHtml(order.customerName) : '';
+        const cPhone = customerPhoneMasked ? escapeHtml(customerPhoneMasked) : '';
+        if(cName || cPhone) lines.push(`<div class="small">${cName}${cPhone ? ' / ' + cPhone : ''}</div>`);
+      }
+      if(fields.items){
+        const name = escapeHtml(it.name || '');
+        // 一張一份，不再顯示 x數量
+        lines.push(`<div class="bold big-item">${name}</div>`);
+        const sel = fields.itemSelections !== false ? buildSelectionText(it) : '';
+        if(sel) lines.push(`<div class="small">${escapeHtml(sel)}</div>`);
+        if(fields.itemNote && it.note) lines.push(`<div class="small">備註：${escapeHtml(it.note)}</div>`);
+      }
+      return `<div class="label">${lines.join('')}</div>`;
+    };
+    return Array.from({ length: qty }, oneLabel);
   }).join('');
+
 
   const css = `
     <style>
