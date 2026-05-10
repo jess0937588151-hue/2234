@@ -1,0 +1,122 @@
+/* 中文備註：多店看板資料 publish 模組 v1
+ * 將本店即時狀態（心跳 / 今日營業 / 班次）寫到 Firebase Realtime Database
+ * 路徑：dashboards/{storeId}/...
+ *
+ * 公開 API：
+ *   ensureDashboardConfig()          → 取得/初始化 dashboard 設定
+ *   startDashboardPublish()          → 啟動心跳（30 秒）+ 立即推一次
+ *   stopDashboardPublish()
+ *   publishDashboardNow()            → 立即推一次（POS 結帳完、班次變動時呼叫）
+ *
+ * 寫到 Firebase 的資料：
+ *   dashboards/{storeId}/heartbeat   { storeName, lastSeenAt }
+ *   dashboards/{storeId}/today       { date, salesTotal, orderCount, avgTicket }
+ *   dashboards/{storeId}/session     { staffId, startedAt, openingCash, currentCash }  ← 沒班次時為 null
+ */
+import { state } from '../core/store.js';
+import { getCurrentSession, calcSessionStats } from './report-session.js';
+import { _getRef, _dbApi } from './realtime-order-service.js';
+
+const HEARTBEAT_INTERVAL_MS = 30 * 1000;
+let heartbeatTimer = null;
+
+// ============================================================
+// 設定
+// ============================================================
+export function ensureDashboardConfig(){
+  if(!state.settings) state.settings = {};
+  const cur = state.settings.dashboard || {};
+  state.settings.dashboard = {
+    enabled: typeof cur.enabled === 'boolean' ? cur.enabled : true,
+    storeId: String(cur.storeId || '').trim(),       // 例：store-001
+    storeName: String(cur.storeName || '').trim() || (state.settings.storeName || '未命名店')
+  };
+  return state.settings.dashboard;
+}
+
+function todayKey(){
+  const d = new Date();
+  return d.getFullYear() + '-' +
+    String(d.getMonth()+1).padStart(2,'0') + '-' +
+    String(d.getDate()).padStart(2,'0');
+}
+
+// ── 計算今日營業統計（用本機 state.orders）──
+function calcTodayStats(){
+  const today = todayKey();
+  const orders = (state.orders || []).filter(o => {
+    if(o.status !== 'completed') return false;
+    const t = o.createdAt ? o.createdAt.slice(0,10) : '';
+    return t === today;
+  });
+  const salesTotal = orders.reduce((s,o)=>s + Number(o.total||0), 0);
+  const orderCount = orders.length;
+  const avgTicket = orderCount > 0 ? Math.round(salesTotal / orderCount) : 0;
+  return { date: today, salesTotal, orderCount, avgTicket };
+}
+
+// ── 計算當前班次摘要 ──
+function calcSessionSummary(){
+  const cur = getCurrentSession();
+  if(!cur) return null;
+  const stats = calcSessionStats(cur.id);
+  const currentCash = Number(cur.openingCash || 0) + Number(stats.cashSales || 0);
+  return {
+    staffId: cur.staffId || '',
+    startedAt: cur.startedAt || '',
+    openingCash: Number(cur.openingCash || 0),
+    currentCash
+  };
+}
+
+// ============================================================
+// 寫入 Firebase
+// ============================================================
+async function writeNode(subPath, data){
+  const cfg = ensureDashboardConfig();
+  if(!cfg.enabled || !cfg.storeId) return;
+  try{
+    const ref = await _getRef(`dashboards/${cfg.storeId}/${subPath}`);
+    const api = _dbApi();
+    if(!ref || !api) return;
+    await api.set(ref, data);
+  }catch(err){
+    console.warn('[dashboard-publish] writeNode failed', subPath, err);
+  }
+}
+
+export async function publishDashboardNow(){
+  const cfg = ensureDashboardConfig();
+  if(!cfg.enabled || !cfg.storeId) return;
+
+  const heartbeat = {
+    storeName: cfg.storeName,
+    lastSeenAt: new Date().toISOString()
+  };
+  const today = calcTodayStats();
+  const session = calcSessionSummary();   // 可能為 null
+
+  await Promise.all([
+    writeNode('heartbeat', heartbeat),
+    writeNode('today', today),
+    writeNode('session', session)         // null 時 set(null) 會把節點刪掉
+  ]);
+}
+
+// ============================================================
+// 心跳
+// ============================================================
+export function startDashboardPublish(){
+  stopDashboardPublish();
+  const cfg = ensureDashboardConfig();
+  if(!cfg.enabled || !cfg.storeId) return;
+  publishDashboardNow();
+  heartbeatTimer = setInterval(publishDashboardNow, HEARTBEAT_INTERVAL_MS);
+}
+
+export function stopDashboardPublish(){
+  if(heartbeatTimer){
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+}
