@@ -16,7 +16,7 @@
 import { state, persistAll } from '../core/store.js';
 import { getCurrentSession, calcSessionStats } from './report-session.js';
 import { _getRef, _dbApi } from './realtime-order-service.js';
-import { persistAll } from '../core/store.js';   
+ 
 
 const HEARTBEAT_INTERVAL_MS = 30 * 1000;
 let heartbeatTimer = null;
