@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>商品圖庫 SKU 對應工具</title>
+<style>
+  body { font-family: -apple-system, "Microsoft JhengHei", sans-serif; margin: 0; padding: 16px; background: #f1f5f9; color: #0f172a; }
+  h1 { margin: 0 0 6px; font-size: 20px; }
+  .meta { color: #64748b; font-size: 13px; margin-bottom: 12px; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+  .toolbar input { flex: 1; min-width: 160px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; }
+  button { padding: 8px 16px; border: 0; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; }
+  .btn-primary { background: #2563eb; color: #fff; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-secondary { background: #e2e8f0; color: #0f172a; }
+  .btn-secondary:hover { background: #cbd5e1; }
+  .btn-warn { background: #fecaca; color: #b91c1c; }
+  #status { font-size: 13px; color: #64748b; margin-bottom: 10px; }
+  #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+  .cell { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; }
+  .cell img { width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 6px; background: #f1f5f9; display: block; }
+  .cell .file { font-size: 12px; color: #475569; margin: 6px 0 4px; word-break: break-all; }
+  .cell .sku-input { width: 100%; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; box-sizing: border-box; }
+  .cell .sku-input:focus { outline: 2px solid #2563eb; border-color: #2563eb; }
+  .cell .sku-input.dup { border-color: #ef4444; background: #fef2f2; }
+  .empty { padding: 40px; text-align: center; color: #94a3b8; background: #fff; border-radius: 8px; }
+</style>
+</head>
+<body>
+
+<h1>📁 商品圖庫 SKU 對應工具</h1>
+<div class="meta">
+  資料夾：<code>images/products/</code> ・
+  每張圖填入對應的商品 SKU 後，點「下載 SKU 對應表 JSON」，再到 POS → 設定 → 匯入對應表
+</div>
+
+<div class="toolbar">
+  <input id="search" placeholder="搜尋檔名…">
+  <button class="btn-secondary" onclick="loadGallery()">🔄 重新載入</button>
+  <button class="btn-warn" onclick="clearAllSku()">清空 SKU</button>
+  <button class="btn-primary" onclick="downloadJson()">⬇ 下載 SKU 對應表 JSON</button>
+</div>
+
+<div id="status">尚未載入</div>
+<div id="grid"></div>
+
+<script>
+const REPO_OWNER = 'jess0937588151-hue';
+const REPO_NAME = '2234';
+const FOLDER_PATH = 'images/products';
+const PAGES_BASE = `https://${REPO_OWNER}.github.io/${REPO_NAME}/${FOLDER_PATH}/`;
+const API_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FOLDER_PATH}`;
+const IMAGE_EXTS = ['.jpg','.jpeg','.png','.gif','.webp','.bmp','.svg'];
+const STORAGE_KEY = 'galleryStudio_skuMap_v1';
+
+let files = [];      // [{name, url}]
+let skuMap = {};     // { fileName: 'A001' }
+
+function loadSkuFromLocal(){
+  try { skuMap = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+  catch(e){ skuMap = {}; }
+}
+function saveSkuToLocal(){
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(skuMap)); } catch(e){}
+}
+
+async function loadGallery(){
+  const status = document.getElementById('status');
+  status.textContent = '載入中…';
+  document.getElementById('grid').innerHTML = '';
+  try {
+    const res = await fetch(API_URL + '?ref=main&t=' + Date.now(), { cache: 'no-store' });
+    if(!res.ok){
+      if(res.status === 403){
+        throw new Error('GitHub API 流量已滿（每小時 60 次），請 1 小時後再試');
+      }
+      throw new Error('HTTP ' + res.status);
+    }
+    const data = await res.json();
+    if(!Array.isArray(data)) throw new Error('資料夾不存在或為空');
+    files = data
+      .filter(f => f.type === 'file')
+      .filter(f => IMAGE_EXTS.some(ext => f.name.toLowerCase().endsWith(ext)))
+      .map(f => ({ name: f.name, url: PAGES_BASE + f.name }))
+      .sort((a,b) => a.name.localeCompare(b.name));
+    status.textContent = `已載入 ${files.length} 張圖片（SKU 自動暫存於瀏覽器，重新整理仍保留）`;
+    renderGrid();
+  } catch(err){
+    status.textContent = '❌ 載入失敗：' + (err.message || err);
+  }
+}
+
+function renderGrid(){
+  const grid = document.getElementById('grid');
+  const keyword = (document.getElementById('search').value || '').trim().toLowerCase();
+  const filtered = files.filter(f => !keyword || f.name.toLowerCase().includes(keyword));
+  if(!filtered.length){
+    grid.innerHTML = '<div class="empty">沒有符合的圖片</div>';
+    return;
+  }
+  const dupSet = findDuplicateSkus();
+  grid.innerHTML = '';
+  filtered.forEach(f => {
+    const sku = skuMap[f.name] || '';
+    const isDup = sku && dupSet.has(sku);
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.innerHTML = `
+      <img src="${f.url}" alt="${f.name}" loading="lazy">
+      <div class="file">${f.name}</div>
+      <input class="sku-input ${isDup ? 'dup' : ''}" placeholder="SKU（例：A001）" value="${sku}" data-file="${f.name}">
+    `;
+    const input = cell.querySelector('.sku-input');
+    input.addEventListener('input', (e)=>{
+      const v = e.target.value.trim();
+      if(v) skuMap[f.name] = v;
+      else delete skuMap[f.name];
+      saveSkuToLocal();
+      updateDupHighlight();
+    });
+    grid.appendChild(cell);
+  });
+}
+
+function findDuplicateSkus(){
+  const count = {};
+  Object.values(skuMap).forEach(sku => {
+    if(!sku) return;
+    count[sku] = (count[sku] || 0) + 1;
+  });
+  return new Set(Object.keys(count).filter(k => count[k] > 1));
+}
+
+function updateDupHighlight(){
+  const dupSet = findDuplicateSkus();
+  document.querySelectorAll('.sku-input').forEach(input => {
+    const v = input.value.trim();
+    if(v && dupSet.has(v)) input.classList.add('dup');
+    else input.classList.remove('dup');
+  });
+}
+
+function clearAllSku(){
+  if(!confirm('確定清空所有 SKU 輸入？此動作不可復原')) return;
+  skuMap = {};
+  saveSkuToLocal();
+  renderGrid();
+}
+
+function downloadJson(){
+  const dupSet = findDuplicateSkus();
+  if(dupSet.size > 0){
+    if(!confirm(`偵測到 SKU 重複：${[...dupSet].join(', ')}\n仍要下載嗎？`)) return;
+  }
+  const items = files
+    .map(f => ({ sku: (skuMap[f.name] || '').trim(), file: f.name }))
+    .filter(x => x.sku);
+  if(!items.length){
+    alert('尚未填寫任何 SKU');
+    return;
+  }
+  const payload = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    baseUrl: PAGES_BASE,
+    items: items
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `sku-image-map-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  setTimeout(()=> URL.revokeObjectURL(url), 1200);
+}
+
+document.getElementById('search').addEventListener('input', renderGrid);
+loadSkuFromLocal();
+loadGallery();
+</script>
+
+</body>
+</html>
