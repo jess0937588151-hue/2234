@@ -100,11 +100,12 @@ function focusFirstInvalidField(result){
 
 function createExcelTemplateRows(){
   return [
-    { 商品名稱:'紅茶', 價格:30, 分類:'飲料', 狀態:'啟用' },
-    { 商品名稱:'奶茶', 價格:45, 分類:'飲料', 狀態:'啟用' },
-    { 商品名稱:'雞排', 價格:80, 分類:'炸物', 狀態:'啟用' }
+    { SKU:'A001', 商品名稱:'紅茶', 價格:30, 分類:'飲料', 狀態:'啟用' },
+    { SKU:'A002', 商品名稱:'奶茶', 價格:45, 分類:'飲料', 狀態:'啟用' },
+    { SKU:'A003', 商品名稱:'雞排', 價格:80, 分類:'炸物', 狀態:'啟用' }
   ];
 }
+
 function buildWorkbookFromRows(rows){
   if(!window.XLSX) throw new Error('XLSX library not loaded');
   const workbook = window.XLSX.utils.book_new();
@@ -125,37 +126,99 @@ function downloadBlob(blob, filename){
   setTimeout(()=> URL.revokeObjectURL(url), 1200);
 }
 function normalizeImportedRow(row){
+  const sku = String(row['SKU'] ?? row['sku'] ?? row['編號'] ?? '').trim();
   const name = String(row['商品名稱'] ?? row['名稱'] ?? row['name'] ?? row['Name'] ?? '').trim();
   const price = Number(row['價格'] ?? row['售價'] ?? row['price'] ?? row['Price'] ?? 0);
   const category = String(row['分類'] ?? row['category'] ?? row['Category'] ?? '未分類').trim() || '未分類';
   const enabledText = String(row['狀態'] ?? row['啟用'] ?? row['enabled'] ?? '啟用').trim();
   const enabled = !['false', '停用', '0', '關閉'].includes(enabledText);
-  return { name, price, category, enabled };
+  return { sku, name, price, category, enabled };
 }
+
 function importExcelRowsToPending(rows){
   const imported = [];
+  const dupSkus = [];
+  const updatedSkus = [];   // 已補 SKU 的現有商品
+  const updatedImages = []; // 順帶補上圖片的商品
+  const skuMap = (state.settings && state.settings.imageLibrary && state.settings.imageLibrary.skuMap) || {};
+  const baseUrl = (state.settings && state.settings.imageLibrary && state.settings.imageLibrary.baseUrl) || '';
+
+  // 收集現有 SKU（排除空字串），用於重複檢查
+  const existingSkus = new Set();
+  (state.products || []).forEach(p => { if(p.sku) existingSkus.add(String(p.sku).trim()); });
+  (state.pendingProducts || []).forEach(p => { if(p.sku) existingSkus.add(String(p.sku).trim()); });
+
   rows.forEach(raw => {
     const item = normalizeImportedRow(raw);
     if(!item.name) return;
     if(!(item.price > 0)) return;
-    const exists = (state.pendingProducts||[]).some(p => p.name === item.name && Number(p.price) === Number(item.price))
-      || state.products.some(p => p.name === item.name && Number(p.price) === Number(item.price));
-    if(exists) return;
+
+    // 1) 先比對現有商品「商品名稱」是否存在
+    const matchProduct = (state.products || []).find(p => (p.name || '').trim() === item.name);
+    if(matchProduct){
+      // 已存在 → 補 SKU 與圖片
+      if(item.sku){
+        // 若該 SKU 已被別的商品使用，記錄為衝突並略過
+        const conflict = (state.products || []).find(p => p.sku === item.sku && p !== matchProduct);
+        if(conflict){
+          dupSkus.push(item.sku + '（與「' + (conflict.name||'') + '」衝突）');
+        } else {
+          if(matchProduct.sku !== item.sku){
+            matchProduct.sku = item.sku;
+            updatedSkus.push(item.name + ' → ' + item.sku);
+          }
+          // 順帶套用圖庫圖片
+          if(skuMap[item.sku] && baseUrl){
+            const url = baseUrl + skuMap[item.sku];
+            if(matchProduct.image !== url){
+              matchProduct.image = url;
+              updatedImages.push(item.name);
+            }
+          }
+        }
+      }
+      return; // 已存在的商品不進待上架
+    }
+
+    // 2) 不存在 → 走原本「進待上架」流程
+    if(item.sku){
+      if(existingSkus.has(item.sku)){ dupSkus.push(item.sku); return; }
+      existingSkus.add(item.sku);
+    }
+    const existsPending = (state.pendingProducts||[]).some(p => p.name === item.name && Number(p.price) === Number(item.price));
+    if(existsPending) return;
+    let image = '';
+    if(item.sku && skuMap[item.sku] && baseUrl){
+      image = baseUrl + skuMap[item.sku];
+    }
     imported.push({
-      id: id(), name: item.name, price: item.price,
+      id: id(), sku: item.sku, name: item.name, price: item.price,
       category: item.category || '未分類', enabled: item.enabled,
-      modules: [], image: '',
+      modules: [], image,
       sortOrder: state.products.length + imported.length, status: 'pending'
     });
   });
-  if(!imported.length){ alert('Excel 沒有可匯入的新資料'); return; }
-  if(!Array.isArray(state.pendingProducts)) state.pendingProducts = [];
-  state.pendingProducts.unshift(...imported);
-  document.getElementById('pendingMenuPanel')?.removeAttribute('hidden');
-  persistAll();
-  window.refreshAllViews();
-  alert(`已匯入 ${imported.length} 筆到待上架商品`);
+
+  // 結果回報
+  const msgs = [];
+  if(updatedSkus.length) msgs.push('✓ 已補 SKU：' + updatedSkus.length + ' 筆');
+  if(updatedImages.length) msgs.push('✓ 已套用圖片：' + updatedImages.length + ' 筆');
+  if(imported.length) msgs.push('✓ 新增到待上架：' + imported.length + ' 筆');
+  if(dupSkus.length) msgs.push('⚠ SKU 衝突已略過：' + dupSkus.join(', '));
+
+  if(updatedSkus.length || updatedImages.length || imported.length){
+    if(imported.length){
+      if(!Array.isArray(state.pendingProducts)) state.pendingProducts = [];
+      state.pendingProducts.unshift(...imported);
+      document.getElementById('pendingMenuPanel')?.removeAttribute('hidden');
+    }
+    persistAll();
+    window.refreshAllViews();
+  }
+  alert(msgs.length ? msgs.join('\n') : 'Excel 沒有可匯入的新資料');
 }
+
+
 async function importExcelFile(file){
   if(!window.XLSX){ alert('Excel 套件尚未載入，請重新整理'); return; }
   const arrayBuffer = await file.arrayBuffer();
@@ -167,7 +230,24 @@ async function importExcelFile(file){
   importExcelRowsToPending(rows);
 }
 
+function exportProductsToExcel(){
+  if(!window.XLSX){ alert('Excel 套件尚未載入，請重新整理'); return; }
+  const rows = (state.products || []).map(p => ({
+    SKU: p.sku || '',
+    商品名稱: p.name || '',
+    價格: Number(p.price || 0),
+    分類: p.category || '未分類',
+    狀態: p.enabled === false ? '停用' : '啟用'
+  }));
+  if(!rows.length){ alert('沒有商品可匯出'); return; }
+  const workbook = buildWorkbookFromRows(rows);
+  const blob = workbookToBlob(workbook);
+  const filename = 'products-' + new Date().toISOString().slice(0,10) + '.xlsx';
+  downloadBlob(blob, filename);
+}
+
 export function renderCategoryOptions(){
+
   const sel = document.getElementById('productCategory');
   if(!sel) return;
   const current = sel.value;
@@ -320,6 +400,50 @@ export function renderPendingMenuList(){
   updatePendingCountLabel();
 }
 
+function getProductListViewMode(){
+  if(!state.settings) state.settings = {};
+  return state.settings.productListViewMode === 'text' ? 'text' : 'card';
+}
+
+function applyProductListViewToggleUI(){
+  const mode = getProductListViewMode();
+  const cardBtn = document.getElementById('productListViewCardBtn');
+  const textBtn = document.getElementById('productListViewTextBtn');
+  if(cardBtn){
+    cardBtn.style.background = mode === 'card' ? '#2563eb' : '';
+    cardBtn.style.color = mode === 'card' ? '#fff' : '';
+    cardBtn.style.borderColor = mode === 'card' ? '#2563eb' : '';
+  }
+  if(textBtn){
+    textBtn.style.background = mode === 'text' ? '#2563eb' : '';
+    textBtn.style.color = mode === 'text' ? '#fff' : '';
+    textBtn.style.borderColor = mode === 'text' ? '#2563eb' : '';
+  }
+}
+
+function bindProductListViewToggle(){
+  const cardBtn = document.getElementById('productListViewCardBtn');
+  const textBtn = document.getElementById('productListViewTextBtn');
+  if(cardBtn && !cardBtn.dataset.bound){
+    cardBtn.dataset.bound = '1';
+    cardBtn.onclick = ()=>{
+      if(!state.settings) state.settings = {};
+      state.settings.productListViewMode = 'card';
+      persistAll();
+      renderProductsTable();
+    };
+  }
+  if(textBtn && !textBtn.dataset.bound){
+    textBtn.dataset.bound = '1';
+    textBtn.onclick = ()=>{
+      if(!state.settings) state.settings = {};
+      state.settings.productListViewMode = 'text';
+      persistAll();
+      renderProductsTable();
+    };
+  }
+}
+
 export function renderProductsTable(){
   const wrap = document.getElementById('productTable');
   if(!wrap) return;
@@ -334,15 +458,64 @@ export function renderProductsTable(){
   const countLbl = document.getElementById('productCountLabel');
   if(countLbl) countLbl.textContent = `共 ${filtered.length} 筆 / 全部 ${(state.products||[]).length} 筆`;
 
+  bindProductListViewToggle();
+  applyProductListViewToggleUI();
+
+  const viewMode = getProductListViewMode();
+
   wrap.innerHTML = '';
+
+  if(!filtered.length){
+    wrap.innerHTML = '<div class="muted" style="padding:20px;text-align:center">沒有符合的商品</div>';
+    return;
+  }
+
+  if(viewMode === 'text'){
+    const list = document.createElement('div');
+    list.style.cssText = 'display:flex;flex-direction:column;gap:4px';
+    filtered.forEach((p)=>{
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;background:' + (p.enabled===false ? '#f1f5f9' : '#fff') + ';font-size:14px';
+      row.innerHTML = `
+        <span style="flex:0 0 24px;text-align:center;color:${p.enabled===false ? '#94a3b8' : '#10b981'};font-size:16px">${p.enabled===false ? '⊘' : '●'}</span>
+        <span style="flex:1;font-weight:600;color:${p.enabled===false ? '#94a3b8' : '#0f172a'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(p.name)}</span>
+        <span style="flex:0 0 100px;color:#64748b;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(p.category)}</span>
+        <span style="flex:0 0 70px;text-align:right;font-weight:700;color:${p.enabled===false ? '#94a3b8' : '#1d4ed8'}">${money(p.price)}</span>
+        <span style="display:inline-flex;gap:2px;flex:0 0 auto">
+          <button class="move-up" style="padding:2px 6px;font-size:12px">▲</button>
+          <button class="move-down" style="padding:2px 6px;font-size:12px">▼</button>
+          <button class="edit" style="padding:2px 8px;font-size:12px">編輯</button>
+          <button class="toggle" style="padding:2px 8px;font-size:12px">${p.enabled===false?'上架':'下架'}</button>
+          <button class="delete" style="padding:2px 8px;font-size:12px;color:#dc2626">刪</button>
+        </span>
+      `;
+      row.querySelector('.move-up').onclick = ()=> { moveProduct(p.id, 'up'); autoPushIfMaster(); };
+      row.querySelector('.move-down').onclick = ()=> { moveProduct(p.id, 'down'); autoPushIfMaster(); };
+      row.querySelector('.edit').onclick = ()=> openProductEditModal(p);
+      row.querySelector('.toggle').onclick = ()=>{
+        p.enabled = !(p.enabled!==false);
+        persistAll(); renderProductsTable();
+        if(window.refreshPublicProducts) window.refreshPublicProducts();
+        autoPushIfMaster();
+      };
+      row.querySelector('.delete').onclick = ()=>{
+        if(!confirm(`確定刪除「${p.name}」？`)) return;
+        state.products = state.products.filter(x=>x.id!==p.id);
+        persistAll(); renderProductsTable();
+        if(window.refreshPublicProducts) window.refreshPublicProducts();
+        autoPushIfMaster();
+      };
+      list.appendChild(row);
+    });
+    wrap.appendChild(list);
+    return;
+  }
+
+  // 預設：圖示模式（原本行為）
   const grid = document.createElement('div');
   grid.className = 'product-grid';
   wrap.appendChild(grid);
 
-  if(!filtered.length){
-    grid.innerHTML = '<div class="muted" style="grid-column:1/-1;padding:20px;text-align:center">沒有符合的商品</div>';
-    return;
-  }
   filtered.forEach((p)=>{
     const card = document.createElement('div');
     card.className = 'product-card' + (p.enabled===false ? ' disabled' : '');
@@ -361,9 +534,7 @@ export function renderProductsTable(){
         <button class="delete">刪除</button>
       </div>`;
 
-
-
-        card.querySelector('.move-up').onclick = ()=> { moveProduct(p.id, 'up'); autoPushIfMaster(); };
+    card.querySelector('.move-up').onclick = ()=> { moveProduct(p.id, 'up'); autoPushIfMaster(); };
     card.querySelector('.move-down').onclick = ()=> { moveProduct(p.id, 'down'); autoPushIfMaster(); };
     card.querySelector('.edit').onclick = ()=> openProductEditModal(p);
     card.querySelector('.toggle').onclick = ()=>{
@@ -372,7 +543,6 @@ export function renderProductsTable(){
       if(window.refreshPublicProducts) window.refreshPublicProducts();
       autoPushIfMaster();
     };
-    
     card.querySelector('.delete').onclick = ()=>{
       if(!confirm(`確定刪除「${p.name}」？`)) return;
       state.products = state.products.filter(x=>x.id!==p.id);
@@ -381,35 +551,40 @@ export function renderProductsTable(){
       autoPushIfMaster();
     };
     grid.appendChild(card);
-
   });
 }
+
 
 export function resetProductForm(){
   const idEl = document.getElementById('productId');
   const nameEl = document.getElementById('productName');
   const priceEl = document.getElementById('productPrice');
+  const skuEl = document.getElementById('productSku');
+  const skuErrEl = document.getElementById('productSkuError');
   const imgDataEl = document.getElementById('productImageData');
-  const imgInputEl = document.getElementById('productImageInput');
   const enabledEl = document.getElementById('productEnabled');
   const catEl = document.getElementById('productCategory');
   if(idEl) idEl.value = '';
   if(nameEl) nameEl.value = '';
   if(priceEl) priceEl.value = '';
+  if(skuEl) skuEl.value = 'A001';
+  if(skuErrEl) skuErrEl.classList.add('hidden');
   const descEl = document.getElementById('productDescription');
   if(descEl) descEl.value = '';
 
   if(imgDataEl) imgDataEl.value = '';
-  if(imgInputEl) imgInputEl.value = '';
   if(enabledEl) enabledEl.value = 'true';
   renderCategoryOptions();
   if(catEl) catEl.value = '未分類';
   state.editModules = [];
   renderProductImagePreview('');
+  const statusEl = document.getElementById('productImageStatus');
+  if(statusEl) statusEl.textContent = '';
   renderProductModulesEditor();
   validateProductForm(false);
   bindFormButtonsState();
 }
+
 
 function bindFormButtonsState(){
   const idEl = document.getElementById('productId');
@@ -426,14 +601,26 @@ function openProductForm(product){
   idEl.value = product.id;
   document.getElementById('productName').value = product.name;
   document.getElementById('productPrice').value = product.price;
+  const skuEl = document.getElementById('productSku');
+  if(skuEl) skuEl.value = product.sku || '';
+  const skuErrEl = document.getElementById('productSkuError');
+  if(skuErrEl) skuErrEl.classList.add('hidden');
   const descEl2 = document.getElementById('productDescription');
   if(descEl2) descEl2.value = product.description || '';
 
+  // 優先用 SKU 解析最新圖片 URL；否則沿用 product.image
+  const resolvedUrl = resolveImageUrlBySku(product.sku || '');
+  const finalUrl = resolvedUrl || product.image || '';
   const imgData = document.getElementById('productImageData');
-  if(imgData) imgData.value = product.image || '';
-  const imgInput = document.getElementById('productImageInput');
-  if(imgInput) imgInput.value = '';
-  renderProductImagePreview(product.image || '');
+  if(imgData) imgData.value = finalUrl;
+  renderProductImagePreview(finalUrl);
+  const statusEl = document.getElementById('productImageStatus');
+  if(statusEl){
+    if(!product.sku) statusEl.textContent = '';
+    else if(resolvedUrl) statusEl.textContent = '✓ 已對應圖片：' + resolvedUrl.split('/').pop();
+    else statusEl.textContent = '⚠ 對應表內找不到 SKU「' + product.sku + '」';
+  }
+
   document.getElementById('productEnabled').value = String(product.enabled!==false);
   renderCategoryOptions();
   document.getElementById('productCategory').value = product.category || '未分類';
@@ -443,6 +630,7 @@ function openProductForm(product){
   validateProductForm(false);
   bindFormButtonsState();
 }
+
 
 function openProductEditModal(product){
   const modal = document.getElementById('productEditModal');
@@ -808,9 +996,30 @@ function updatePendingCountLabel(){
 }
 
 // ============================================================
+// SKU → 圖片 URL 對應（依 state.settings.imageLibrary）
+// ============================================================
+function resolveImageUrlBySku(sku){
+  if(!sku) return '';
+  const lib = state.settings?.imageLibrary;
+  if(!lib || !lib.skuMap || !lib.baseUrl) return '';
+  const file = lib.skuMap[sku];
+  if(!file) return '';
+  return lib.baseUrl + file;
+}
+
+function findSkuConflict(sku, currentProductId){
+  if(!sku) return null;
+  const norm = sku.trim();
+  if(!norm) return null;
+  return (state.products || []).find(p => p.sku && p.sku === norm && p.id !== currentProductId) || null;
+}
+
+
+// ============================================================
 // 雲端同步菜單（與設定頁一致：上傳 + 讀取 + 從機鎖）
 // ============================================================
 function applyProductsRoleLock(){
+
   const cfg = (typeof getRealtimeConfig === 'function') ? getRealtimeConfig() : {};
   const isSlave = cfg.deviceRole === 'slave';
   const upBtn = document.getElementById('syncMenuBtnProducts');
@@ -886,14 +1095,17 @@ export function initProductsPage(){
       downloadBlob(blob, '菜單匯入範本.xlsx');
     }catch(e){ alert('範本下載失敗：' + e.message); }
   });
-  document.getElementById('excelImportInput')?.addEventListener('change', async (e)=>{
+    document.getElementById('excelImportInput')?.addEventListener('change', async (e)=>{
     const file = e.target.files && e.target.files[0];
     if(!file) return;
     await importExcelFile(file);
     e.target.value = '';
   });
 
+  document.getElementById('excelExportBtn')?.addEventListener('click', exportProductsToExcel);
+
   document.getElementById('addCategoryBtn')?.addEventListener('click', ()=>{
+
     const name = prompt('請輸入新分類名稱');
     if(!name) return;
     const trimmed = name.trim();
@@ -920,20 +1132,23 @@ export function initProductsPage(){
     renderProductModulesEditor();
   });
 
-  document.getElementById('removeProductImageBtn')?.addEventListener('click', ()=>{
-    const imgData = document.getElementById('productImageData'); if(imgData) imgData.value = '';
-    const imgInput = document.getElementById('productImageInput'); if(imgInput) imgInput.value = '';
-    renderProductImagePreview('');
+      // SKU 變動時即時嘗試對應圖片
+  document.getElementById('productSku')?.addEventListener('input', (e)=>{
+    const sku = e.target.value.trim();
+    const url = resolveImageUrlBySku(sku);
+    const imgData = document.getElementById('productImageData');
+    if(imgData) imgData.value = url;
+    renderProductImagePreview(url);
+    const status = document.getElementById('productImageStatus');
+    const errEl = document.getElementById('productSkuError');
+    if(errEl) errEl.classList.toggle('hidden', !findSkuConflict(sku, document.getElementById('productId')?.value || ''));
+    if(status){
+      if(!sku) status.textContent = '';
+      else if(url) status.textContent = '✓ 已對應圖片：' + url.split('/').pop();
+      else status.textContent = '⚠ 對應表內找不到 SKU「' + sku + '」，請先在設定頁匯入對應表';
+    }
   });
-  document.getElementById('productImageInput')?.addEventListener('change', async (e)=>{
-    const file = e.target.files && e.target.files[0]; if(!file) return;
-    try{
-      const dataUrl = await optimizeProductImage(file);
-      const imgData = document.getElementById('productImageData');
-      if(imgData) imgData.value = dataUrl;
-      renderProductImagePreview(dataUrl);
-    }catch(err){ alert('圖片處理失敗，請換一張圖片再試'); }
-  });
+
 
   document.getElementById('deleteProductBtn')?.addEventListener('click', ()=>{
     const pid = document.getElementById('productId')?.value; if(!pid) return;
@@ -949,18 +1164,34 @@ export function initProductsPage(){
   nameInput?.addEventListener('input', ()=> validateProductForm(false));
   priceInput?.addEventListener('input', ()=> validateProductForm(false));
 
-  document.getElementById('productForm')?.addEventListener('submit', (e)=>{
+    document.getElementById('productForm')?.addEventListener('submit', (e)=>{
     e.preventDefault();
     const validation = validateProductForm(true);
     if(!validation.valid){ focusFirstInvalidField(validation); return; }
     const idEl = document.getElementById('productId');
+    const productIdVal = idEl?.value || id();
+    const sku = (document.getElementById('productSku')?.value || '').trim();
+    if(sku){
+      const conflict = findSkuConflict(sku, productIdVal);
+      if(conflict){
+        const errEl = document.getElementById('productSkuError');
+        if(errEl) errEl.classList.remove('hidden');
+        alert(`SKU「${sku}」已被商品「${conflict.name}」使用，請改用其他編號`);
+        document.getElementById('productSku')?.focus();
+        return;
+      }
+    }
+    // 若 SKU 對應到圖庫，使用對應 URL；否則沿用既有 image 欄
+    const resolvedUrl = resolveImageUrlBySku(sku);
+    const imageFromForm = document.getElementById('productImageData')?.value || '';
     const product = {
-      id: idEl?.value || id(),
+      id: productIdVal,
+      sku: sku,
       name: document.getElementById('productName').value.trim(),
       price: Number(document.getElementById('productPrice').value || 0),
       category: document.getElementById('productCategory').value || '未分類',
       enabled: document.getElementById('productEnabled').value === 'true',
-      image: document.getElementById('productImageData')?.value || '',
+      image: resolvedUrl || imageFromForm,
       description: (document.getElementById('productDescription')?.value || '').trim().slice(0, 60),
       modules: deepCopy(state.editModules || []),
       sortOrder: idEl?.value ? (state.products.find(p=>p.id===idEl.value)?.sortOrder ?? state.products.length) : state.products.length,
@@ -972,6 +1203,7 @@ export function initProductsPage(){
     persistAll(); window.refreshAllViews();
     closeProductEditModal();
   });
+
 
   document.getElementById('applyPendingMenuBtn')?.addEventListener('click', ()=>{
     const list = state.pendingProducts || [];

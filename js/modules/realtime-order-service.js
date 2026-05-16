@@ -657,19 +657,21 @@ export async function syncMenuToFirebase(){
   const menuData = {
     categories: state.categories || [],
     products: (state.products || []).map(function(p){
-      return {
-        id: p.id,
-        name: p.name,
-        price: p.price,
-        category: p.category,
-        image: p.image || '',
-        description: p.description || '',
-        modules: p.modules || [],
-        sortOrder: p.sortOrder || 0,
-        enabled: p.enabled !== false,
-        soldOut: p.soldOut === true
-      };
-    }),
+  return {
+    id: p.id,
+    sku: p.sku || '',
+    name: p.name,
+    price: p.price,
+    category: p.category,
+    image: p.image || '',
+    description: p.description || '',
+    modules: p.modules || [],
+    sortOrder: p.sortOrder || 0,
+    enabled: p.enabled !== false,
+    soldOut: p.soldOut === true
+  };
+}),
+
     modules: state.modules || [],
     updatedAt: new Date().toISOString()
   };
@@ -744,6 +746,7 @@ export async function fetchAndMergeMenuFromFirebase(){
       const soldOut = lp ? (lp.soldOut === true) : (cp.soldOut === true);
       merged.push({
         id: cp.id,
+        sku: cp.sku || '', 
         name: cp.name || '',
         price: Number(cp.price || 0),
         category: cp.category || '未分類',
@@ -826,7 +829,7 @@ function applyCloudMenu(data){
       const enabled = lp ? (lp.enabled !== false) : (cp.enabled !== false);
       const soldOut = lp ? (lp.soldOut === true) : (cp.soldOut === true);
       merged.push({
-        id: cp.id, name: cp.name || '', price: Number(cp.price || 0),
+        id: cp.id, sku: cp.sku || '', name: cp.name || '', price: Number(cp.price || 0),
         category: cp.category || '未分類', image: cp.image || '',
         description: cp.description || '',
         modules: Array.isArray(cp.modules) ? cp.modules : [],

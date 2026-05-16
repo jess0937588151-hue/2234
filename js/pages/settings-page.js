@@ -389,7 +389,160 @@ function saveBusinessHours(){
   alert('營業時間已儲存');
 }
 
+// ── SKU 圖庫對應 ──
+function getImageLibrary(){
+  if(!state.settings) state.settings = {};
+  if(!state.settings.imageLibrary){
+    state.settings.imageLibrary = {
+      baseUrl: 'https://jess0937588151-hue.github.io/2234/images/products/',
+      skuMap: {},
+      importedAt: '',
+      itemCount: 0
+    };
+  }
+  if(!state.settings.imageLibrary.skuMap || typeof state.settings.imageLibrary.skuMap !== 'object'){
+    state.settings.imageLibrary.skuMap = {};
+  }
+  return state.settings.imageLibrary;
+}
+
+function loadImageLibraryToForm(){
+  var lib = getImageLibrary();
+  var baseInput = document.getElementById('imageLibraryBaseUrl');
+  if(baseInput) baseInput.value = lib.baseUrl || '';
+  var status = document.getElementById('imageLibraryImportStatus');
+  if(status){
+    var count = Object.keys(lib.skuMap||{}).length;
+    status.textContent = count > 0
+      ? ('目前已匯入 ' + count + ' 筆，最後匯入：' + (lib.importedAt || '未知'))
+      : '尚未匯入';
+  }
+  renderImageLibraryList();
+}
+
+function renderImageLibraryList(){
+  var box = document.getElementById('imageLibraryListBox');
+  if(!box) return;
+  var lib = getImageLibrary();
+  var keys = Object.keys(lib.skuMap || {});
+  if(keys.length === 0){ box.innerHTML = '（尚無資料）'; return; }
+  keys.sort();
+  box.innerHTML = keys.map(function(sku){
+    var file = lib.skuMap[sku];
+    return '<div style="padding:3px 0;border-bottom:1px dashed #e2e8f0">'
+      + '<strong>' + escapeHtml(sku) + '</strong> → '
+      + '<span style="color:#475569">' + escapeHtml(file) + '</span>'
+      + '</div>';
+  }).join('');
+}
+
+function escapeHtml(s){
+  return String(s||'').replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+function parseImageLibraryJson(text){
+  var data = JSON.parse(text);
+  var map = {};
+  // 支援三種格式：
+  // 1) { "A001":"A001.jpg", "A002":"A002.png" }
+  // 2) [ {"sku":"A001","file":"A001.jpg"}, ... ]
+  // 3) gallery.html 匯出：{ version, baseUrl, items:[{sku,file},...] }
+  var rows = null;
+  if(Array.isArray(data)){
+    rows = data;
+  } else if(data && typeof data === 'object' && Array.isArray(data.items)){
+    rows = data.items;
+    // 若 JSON 自帶 baseUrl，順便同步到 imageLibrary.baseUrl 欄位（呼叫端會處理）
+    if(data.baseUrl){
+      var baseInput = document.getElementById('imageLibraryBaseUrl');
+      if(baseInput && !baseInput.value) baseInput.value = String(data.baseUrl);
+    }
+  }
+  if(rows){
+    rows.forEach(function(row){
+      if(row && row.sku && row.file){
+        map[String(row.sku).trim()] = String(row.file).trim();
+      }
+    });
+  } else if(data && typeof data === 'object'){
+    Object.keys(data).forEach(function(k){
+      var v = data[k];
+      if(v && typeof v === 'string') map[String(k).trim()] = String(v).trim();
+    });
+  } else {
+    throw new Error('JSON 格式無法解析');
+  }
+  if(Object.keys(map).length === 0) throw new Error('JSON 內沒有有效資料');
+  return map;
+}
+
+
+async function importImageLibraryFile(replaceMode){
+  var fileInput = document.getElementById('imageLibraryFileInput');
+  if(!fileInput || !fileInput.files || !fileInput.files[0]){
+    alert('請先選擇 JSON 檔');
+    return;
+  }
+  var file = fileInput.files[0];
+  try {
+    var text = await file.text();
+    var newMap = parseImageLibraryJson(text);
+    var lib = getImageLibrary();
+    if(replaceMode){
+      lib.skuMap = newMap;
+    } else {
+      Object.keys(newMap).forEach(function(k){ lib.skuMap[k] = newMap[k]; });
+    }
+    lib.importedAt = new Date().toLocaleString();
+    lib.itemCount = Object.keys(lib.skuMap).length;
+    persistAll();
+    loadImageLibraryToForm();
+    alert((replaceMode ? '覆蓋' : '合併') + '完成，共 ' + lib.itemCount + ' 筆');
+    fileInput.value = '';
+  } catch(err){
+    alert('匯入失敗：' + (err && err.message ? err.message : err));
+  }
+}
+
+function clearImageLibrary(){
+  if(!confirm('確定清空所有 SKU 對應？此動作無法復原。')) return;
+  var lib = getImageLibrary();
+  lib.skuMap = {};
+  lib.itemCount = 0;
+  lib.importedAt = '';
+  persistAll();
+  loadImageLibraryToForm();
+}
+
+function exportImageLibrary(){
+  var lib = getImageLibrary();
+  var blob = new Blob([JSON.stringify(lib.skuMap || {}, null, 2)], {type:'application/json'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'sku-image-map-' + new Date().toISOString().slice(0,10) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function saveImageLibrarySettings(){
+  var lib = getImageLibrary();
+  var baseInput = document.getElementById('imageLibraryBaseUrl');
+  if(baseInput){
+    var v = (baseInput.value || '').trim();
+    if(v && !/\/$/.test(v)) v = v + '/';
+    lib.baseUrl = v;
+  }
+  persistAll();
+  alert('圖庫設定已儲存');
+}
+
 // ── 主函式 ──
+
 export function initSettingsPage() {
 
   initModalSystem();
@@ -450,12 +603,24 @@ export function initSettingsPage() {
     openModal('modalBusinessHours');
   });
 
-  document.getElementById('saveBusinessHoursBtn')?.addEventListener('click', saveBusinessHours);
+    document.getElementById('saveBusinessHoursBtn')?.addEventListener('click', saveBusinessHours);
+
+  // SKU 圖庫對應
+  document.querySelector('[data-modal="modalImageLibrary"]')?.addEventListener('click', function() {
+    loadImageLibraryToForm();
+    openModal('modalImageLibrary');
+  });
+  document.getElementById('imageLibraryImportBtn')?.addEventListener('click', function(){ importImageLibraryFile(false); });
+  document.getElementById('imageLibraryReplaceBtn')?.addEventListener('click', function(){ importImageLibraryFile(true); });
+  document.getElementById('imageLibraryClearBtn')?.addEventListener('click', clearImageLibrary);
+  document.getElementById('imageLibraryExportBtn')?.addEventListener('click', exportImageLibrary);
+  document.getElementById('saveImageLibraryBtn')?.addEventListener('click', saveImageLibrarySettings);
 
 
   // ============================
   // 列印設定 — 儲存
   // ============================
+
   document.getElementById('savePrintSettingsBtn')?.addEventListener('click', function() {
     var cfg = getPrintSettings();
     cfg.storeName = (document.getElementById('printStoreName')?.value || '').trim();
@@ -1047,11 +1212,24 @@ document.getElementById('previewLabelPrintBtn')?.addEventListener('click', funct
     }
   });
 
-  document.getElementById('showProductImagesToggle')?.addEventListener('change', function(e) {
+    document.getElementById('showProductImagesToggle')?.addEventListener('change', function(e) {
     if (!state.settings) state.settings = {};
     state.settings.showProductImages = e.target.checked;
     persistAll();
+    // 立即重新渲染 POS 點餐頁，不必切頁或重整就會生效
+    if (typeof window.refreshPublicProducts === 'function') {
+      window.refreshPublicProducts();
+    }
   });
+
+  // 開啟「本機資料」Modal 時，把目前設定值回填到 checkbox
+  document.querySelectorAll('[data-modal="modalLocalData"]').forEach(function(tile){
+    tile.addEventListener('click', function(){
+      var cb = document.getElementById('showProductImagesToggle');
+      if (cb) cb.checked = !!(state.settings && state.settings.showProductImages);
+    });
+  });
+
 
   // ============================
   // 進單提示音
