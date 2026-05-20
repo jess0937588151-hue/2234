@@ -4,7 +4,7 @@
  * 強制鎖定：即使網址帶 ?storeId=xxx 也以本檔為準，避免誤切店。
  */
 export const STORE_CONFIG = {
-  storeId:   'store02',     // 內部識別碼，Firebase 路徑與 Google Sheet 分頁名稱
+  storeId:   'store002',     // 內部識別碼，Firebase 路徑與 Google Sheet 分頁名稱
   storeName: '桃園民族店',         // 顯示名稱（報表、收據抬頭備援）
   storeCode: 'store002',     // 線上點餐 URL 用的 storeCode（可與 storeId 相同）
   lockFromUrl: true          // true = 忽略 URL 的 storeId / storeName 參數
