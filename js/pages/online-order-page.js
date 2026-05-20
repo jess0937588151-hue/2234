@@ -8,6 +8,8 @@ import { state } from '../core/store.js';
 import { escapeHtml, id, money, fmtLocalDateTime} from '../core/utils.js';
 import { getRealtimeConfig, pushOnlineOrder, watchCustomerOrder, fetchMenuFromFirebase, startMenuAutoWatch } from '../modules/realtime-order-service.js';
 import { lookupOrdersByCustomer } from '../modules/customer-service.js';
+import { mountPromotionOnlineUI, refreshPromotionDisplay, getCurrentPromotionResult } from '../modules/promotion-ui.js';
+import { pullPromotionsFromCloud } from '../modules/promotion-service.js';
 
 const onlineState = {
   selectedCategory: '全部',
@@ -191,7 +193,9 @@ function renderProductConfig(product){
   (product.modules || []).forEach(att=>{
     const mod = state.modules.find(m=>m.id===att.moduleId);
     if(!mod) return;
-    const required = att.requiredOverride === null ? mod.required : att.requiredOverride;
+// 注意：requiredOverride 不能用 === null，因為 Firebase 會把 null 吃掉，
+//       同步回顧客端時會變 undefined（不是 null）。用 == null 同時涵蓋兩者。
+const required = (att.requiredOverride == null) ? mod.required : att.requiredOverride;
     const block = document.createElement('div');
     block.className = 'module-block';
     block.innerHTML = `
@@ -303,6 +307,9 @@ function renderCart(){
   document.getElementById('onlineTotalQtyText').textContent = String(totalQty);
   document.getElementById('openCartBtn').innerHTML = `購物車 <span id="cartQtyBadge">${totalQty}</span>`;
   updateFloatingCartBadge();
+
+    if(typeof window.__refreshOnlinePromotion === 'function') window.__refreshOnlinePromotion();
+
 }
 
 function openCartDrawer(){ document.getElementById('onlineCartDrawer').classList.remove('hidden'); }
@@ -449,16 +456,79 @@ async function submitOnlineOrder(){
   if(!name) return alert('請輸入姓名');
   if(!phone) return alert('請輸入電話');
 
-  let reservationAt = '';
+ let reservationAt = '';
   if(orderType === '預約'){
     reservationAt = document.getElementById('onlineReservationSlot').value;
     if(!reservationAt) return alert('請選擇預約取餐時段');
+  } else {
+    // 非營業時間禁止外帶/內用下單，只允許改用「預約」並挑選營業時段
+    // 注意：營業時間判斷沿用「預約」用的 getBusinessHoursConfig() 與 WEEKDAY_MAP，
+    // 兩邊永遠同一份設定，未來改預約規則這裡會跟著對。
+    const _bh = getBusinessHoursConfig();
+    const _now = new Date();
+    const _todayKey = WEEKDAY_MAP[_now.getDay()];
+    const _todaySegs = Array.isArray(_bh[_todayKey]) ? _bh[_todayKey] : [];
+    let _isOpen = false;
+    for(const seg of _todaySegs){
+      if(!seg || !seg.start || !seg.end) continue;
+      const [sH, sM] = String(seg.start).split(':').map(Number);
+      const [eH, eM] = String(seg.end).split(':').map(Number);
+      if(Number.isNaN(sH) || Number.isNaN(eH)) continue;
+      const segStart = new Date(_now.getFullYear(), _now.getMonth(), _now.getDate(), sH, sM, 0, 0);
+      const segEnd   = new Date(_now.getFullYear(), _now.getMonth(), _now.getDate(), eH, eM, 0, 0);
+      if(segEnd <= segStart) segEnd.setDate(segEnd.getDate() + 1); // 跨日（同預約寫法）
+      if(_now >= segStart && _now < segEnd){ _isOpen = true; break; }
+    }
+    if(!_isOpen){
+      // 再檢查「前一天的跨日時段」尾巴（例：昨天 14:00–今天 03:00，現在是凌晨 02:00）
+      const _yest = new Date(_now); _yest.setDate(_yest.getDate() - 1);
+      const _yestKey = WEEKDAY_MAP[_yest.getDay()];
+      const _yestSegs = Array.isArray(_bh[_yestKey]) ? _bh[_yestKey] : [];
+      for(const seg of _yestSegs){
+        if(!seg || !seg.start || !seg.end) continue;
+        const [sH, sM] = String(seg.start).split(':').map(Number);
+        const [eH, eM] = String(seg.end).split(':').map(Number);
+        if(Number.isNaN(sH) || Number.isNaN(eH)) continue;
+        const segStart = new Date(_yest.getFullYear(), _yest.getMonth(), _yest.getDate(), sH, sM, 0, 0);
+        const segEnd   = new Date(_yest.getFullYear(), _yest.getMonth(), _yest.getDate(), eH, eM, 0, 0);
+        if(segEnd <= segStart){
+          segEnd.setDate(segEnd.getDate() + 1);
+          if(_now >= segStart && _now < segEnd){ _isOpen = true; break; }
+        }
+      }
+    }
+    if(!_isOpen){
+      alert('目前為非營業時間，外帶／內用暫停接單。\n請改選「預約」並挑選店家營業時段內的取餐時間。');
+      document.getElementById('onlineOrderType').value = '預約';
+      toggleReservationBlock();
+      return;
+    }
   }
+
+
 
   const realtimeCfg = getRealtimeConfig();
   if(!realtimeCfg.enabled) return alert('店家尚未啟用即時接單');
 
-  const subtotal = onlineState.cart.reduce((s,x)=>s + (x.basePrice + x.extraPrice) * x.qty, 0);
+    const subtotal = onlineState.cart.reduce((s,x)=>s + (x.basePrice + x.extraPrice) * x.qty, 0);
+
+  // ===== 套用優惠碼／促銷 =====
+  // 從 promotion-ui 取得目前套用結果；若沒有或無效就視為無折扣
+  let promoCode = '';
+  let promoDiscount = 0;
+  let promoMessage = '';
+  try{
+    const promo = getCurrentPromotionResult();
+    if(promo && promo.ok && Number(promo.discount) > 0){
+      promoCode = String(promo.code || '').toUpperCase();
+      promoDiscount = Math.min(Number(promo.discount) || 0, subtotal); // 折扣不超過小計
+      promoMessage = String(promo.message || '');
+    }
+  }catch(e){
+    console.warn('[online-order] 取得促銷結果失敗', e);
+  }
+  const grandTotal = Math.max(0, subtotal - promoDiscount);
+
   const payload = {
     orderNo: 'ON' + Date.now(),
     customerName: name,
@@ -469,8 +539,12 @@ async function submitOnlineOrder(){
     reservationReminded: false,
     items: JSON.parse(JSON.stringify(onlineState.cart)),
     subtotal,
-    total: subtotal
+    discount: promoDiscount,
+    couponCode: promoCode,
+    couponMessage: promoMessage,
+    total: grandTotal
   };
+
 
   try{
     openStatusOverlay('等待店家確認訂單', '送出後請稍候，店家確認後才算完成訂購。');
@@ -630,10 +704,26 @@ async function init(){
     for(const att of product.modules || []){
       const mod = state.modules.find(m=>m.id===att.moduleId);
       if(!mod) continue;
-      const required = att.requiredOverride === null ? mod.required : att.requiredOverride;
+      const required = att.requiredOverride == null ? mod.required : att.requiredOverride;
       const val = onlineState.currentSelections[mod.id];
       const missing = Array.isArray(val) ? val.length === 0 : !val;
       if(required && missing) return alert(`請先選擇「${mod.name}」`);
+    // 複選時檢查「至少／最多」數量規則（POS 主機 pos-page.js 同款邏輯）
+    if(mod.selection === 'multi' && Array.isArray(val)){
+      const cnt = val.length;
+      const minSel = (typeof mod.minSelect === 'number') ? mod.minSelect : (mod.required ? 1 : 0);
+      const maxSel = (typeof mod.maxSelect === 'number') ? mod.maxSelect : null;
+      if(required && cnt < Math.max(1, minSel)){
+        return alert(`「${mod.name}」為必選，至少需選 ${Math.max(1, minSel)} 項（目前已選 ${cnt} 項）`);
+      }
+      if(minSel > 0 && cnt > 0 && cnt < minSel){
+        return alert(`「${mod.name}」若要選擇，至少需選 ${minSel} 項（目前已選 ${cnt} 項）`);
+      }
+      if(maxSel != null && cnt > maxSel){
+        return alert(`「${mod.name}」最多只能選 ${maxSel} 項（目前已選 ${cnt} 項）`);
+      }
+    }
+
     }
     const selections = flattenSelections(product);
     const extra = selections.reduce((s,x)=>s + Number(x.price||0), 0);
@@ -761,3 +851,70 @@ function renderMyOrdersList(list){
 }
 
 init();
+
+// === 載入時從雲端拉取本店促銷設定 ===
+(function pullPromoOnReady(){
+  function doPull(){
+    var code = onlineState.storeCode || '';
+    if(!code){
+      try{
+        const params = new URLSearchParams(window.location.search);
+        code = String(params.get('storeId') || '').trim();
+      }catch(e){}
+    }
+    if(!code) return;
+    pullPromotionsFromCloud(code).then(function(r){
+      if(r && r.ok){
+        console.log('[online-order] 雲端促銷已套用');
+        if(typeof window.__refreshOnlinePromotion === 'function'){
+          window.__refreshOnlinePromotion();
+        }
+        // 強制重繪 banner
+        setTimeout(function(){
+          try{
+            const ui = window.__getPromoUI;
+            if(typeof refreshPromotionDisplay === 'function') refreshPromotionDisplay();
+            // 重新觸發 banner 渲染
+            var area = document.getElementById('onlinePromotionArea');
+            if(area){
+              area.remove();  // 移除舊的
+              import('../modules/promotion-ui.js').then(function(m){
+                m.mountPromotionOnlineUI({
+                  getCart: function(){ return onlineState.cart; }
+                });
+              });
+            }
+          }catch(e){ console.warn(e); }
+        }, 200);
+      } else {
+        console.log('[online-order] 雲端無促銷或讀取失敗：', r && r.reason);
+      }
+    }).catch(function(e){ console.warn('[online-order] pull 例外：', e); });
+  }
+  if(document.readyState === 'complete' || document.readyState === 'interactive'){
+    setTimeout(doPull, 800);  // 等 Firebase 模組載入
+  } else {
+    document.addEventListener('DOMContentLoaded', function(){ setTimeout(doPull, 800); });
+  }
+})();
+
+// === 促銷 UI 自動掛載（線上點餐頁）===
+(function mountPromoOnline(){
+  function tryMount(){
+    try {
+      mountPromotionOnlineUI({
+        getCart: function(){ return (typeof onlineState !== 'undefined' && Array.isArray(onlineState.cart)) ? onlineState.cart : []; }
+      });
+      // 提供全域 hook 給購物車變動時呼叫
+      window.__refreshOnlinePromotion = refreshPromotionDisplay;
+      window.__getOnlinePromotionResult = getCurrentPromotionResult;
+    } catch(e){
+      console.warn('線上促銷 UI 掛載失敗', e);
+    }
+  }
+  if(document.readyState === 'complete' || document.readyState === 'interactive'){
+    setTimeout(tryMount, 200);
+  } else {
+    document.addEventListener('DOMContentLoaded', function(){ setTimeout(tryMount, 200); });
+  }
+})();
