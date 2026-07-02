@@ -198,9 +198,17 @@ function loadPrintSettingsToForm() {
   if (el('printLabelOffsetX')) el('printLabelOffsetX').value = Number(cfg.labelOffsetX || 0);
   if (el('printLabelOffsetY')) el('printLabelOffsetY').value = Number(cfg.labelOffsetY || 0);
   if (el('printKitchenCopies')) el('printKitchenCopies').value = Number(cfg.kitchenCopies || 1);
+   if (el('printFontKitchenItem')) el('printFontKitchenItem').value = Number(cfg.fontKitchenItem || 32);
+  if (el('printFontKitchenInfo')) el('printFontKitchenInfo').value = Number(cfg.fontKitchenInfo || 24);
+ 
   if (el('printAutoCheckout')) el('printAutoCheckout').checked = !!cfg.autoPrintCheckout;
   if (el('printAutoKitchen')) el('printAutoKitchen').checked = !!cfg.autoPrintKitchen;
-      // 回顯欄位勾選（顧客單 / 廚房單 / 標籤 各自勾選）
+    // v20260620 每單別印表機路由
+   const routes = cfg.routes || { receipt:'auto', kitchen:'auto', label:'auto' };
+   if (el('printRouteReceipt')) el('printRouteReceipt').value = routes.receipt || 'auto';
+   if (el('printRouteKitchen')) el('printRouteKitchen').value = routes.kitchen || 'auto';
+   if (el('printRouteLabel'))   el('printRouteLabel').value   = routes.label   || 'auto';
+   // 回顯欄位勾選（顧客單 / 廚房單 / 標籤 各自勾選）
   renderPrintFieldsMatrix();
   loadPrintFieldsMatrix(cfg);
 
@@ -374,7 +382,7 @@ function collectAllBusinessHours(){
   return bh;
 }
 
-function saveBusinessHours(){
+async function saveBusinessHours(){
   var bh = collectAllBusinessHours();
   var error = '';
   WEEKDAY_KEYS.forEach(function(key){
@@ -387,8 +395,19 @@ function saveBusinessHours(){
   if(error){ alert('儲存失敗：' + error); return; }
   state.settings.businessHours = bh;
   persistAll();
-  alert('營業時間已儲存');
+
+  // 上傳到本店 storeHours/{storeCode}，讓線上點餐讀得到（各店獨立）
+  try{
+    const { syncStoreHoursToFirebase } = await import('../modules/realtime-order-service.js');
+    await syncStoreHoursToFirebase();
+    alert('營業時間已儲存並上傳雲端');
+  }catch(e){
+    alert('營業時間已儲存（本機），但上傳雲端失敗：\n'
+      + (e && e.message ? e.message : e)
+      + '\n請確認已 Google 登入，且已設定店鋪代碼(storeId)。');
+  }
 }
+
 
 // ── SKU 圖庫對應 ──
 function getImageLibrary(){
@@ -542,6 +561,127 @@ function saveImageLibrarySettings(){
   alert('圖庫設定已儲存');
 }
 
+// ── 會員點數查詢（原 Google 備份區改用）──
+function getQueryStoreCode(){
+  return (state.settings && state.settings.dashboard && state.settings.dashboard.storeId) || '';
+}
+
+function resetPointsQueryUI(){
+  var phoneEl = document.getElementById('pointsQueryPhone');
+  if(phoneEl) phoneEl.value = '';
+  var balBox = document.getElementById('pointsQueryBalanceBox');
+  if(balBox) balBox.textContent = '點數餘額：—';
+  var histBox = document.getElementById('pointsQueryHistoryBox');
+  if(histBox) histBox.innerHTML = '（尚未查詢）';
+}
+
+// 自製電話鍵盤：以「字串」累加，完整保留開頭 0（不可用 openNumPad，它會把 0912 變 912）
+function openPhonePad(onConfirm){
+  var old = document.getElementById('phonePadModal');
+  if(old) old.remove();
+  var val = '';
+  var modal = document.createElement('div');
+  modal.id = 'phonePadModal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,0.6);padding:20px;';
+  var keys = ['1','2','3','4','5','6','7','8','9','0'];
+  modal.innerHTML =
+    '<div style="background:#fff;border-radius:14px;max-width:340px;width:100%;padding:18px;box-shadow:0 20px 50px rgba(0,0,0,0.3)">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+    +   '<h2 style="margin:0;font-size:17px">輸入手機號碼</h2>'
+    +   '<button type="button" id="phonePadClose" style="border:none;background:none;font-size:22px;cursor:pointer;color:#94a3b8">✕</button>'
+    + '</div>'
+    + '<div style="background:#f1f5f9;border-radius:10px;padding:14px;text-align:right;margin-bottom:12px">'
+    +   '<span id="phonePadValue" style="font-size:24px;font-weight:800;color:#0f172a">—</span>'
+    + '</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'
+    +   keys.map(function(k){ return '<button type="button" class="cash-key pp-key" data-key="'+k+'">'+k+'</button>'; }).join('')
+    +   '<button type="button" class="cash-key pp-key" data-key="del" style="background:#fee2e2;color:#b91c1c">⌫</button>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;margin-top:14px">'
+    +   '<button type="button" id="phonePadConfirm" class="primary-btn" style="flex:2;background:#10b981">確認</button>'
+    +   '<button type="button" id="phonePadCancel" class="secondary-btn" style="flex:1">取消</button>'
+    + '</div>'
+    + '</div>';
+  document.body.appendChild(modal);
+  var disp = modal.querySelector('#phonePadValue');
+  function refresh(){ disp.textContent = val === '' ? '—' : val; }
+  function close(){ modal.remove(); }
+  modal.addEventListener('click', function(e){ if(e.target === modal) close(); });
+  modal.querySelector('#phonePadClose').onclick = close;
+  modal.querySelector('#phonePadCancel').onclick = close;
+  modal.querySelectorAll('.pp-key').forEach(function(btn){
+    btn.onclick = function(){
+      var k = btn.dataset.key;
+      if(k === 'del') val = val.slice(0, -1);
+      else if(val.length < 15) val = val + k;   // 字串累加，保留開頭 0
+      refresh();
+    };
+  });
+  modal.querySelector('#phonePadConfirm').onclick = function(){
+    close();
+    if(onConfirm) onConfirm(val);
+  };
+}
+
+async function runPointsQuery(){
+  var phoneEl = document.getElementById('pointsQueryPhone');
+  var phone = (phoneEl && phoneEl.value || '').trim();
+  if(!phone){ alert('請先輸入顧客手機號碼'); return; }
+  var storeCode = getQueryStoreCode();
+  if(!storeCode){ alert('尚未設定店鋪代碼(storeId)，無法查詢'); return; }
+  var balBox = document.getElementById('pointsQueryBalanceBox');
+  var histBox = document.getElementById('pointsQueryHistoryBox');
+  if(balBox) balBox.textContent = '查詢中…';
+  if(histBox) histBox.innerHTML = '查詢中…';
+  // v20260603-v2：點數可能有小數一位（付款回饋 percent），格式化成最多 1 位小數、整數不顯示 .0
+  function fmtPts(n){
+    var v = Math.round(Number(n || 0) * 10) / 10;
+    return (Math.round(v) === v) ? String(Math.round(v)) : String(v);
+  }
+  try{
+    var cust = await import('../modules/customer-service.js');
+    var res = await cust.getPointsHistory(phone, storeCode);
+    var balance = (res && typeof res.balance === 'number') ? res.balance : 0;
+    var history = (res && Array.isArray(res.history)) ? res.history : [];
+    if(balBox) balBox.textContent = '點數餘額：' + fmtPts(balance) + ' 點';
+    if(histBox){
+      if(history.length === 0){
+        histBox.innerHTML = '（無交易紀錄）';
+      } else {
+        // getPointsHistory 已依時間新→舊排序；欄位為 at / type / delta / orderNo
+        histBox.innerHTML = history.map(function(h){
+          var t = h.at ? new Date(h.at).toLocaleString() : '';
+          var delta = Number(h.delta || 0);
+          var sign = delta > 0 ? '+' : '';
+          var color = delta > 0 ? '#16a34a' : '#dc2626';
+          var typeLabel = h.type === 'earn' ? '賺點' : (h.type === 'use' ? '折抵' : (h.type === 'refund' ? '退點' : (h.type || '')));
+          return '<div style="padding:4px 0;border-bottom:1px dashed #e2e8f0">'
+            + '<span style="color:#64748b">' + escapeHtml(t) + '</span> '
+            + '<strong>' + escapeHtml(typeLabel) + '</strong> '
+            + '<span style="color:' + color + ';font-weight:700">' + sign + fmtPts(delta) + '</span>'
+            + (h.orderNo ? ' <span style="color:#94a3b8">#' + escapeHtml(h.orderNo) + '</span>' : '')
+            + '</div>';
+        }).join('');
+      }
+    }
+  }catch(err){
+    if(balBox) balBox.textContent = '查詢失敗';
+    if(histBox) histBox.innerHTML = '查詢失敗：' + escapeHtml(err && err.message ? err.message : String(err));
+  }
+}
+
+
+function bindPointsQueryEvents(){
+  var phoneEl = document.getElementById('pointsQueryPhone');
+  if(phoneEl){
+    phoneEl.addEventListener('click', function(){
+      openPhonePad(function(val){ phoneEl.value = String(val || ''); });
+    });
+  }
+  var btn = document.getElementById('pointsQueryBtn');
+  if(btn) btn.addEventListener('click', runPointsQuery);
+}
+
 // ── 主函式 ──
 
 export function initSettingsPage() {
@@ -551,6 +691,89 @@ export function initSettingsPage() {
   // ============================
   // Tile 開啟事件（每個 tile 開啟前先載入最新資料）
   // ============================
+// ==================== 客顯設定（v20260525 新增） ====================
+
+/** 將 state.settings.customerDisplay 載入表單 */
+function loadCustomerDisplayToForm() {
+  var cd = (state.settings && state.settings.customerDisplay) || {};
+  var el = function(id) { return document.getElementById(id); };
+  if (el('cdHost'))        el('cdHost').value             = cd.host || '127.0.0.1';
+  if (el('cdEnabled'))     el('cdEnabled').checked       = cd.enabled !== false;
+  if (el('cdPort'))        el('cdPort').value             = cd.port    || 8081;
+  if (el('cdIdleMessage')) el('cdIdleMessage').value      = cd.idleMessage || '歡迎光臨';
+  if (el('cdSlidesBaseUrl')) el('cdSlidesBaseUrl').value  = cd.slidesBaseUrl || '';
+  var slides = Array.isArray(cd.slides) ? cd.slides : [];
+  for (var i = 1; i <= 5; i++) {
+    if (el('cdSlide' + i)) el('cdSlide' + i).value = slides[i - 1] || '';
+  }
+}
+
+
+/** 從表單收集客顯設定並儲存到 state */
+function saveCustomerDisplayFromForm() {
+  if (!state.settings) state.settings = {};
+  if (!state.settings.customerDisplay) state.settings.customerDisplay = {};
+  var el = function(id) { return document.getElementById(id); };
+  if (el('cdHost'))        state.settings.customerDisplay.host        = (el('cdHost').value || '').trim() || '127.0.0.1';
+  if (el('cdEnabled'))     state.settings.customerDisplay.enabled     = el('cdEnabled').checked;
+  if (el('cdPort'))        state.settings.customerDisplay.port        = parseInt(el('cdPort').value, 10) || 8081;
+  if (el('cdIdleMessage')) state.settings.customerDisplay.idleMessage = el('cdIdleMessage').value.trim() || '歡迎光臨';
+  if (el('cdSlidesBaseUrl')) {
+    var b = (el('cdSlidesBaseUrl').value || '').trim();
+    if (b && !/\/$/.test(b)) b = b + '/';
+    state.settings.customerDisplay.slidesBaseUrl = b;
+  }
+  var slides = [];
+  for (var i = 1; i <= 5; i++) {
+    if (el('cdSlide' + i)) slides.push((el('cdSlide' + i).value || '').trim());
+  }
+  state.settings.customerDisplay.slides = slides;
+  persistAll();
+}
+
+
+/** 掛接客顯設定 tile 點擊與 Modal 儲存按鈕 */
+function initCustomerDisplaySettings() {
+  // Tile 點擊事件（data-customer-display-open="1"）
+  var tile = document.querySelector('[data-customer-display-open="1"]');
+  if (tile) {
+    tile.addEventListener('click', function() {
+      loadCustomerDisplayToForm();
+      openModal('customerDisplayModal');
+    });
+  }
+
+  // 儲存按鈕
+  var saveBtn = document.getElementById('cdSaveBtn');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', function() {
+      saveCustomerDisplayFromForm();
+      closeModal('customerDisplayModal');
+      alert('✅ 客顯設定已儲存');
+    });
+  }
+
+  // 偵測按鈕：ping 客顯 Server
+  var pingBtn = document.getElementById('cdPingBtn');
+  if (pingBtn) {
+    pingBtn.addEventListener('click', async function() {
+      pingBtn.disabled = true;
+      pingBtn.textContent = '偵測中…';
+      try {
+        var { pingDisplayServer } = await import('../modules/customer-display-service.js');
+        var ok = await pingDisplayServer();
+        alert(ok ? '✅ 客顯 Server 已連線 (port ' + (document.getElementById('cdPort').value || 8081) + ')'
+                 : '❌ 無法連線，請確認 APK 已更新並啟動');
+      } catch (e) {
+        alert('偵測失敗：' + (e && e.message));
+      } finally {
+        pingBtn.disabled = false;
+        pingBtn.textContent = '🔍 偵測連線';
+      }
+    });
+  }
+}
+  initCustomerDisplaySettings();
 
   // 列印設定
   document.querySelector('[data-modal="modalPrint"]')?.addEventListener('click', function() {
@@ -604,13 +827,16 @@ export function initSettingsPage() {
   });
 
 
-  // Google 備份
+      // 會員點數查詢（原 Google 備份區改用）
   document.querySelector('[data-modal="modalGoogle"]')?.addEventListener('click', function() {
-    loadGoogleSettingsToForm();
+    resetPointsQueryUI();
     openModal('modalGoogle');
   });
+  bindPointsQueryEvents();
 
   // 本機資料
+
+
   document.querySelector('[data-modal="modalLocalData"]')?.addEventListener('click', function() {
     openModal('modalLocalData');
   });
@@ -657,12 +883,25 @@ export function initSettingsPage() {
     cfg.labelFontSize = Number(document.getElementById('printLabelFontSize')?.value) || 12;
     cfg.receiptOffsetX = Number(document.getElementById('printReceiptOffsetX')?.value) || 0;
     cfg.receiptOffsetY = Number(document.getElementById('printReceiptOffsetY')?.value) || 0;
-    cfg.labelOffsetX = Number(document.getElementById('printLabelOffsetX')?.value) || 0;
+     cfg.labelOffsetX = Number(document.getElementById('printLabelOffsetX')?.value) || 0;
     cfg.labelOffsetY = Number(document.getElementById('printLabelOffsetY')?.value) || 0;
     cfg.kitchenCopies = Math.max(1, Number(document.getElementById('printKitchenCopies')?.value) || 1);
+        cfg.fontKitchenItem = Math.min(60, Math.max(24, Number(document.getElementById('printFontKitchenItem')?.value) || 32));
+    cfg.fontKitchenInfo = Math.min(60, Math.max(24, Number(document.getElementById('printFontKitchenInfo')?.value) || 24));
+
     cfg.autoPrintCheckout = !!document.getElementById('printAutoCheckout')?.checked;
     cfg.autoPrintKitchen = !!document.getElementById('printAutoKitchen')?.checked;
-                // 儲存欄位勾選（顧客單 / 廚房單 / 標籤 各自獨立）
+         // v20260620 每單別印表機路由（限定四個合法值，否則退回 auto）
+    var _validRoute = function(v){
+      return (v === 'sunmi' || v === 'bluetooth' || v === 'network') ? v : 'auto';
+    };
+    cfg.routes = {
+      receipt: _validRoute(document.getElementById('printRouteReceipt')?.value),
+      kitchen: _validRoute(document.getElementById('printRouteKitchen')?.value),
+      label:   _validRoute(document.getElementById('printRouteLabel')?.value)
+    };
+
+     // 儲存欄位勾選（顧客單 / 廚房單 / 標籤 各自獨立）
     cfg.fields = collectPrintFieldsMatrix();
 
      persistAll();

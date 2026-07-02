@@ -1,15 +1,19 @@
-# ✅ 已完成紀錄
+已完成紀錄
 
 > 本檔記錄所有版本已完成項目的詳細紀錄（由新到舊）。
 > 規範與架構說明請見 `aiREADME.md`。
 > 當前進行中與待處理請見 `aiREADME最新進度.md`。
 
 ---
-
 ## 📌 版本速查
 
 | 版本 | 日期 | 重點 |
 |---|---|---|
+| v20260604 | 2026-06-04 | 線上點餐購物車打開自動查點數（兩入口）+ 待付款訂單卡顯示顧客預選付款別（現金/電支）|
+| v20260603-points | 2026-06-03 | 會員點數模組：賺點/折抵預扣/作廢退點/POS查詢 + Firebase points 規則 |
+
+| v20260616 | 2026-05-20 | SKU 圖庫工具按鈕 + 2234 storeId 部署疏失修正 + 線上點餐標題來源確認 + Google OAuth 環境排查 |
+| v20260615 | 2026-05-20 | 促銷整合 + 優惠碼帶入訂單 + 訂單卡折扣明細 + 預約 30 分鐘提醒 + SKU 圖庫反推 + 三個舊 bug |
 | v20260613 | 2026-05-13 | 營業日 BD + 外送統計 + 修改改加單 |
 | v20260608 | 2026-05-11 | 雲端三層架構（IndexedDB + Firebase posBackup + Google Sheets）+ store-config.js 寫死店家綁定 |
 | v20260607 | 2026-05-xx | fields 勾選矩陣 + 標籤一品項一張 + 數量 +/- 按鈕 |
@@ -17,12 +21,202 @@
 | v20260603 | 2026-04-xx | APK 商用化補強（LogManager、PrintQueue、API Token） |
 | v20260602 | 2026-04-xx | 印表機字串排版、token 驗證初版、SW cache 更新 |
 | v20260601 | 2026-04-xx | APK 純後台改造、三層列印橋接、設定頁 UI |
-| v20260601 | 2026-04-xx | APK 純後台改造、三層列印橋接、設定頁 UI |
+
+## v20260604 — 線上購物車自動查點數 + 待付款卡顯示顧客預選付款別
+
+### 異動檔案（2 支 JS + service-worker 升版）
+1. js/pages/online-order-page.js — 打開購物車時主動查一次會員點數並顯示。
+   - openCartDrawer() 內新增呼叫 refreshPointsBalance()（原本只在電話欄位 blur/change 時查，
+     導致電話雖已帶入、但要碰一下欄位點數才會出現）。
+   - 購物車有兩個開啟入口：#openCartBtn 與浮動鈕 #floatingCartBtn。浮動鈕原本直接
+     remove('hidden') 不走 openCartDrawer，已改成呼叫 openCartDrawer()，兩入口行為一致。
+2. js/pages/orders-page.js — renderOrdersSection 訂單卡新增顯示「顧客選擇：現金/電子支付」標籤。
+   - 讀 o.payMethod（由 realtime-order-service.js buildRealtimeOrderForPOS 帶入，
+     值為 '現金' / '電子支付' / ''）。現金綠底、電支藍底。
+   - pending/completed/void 三種 mode 共用該段 HTML，故三區皆顯示；POS 現場單無 payMethod 故不顯示。
+3. service-worker.js — 升 CACHE_NAME，強制顧客端與 POS 主機 T2 Chrome 清舊快取載新檔。
+
+### 設計決策 / 注意
+- 點數讀取走 Firebase points/{storeCode}/{phone}/balance，規則為 .read=true（匿名可讀），
+  手機顧客查得到；若顯示 0 是該電話真的無餘額，非權限問題（與查單需 auth!=null 的路徑不同）。
+- 顧客「預選付款別」o.payMethod 與「實際收款方式」o.paymentMethod 是兩個不同欄位，勿混用。
+- 兩項皆屬 points-v2 任務範圍內的補強，與付款回饋點數主流程不衝突。
+
+## v20260603-points — 會員點數模組（賺點 / 折抵 / 退點 / POS 查詢）
+
+
+### 規則
+- 賺點：僅線上單，店家確認＋結帳完成(completed) 才入帳，賺點 = order.discountAmount（優惠不折現、全轉點）。
+- 折抵：1點=1元，僅線上點餐用。接單(confirmed)時 POS 預扣 min(pointsRequested, 真實餘額)，杜絕超折。
+- 退點：pending 單作廢退回 pointsUsed；completed 作廢不退。
+- 儲存：points/{storeCode}/{phone}/balance 與 /history/{pushId}，各店獨立；POS 才能寫，顧客匿名只讀。
+
+### 異動檔案
+1. js/modules/customer-service.js — 新增點數核心六函式：getPointsBalance、_writePointsTxn（改餘額＋推 history，欄位 at/type/delta/balanceAfter/orderNo）、deductPointsOnConfirm（回寫 order.pointsUsed）、refundPointsOnCancel（completed 不退）、earnPointsOnComplete（pointsSettled 防重複）、getPointsHistory（回 {balance, history} 新→舊）。
+2. js/modules/realtime-order-service.js — showOnlineOrderOverlay 彈窗接單已接 deductPointsOnConfirm 並調整 total；新增 export _getRef / _dbApi / getStoreCode 供 customer-service 跨檔讀寫 points。
+3. js/modules/order-service.js — 第 2 行 import 補 persistAll；markPendingOrderPaid 結帳完成且 discountAmount>0 且未 settle 時 import customer-service 呼叫 earnPointsOnComplete 後 persistAll。
+4. js/pages/orders-page.js — 列表接單 accept-btn 補 deductPointsOnConfirm（與彈窗一致）；voidOrder callback 改 async，pending 單作廢時 refundPointsOnCancel。
+5. index.html — modalGoogle 改為「🎯 會員點數查詢」區（電話輸入框＋查詢鈕＋餘額框＋紀錄框）；設定頁 tile 文字改「會員點數查詢」。
+6. js/pages/settings-page.js — 新增 getQueryStoreCode / resetPointsQueryUI / openPhonePad（自製字串鍵盤保留開頭 0）/ runPointsQuery（欄位 at/delta，type 翻賺點/折抵/退點）/ bindPointsQueryEvents；Google tile 綁定改為開點數查詢區，移除舊 loadGoogleSettingsToForm。
+7. Firebase 安全規則 — 新增 points/{storeCode}/{phone}：.read=true（顧客匿名只讀餘額/紀錄）、.write 限 admin 或 stores/{storeCode}===true 員工；balance 驗證為 >=0 數字，history 子項驗證 at/type/delta/balanceAfter 且 type∈{earn,use,refund}。已於 Console 發布。
+
+### 設計決策 / 注意
+- 電話輸入不可用 pos-page 的 openNumPad（走 Number() 會吃掉開頭 0），改用 settings-page 自製字串鍵盤 openPhonePad，與 points key（replace(/\D/g,'') 保留 0）對齊。
+- 查詢區沿用 modalGoogle 容器（保留原 id 與開關機制），只換內容與綁定，降低風險。
+- storeCode 來源統一為 state.settings.dashboard.storeId（與接單預扣、realtime getStoreCode 同源）。
+- 待實機驗證：全鏈路（帶券下單→接單預扣→結帳賺點→查詢顯示）、作廢退點 pending/completed 差異。
+
+## v20260603 — 結帳列印偵測逾時 / 客顯推送干擾列印（已驗證 2026-06-03）
+
+## v20260603 — 結帳列印偵測逾時 / 客顯推送干擾列印（已驗證 2026-06-03）
+
+### 問題
+- 症狀：結帳不會自動印廚房單，改跳瀏覽器 PDF；從「訂單查詢」手動列印正常。
+- 實機 log 證據（T2，08:43）：結帳當下 detectPrinters 對 127.0.0.1:8080 的 /ping
+  逾時 1500ms → fallback BROWSER → 跳 PDF；閒置時同一支 ping 要 1248ms 才回。
+- 根因（雙重）：
+  1. 客顯（8081）POST 在結帳瞬間搶佔 T2（2GB RAM）連線池與 CPU，
+     把緊接其後的列印 ping（8080）拖到逾時。
+  2. print-bridge 的 PING_TIMEOUT_MS=1500 太短（實機閒置已要 1248ms，邊際幾乎為 0），
+     且 fetchWithTimeout 只對 socket 死掉重試，timeout 不重試 → 一逾時就掉 browser。
+
+### 修正一：js/modules/print-bridge.js（commit 1，已驗證直印恢復）
+- PING_TIMEOUT_MS：1500 → 3500。
+- fetchWithTimeout：重試條件新增 timeout（原僅 'Failed to fetch'/'NetworkError'，
+  加上 || msg.indexOf('timeout')>=0），逾時也重試一次（間隔 250ms）。
+- 驗證：2026-06-03 09:17 結帳，廚房單由 APK 直印實體紙（單號 OD1780478245090），不再跳 PDF。
+
+### 修正二：js/modules/customer-display-service.js（v20260603-interval，commit baa1391→b9caf5a）
+- 移除 400ms 節流（DISPLAY_THROTTLE_MS / _throttledSend）。
+- 改為 _postNow(payload)：保留 _lastSentHash 去重，內容相同不重送。
+- 新增固定間隔機制：IDLE_INTERVAL_MS=10000（10 秒），_ensureIdleTimer/_resetIdleTimer
+  管理單一 setInterval；無購物車變動時每 10 秒重送 _lastPayload。
+- 購物車變動（displayCart）：更新 _lastPayload → _resetIdleTimer() → _postNow() 立即推送。
+- displayPaid 加 PAID_DELAY_MS=600ms 延遲再推，讓結帳列印 ping 先完成；推送後 5 秒回 displayIdle。
+- collectSlideImages 優先序：customerDisplay.slides(含 slidesBaseUrl) → product.image/skuMap，上限 12。
+- 設計原則落實：購物車有變動→立即推送；無變動→每 10 秒固定推送，避免結帳瞬間爆量 POST。
+
+### 注意（非程式問題，已排除）
+- 廚房單標題出現「Bd」並非 bug：getReceiptHtml 廚房單會先印 cfg.storeName 一行、
+  再印「** 廚房單 **」一行。當時 printConfig.storeName 被設成「Bd」（測試殘留），
+  故印成兩行黏在一起。解法為設定頁→列印設定→修正店名或取消廚房單「店名」欄位勾選，
+  無需改程式。getPrintSettings 店名預設為 cfg.storeName || '我的店'。
+
+---
+v20260525 客顯功能）
+Web POS（lcym346-byte/2237-1）
+檔案	變更內容
+js/modules/customer-display-service.js	新增。POST /display/update 推送客顯，5 秒節流，提供 displayCart() / displayPaid() / displayIdle() / pingDisplayServer()
+js/core/store.js	新增 DEFAULT_CUSTOMER_DISPLAY，buildDefaultState() 與 applyHydrate() 均已加入
+js/pages/pos-page.js	renderCart() 末尾加入 displayCart() / displayIdle() 呼叫，位於 if/else 外層
+js/modules/order-service.js	createOrUpdateOrder() 與 markPendingOrderPaid() 結帳時呼叫 displayPaid()
+js/pages/settings-page.js	新增 loadCustomerDisplayToForm() / saveCustomerDisplayFromForm() / initCustomerDisplaySettings()，並在 initSettingsPage() 內呼叫
+index.html	設定頁新增客顯 Tile（data-customer-display-open="1"）與 customerDisplayModal
+service-worker.js	CACHE_NAME 升為 pos-v20260618-display-cache，ASSETS 加入 customer-display-service.js
+APK（jess0937588151-hue/sunmi-pos-v2）
+檔案	變更內容
+DisplayHttpServer.java	新增。監聽 0.0.0.0:8081，提供 GET /display/（內嵌 HTML 頁面）、GET /display/state（無需 Token）、POST /display/update（需 Token）、GET /display/ping
+DisplayStateManager.java	新增。執行緒安全的記憶體狀態容器，提供 update() / reset() / getStateJson() / getType() / getUpdatedAt()
+MainActivity.java	新增 DisplayHttpServer field，onCreate 呼叫 startDisplayServer()，onDestroy 停止並 reset
+LogManager.java	新增 TAG_DISPLAY = "DisplayHttpServer" 常數
+📱 客顯使用方式（已完成，供參考）
+CopyAPK 健康檢查頁查看 Sunmi T2 的區域 IP（例如 192.168.1.50）
+        ↓
+iPad Safari 開啟：http://192.168.1.50:8081/display/
+        ↓
+頁面每秒輪詢 /display/state，自動切換三種畫面：
+  idle → 深色待機 + 時鐘 + 歡迎語
+  cart → 白底品項列表 + 右側藍色合計
+  paid → 綠色感謝畫面 + 5 秒倒數後自動回待機
+IP 變動時：重新查 APK 頁面的 IP，更新 iPad 書籤即可。若要固定 IP，在路由器 DHCP 設定綁定 Sunmi T2 MAC 地址。
+## v20260617 線上點餐營業時間改為各店獨立（storeHours/{storeCode}）
+
+問題：營業時間原本寫在共用菜單 menu/{projectId} 內，但規則是「只有 store001 能上傳菜單，其他店唯讀」，
+導致 store002/003 永遠讀到 store001 的營業時間，各店無法各自設定營業時間。
+
+解法：將 businessHours 從共用菜單抽離，改用各店獨立路徑 storeHours/{storeCode}，與菜單完全分開。
+
+異動檔案（4 commit + service-worker 升版）：
+1. js/modules/realtime-order-service.js
+   - 新增 syncStoreHoursToFirebase()：每台 POS 都能上傳自己店的營業時間到 storeHours/{storeCode}，
+     不受「只有主機能傳菜單」限制（內部 getStoreCode() + verifyPOSAccess()）。
+   - 新增 fetchStoreHoursFromFirebase(storeCode)：顧客端傳 URL 的 storeCode、POS 端不傳則用本機，
+     讀回寫入 state.settings.businessHours。
+   - 移除 syncMenuToFirebase menuData 內的 businessHours（菜單回到只含 categories/products/modules/updatedAt，
+     對齊 menu 規則的 .validate）。
+   - 移除 fetchMenuFromFirebase / applyCloudMenu / watchMenuFromFirebase 三處讀取 businessHours 的程式碼，
+     避免 store001 的菜單同步覆蓋各店營業時間。
+2. js/pages/settings-page.js
+   - saveBusinessHours() 改為 async，存本機後自動 import 並呼叫 syncStoreHoursToFirebase() 上傳本店，
+     成功跳「營業時間已儲存並上傳雲端」、失敗提示需 Google 登入且已設定 storeId。
+3. js/pages/online-order-page.js
+   - init() 菜單載入後新增讀取本店營業時間：import fetchStoreHoursFromFirebase(onlineState.storeCode)，
+     讓顧客端讀到「該店自己」的營業時間，預約時段才正確。
+4. Firebase_Realtime_Database_安全規則.json
+   - 新增 storeHours 節點規則：.read=true（顧客預約時段要讀），
+     .write 為 admin 或 staff/{uid}/stores/{storeCode}===true，
+     .validate 要求 hasChildren(['businessHours','updatedAt'])。
+   - 已於 Firebase Console 發布。
+5. service-worker.js
+   - CACHE_NAME 升版至 pos-v20260617-swfix-cache。
+
+實機驗證：store001 POS 設定營業時間→儲存→跳「已上傳雲端」；
+Firebase Console 出現 storeHours/store001/businessHours（含 fri 15:00–23:30 等）；確認位置正確。
+
+注意事項（供 store002 複製時參考）：
+- 各店 POS 帳號要能上傳營業時間，需在 staff/{uid}/stores/{storeCode}=true（或 role=admin），否則 PERMISSION_DENIED。
+- 預約時段維持「今天＋明天」兩天（buildReservationSlots dayOffset < 2，本次未改）。
+## v20260616（2026-05-20）— 圖庫工具按鈕 + 多店部署疏失修正 + 線上點餐標題確認
+
+### SKU 圖庫對應 Modal 新增「開啟圖庫對應工具」按鈕
+- 需求：使用者希望在「圖庫網址（GitHub Pages）」輸入框後面，加一顆按鈕直接開啟外部圖庫工具 `gallery.html`。
+- 修法：在 `index.html` 的「SKU 圖庫對應」Modal 內，於 `<input id="imageLibraryBaseUrl">` 之後新增一行 `.sm-btn-row`，內含 `<button class="sm-btn" onclick="window.open('https://jess0937588151-hue.github.io/2234/images/products/gallery.html','_blank','noopener')">🛠 開啟圖庫對應工具</button>`。
+- 影響檔案：`index.html`
+- 設計考量：不改動既有 `imageLibrary` 邏輯，純 UI 增加；用 `window.open` + `noopener` 在新分頁開啟避免主頁被遠端控制。
+
+### 2234 範本 store-config.js 部署疏失修正（多店促銷隔離）
+- 症狀：開兩台 POS（2234 jess0937588151-hue / 2237-1 lcym346-byte）時，雙方促銷資料互相覆蓋；2234 設定的促銷在線上點餐讀不到，反而讀到 2237-1 設的。
+- 根因：**不是程式 bug**。2234 repo 是早期把整份 2237-1 程式碼覆蓋過去時，`js/core/store-config.js` 忘了同步調整為新 storeId，兩台 POS 的 `STORE_CONFIG.storeId` 同為 `store001` 且 `lockFromUrl:true`，導致都寫入 `publicOnlineStores/store001/promotions`。
+- 修法：使用者在 2234 repo 手動編輯 `js/core/store-config.js`，將 `storeId` / `storeName` / `storeCode` 改為對應的新值（例：`store002` / 「桃園民族店」），commit 後 Ctrl+F5 重新整理 POS，雙店資料節點從此分離。
+- 影響檔案（僅 2234 repo）：`js/core/store-config.js`
+- 踩雷紀錄：複製整份 repo 到新店時，**`js/core/store-config.js` 是唯一一定要改的檔案**，但複製腳本/手動覆蓋很容易忘掉。已寫進規範第 18 條。
+- 驗證：兩台 POS 在 Console 跑 `state.settings.store.storeId` / `state.settings.dashboard.storeId` 各自為不同值；Firebase Console 看到 `publicOnlineStores/` 下出現兩個獨立節點。
+
+### 線上點餐標題來源確認（非程式修改）
+- 症狀：線上點餐頁 (`online-order.html`) 標題顯示「我的店」，使用者以為無法修改。
+- 根因：`js/pages/online-order-page.js` 的 `getStoreName()` 讀取優先順序為 `state.settings.realtimeOrder.onlineStoreTitle` → `state.settings.printConfig.storeName` → `'立即點餐'`。前者未設定（undefined），所以顯示後者「我的店」（出單店名預設值）。
+- 修法：使用者於 POS 設定頁修改「列印設定 → 店名」即可同時改線上點餐標題與發票店名。若想兩者分開，可在「看板 / 即時接單」設定頁填寫 `onlineStoreTitle`。
+- 影響檔案：無（純設定操作）
+- 留存設計決策：未來若要做「線上點餐標題」獨立 UI，應綁到 `state.settings.realtimeOrder.onlineStoreTitle`，避免動到 `printConfig.storeName`。
+
+### Google OAuth `invalid_client` 環境排查（已解決，無程式修改）
+- 症狀：2234 POS（jess0937588151 帳號）點 Google Drive 登入跳 `401 invalid_client / The OAuth client was not found`；2237-1 POS（lcym346 帳號）正常。
+- 排查過程：
+  1. 雙方 `googleBackup.clientId` 在 state 內皆為 `undefined`，因為 `google-backup-service.js` 採 `DEFAULT_CLIENT_ID` 硬編碼，不寫進 state（state 路徑應是 `googleDriveBackup` 而非 `googleBackup`）。
+  2. Client ID 屬於 Firebase 自動建立的 OAuth client（Web client auto created by Google Service），Project `webpos-1f626`、Project number `203764995518`。
+  3. 確認 Authorized JavaScript origins 已包含 `https://jess0937588151-hue.github.io` 和 `https://lcym346-byte.github.io`，但 2234 仍 invalid_client。
+- 真正解法：使用者改用 T2 主機（Sunmi POS）登入即正常，桌機 Chrome 帳號狀態 / Cookie 因素導致暫時無法登入，**並非程式或 OAuth 設定問題**。
+- 留存 SOP：未來若再遇 `invalid_client`：(a) 先換裝置或無痕視窗排除 Cookie；(b) 確認 Authorized JavaScript origins 包含當前網址；(c) 確認 OAuth consent screen 已發佈或測試使用者名單包含當前帳號；(d) 確認 Firebase Authorized domains 包含當前網域。
+- 影響檔案：無
+
+### 廚房單字級設定確認（無程式修改）
+- 症狀：使用者反映 POS 設定頁「列印設定」內調整字級對廚房單沒效果。
+- 根因：`js/modules/print-service.js` 的 `getPrintSettings()` 只有 `receiptFontSize` / `labelFontSize`，沒有 `kitchenFontSize` 獨立欄位；廚房單實際共用 `receiptFontSize`。但實際列印走的是 Sunmi APK 端的 HTTP 路徑，APK 內部可能對廚房單字級有自己的邏輯，POS 端的 `fontSize` 不一定會被讀取。
+- 暫時解法：使用者於 Sunmi APK 設定頁直接調整字級，已解決。
+- 未來優化方向（未做）：在 `getPrintSettings()` 加 `kitchenFontSize` 欄位、設定頁加對應 UI、`buildBridgePayload` 把字級放進 payload、Sunmi APK 端讀取 `payload.fontSize` 套用。三端都要動才完整。
+- 影響檔案：無（純 APK 端調整）
+
+### 踩雷紀錄
+- **「找不到設定」可能不是 UI bug 而是讀取優先順序**：線上點餐標題的 fallback chain 是 `onlineStoreTitle` → `printConfig.storeName` → 預設值；使用者去設定頁找「線上點餐標題」找不到時，要先講清楚實際讀的是哪個欄位，避免使用者瞎找。
+- **複製 repo 必改清單要明文寫**：`store-config.js` 漏改造成多店資料覆蓋，影響範圍極大（促銷、雲端備份、線上訂單、看板四條路徑全混在一起）。已寫入規範第 18 條。
+- **OAuth `invalid_client` 不一定是 OAuth 設定問題**：可能只是瀏覽器 Cookie / 帳號狀態問題，先換裝置/無痕視窗測試比直接動 Google Cloud Console 安全。
+- **POS 字級設定不一定全程貫穿**：POS 前端 `print-service.js` 的字級欄位只影響瀏覽器列印與舊 WebView 列印；走 HTTP → Sunmi APK 那條路徑時，字級實際是 APK 端控制。改字級要先確認用哪條列印路徑。
 
 ---
 ---
 
 ## v20260615（2026-05-20）— 促銷整合 + 預約提醒 + 圖庫匯出
+
 
 ### 廣告促銷管理整合至設定頁 tile
 - 需求：原本 POS 主畫面有浮動按鈕 `#promoOpenSettingsBtn` 觸發促銷管理 Modal，使用者希望統一從「設定」頁進入。

@@ -95,8 +95,13 @@ const DEFAULT_PRINT_CONFIG = {
   autoPrintCheckout: false,
   autoPrintKitchen: false,
   openDrawer: true,
+  // v20260620 新增：每種單別各自指定走哪台印表機
+  // 'auto' = 維持自動偵測順序（sunmi→bluetooth→network），這是預設，確保現有 T2 不改設定照舊運作
+  // 'sunmi' / 'bluetooth' / 'network' = 指定該台優先；若指定的那台未連線，仍會退回 auto 順序當備援
+  routes: { receipt: 'auto', kitchen: 'auto', label: 'auto' },
   fields: DEFAULT_PRINT_FIELDS
 };
+
 
 const DEFAULT_STORE_BINDING = {
   storeId: 'store001',
@@ -118,6 +123,17 @@ const DEFAULT_IMAGE_LIBRARY = {
   importedAt: '',
   itemCount: 0
 };
+// ── v20260525 新增：客顯預設設定 ──
+const DEFAULT_CUSTOMER_DISPLAY = {
+  enabled:     true,   // 是否啟用客顯推送
+  host:        '127.0.0.1',  // 客顯主機 IP：POS 與客顯同一台(T2)填 127.0.0.1；POS 在另一台(iPad)請填 T2 的區域 IP，例 192.168.1.101
+  port:        8081,   // DisplayHttpServer 埠號（與 PrintHttpServer 8080 分開）
+  token:       '',     // 與 APK 共用同一個 ApiToken（由 print-bridge.js detectPrinters 自動取得後填入）
+  idleMessage: '歡迎光臨',  // 待機時顯示的廣告語
+  slidesBaseUrl: 'https://lcym346-byte.github.io/2237-1/images/',  // 客顯輪播圖存放位置（結尾要有 /）
+  slides:      ['', '', '', '', '']  // 獨立輪播圖檔名（最多 5 張，與餐點圖無關）
+};
+
 
 
 // ── 工具 ──
@@ -306,6 +322,9 @@ function buildDefaultState(){
             store: JSON.parse(JSON.stringify(DEFAULT_STORE_BINDING)),
       cloudBackup: JSON.parse(JSON.stringify(DEFAULT_CLOUD_BACKUP)),  // v20260608-b 新增
       imageLibrary: JSON.parse(JSON.stringify(DEFAULT_IMAGE_LIBRARY)),  // v20260614 新增
+      // v20260525 新增：客顯設定
+      customerDisplay: JSON.parse(JSON.stringify(DEFAULT_CUSTOMER_DISPLAY)),
+
       realtimeOrder: {
 
         enabled: true,
@@ -375,9 +394,21 @@ function applyHydrate(saved){
           }
         });
       }
-      if (typeof state.settings.printConfig.openDrawer === 'undefined') {
+            if (typeof state.settings.printConfig.openDrawer === 'undefined') {
         state.settings.printConfig.openDrawer = true;
       }
+      // v20260620 新增：補 printConfig.routes 預設（舊資料沒有此欄位時補上）
+      if (!state.settings.printConfig.routes || typeof state.settings.printConfig.routes !== 'object') {
+        state.settings.printConfig.routes = { receipt: 'auto', kitchen: 'auto', label: 'auto' };
+      } else {
+        ['receipt','kitchen','label'].forEach(function(kind){
+          var v = state.settings.printConfig.routes[kind];
+          if (v !== 'sunmi' && v !== 'bluetooth' && v !== 'network') {
+            state.settings.printConfig.routes[kind] = 'auto';
+          }
+        });
+      }
+
       if (!state.settings.businessHours || typeof state.settings.businessHours !== 'object') {
         state.settings.businessHours = JSON.parse(JSON.stringify(DEFAULT_BUSINESS_HOURS));
       } else {
@@ -418,6 +449,16 @@ function applyHydrate(saved){
         }
       }
     }
+      // v20260525 新增：補 customerDisplay 預設
+      if (!state.settings.customerDisplay || typeof state.settings.customerDisplay !== 'object') {
+        state.settings.customerDisplay = JSON.parse(JSON.stringify(DEFAULT_CUSTOMER_DISPLAY));
+      } else {
+        Object.keys(DEFAULT_CUSTOMER_DISPLAY).forEach(k => {
+          if (typeof state.settings.customerDisplay[k] === 'undefined') {
+            state.settings.customerDisplay[k] = DEFAULT_CUSTOMER_DISPLAY[k];
+          }
+        });
+      }
 
 
     if (saved.reports && typeof saved.reports === 'object') {

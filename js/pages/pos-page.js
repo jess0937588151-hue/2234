@@ -8,6 +8,8 @@ import { createOrUpdateOrder, markPendingOrderPaid } from '../modules/order-serv
 import { buildCartPreviewOrder, getPrintSettings, printOrderLabels, printOrderReceipt, printKitchenCopies, openCashDrawer, getReceiptHtml } from '../modules/print-service.js';
 import { hasOpenSession } from '../modules/report-session.js';
 import { getRealtimeAuthUser, signInPOSWithGoogle, waitForAuthReady } from '../modules/realtime-order-service.js';
+// v20260525 新增：客顯同步（購物車更新時推送）
+import { displayCart, displayIdle } from '../modules/customer-display-service.js';
 
 // ── 預約功能（POS 端） ──
 const POS_WEEKDAY_MAP = ['sun','mon','tue','wed','thu','fri','sat'];
@@ -322,7 +324,7 @@ window.refreshPublicProducts = renderProducts;
 export function renderCart(){
   const list = document.getElementById('cartList');
   const listModal = document.getElementById('cartListModal');
-   list.innerHTML = '';
+  list.innerHTML = '';
 
   // 右側面板：只顯示品項、數量、金額
   if(!state.cart.length){
@@ -336,6 +338,13 @@ export function renderCart(){
       row.innerHTML = `<span>${escapeHtml(item.name)} x${item.qty}</span><strong>${money((item.basePrice + item.extraPrice) * item.qty)}</strong>`;
       list.appendChild(row);
     });
+  }
+
+  // v20260525：購物車渲染後同步推送客顯（移到 if/else 外，兩種狀態都能正確觸發）
+  if (state.cart && state.cart.length > 0) {
+    displayCart();
+  } else {
+    displayIdle();
   }
 
   // 浮動視窗：完整功能
@@ -451,11 +460,206 @@ if(order && printConfig.autoPrintKitchen){
     catch(e) { console.error('列印廚房單失敗:', e); }
 }
 
-    alert(paymentMethod === '待付款' ? '已加入待付款' : '結帳完成');
+        alert(paymentMethod === '待付款' ? '已加入待付款' : '結帳完成');
+}
+
+// ============================================================
+// v20260620 現金收款視窗（自製鍵盤，全程不調用系統鍵盤）
+// ============================================================
+let _cashReceived = '';   // 使用者輸入的實收金額字串（空 = 尚未輸入）
+let _cashDue = 0;         // 本次應收金額
+let _cashBound = false;   // 鍵盤事件是否已綁定（避免重複綁）
+
+// 取得目前購物車應收金額（與 renderCart 的 total 算法一致）
+function getCartDueAmount(){
+  const subtotal = state.cart.reduce((s,x)=> s + (x.basePrice + x.extraPrice) * x.qty, 0);
+  return Math.max(0, subtotal);
+}
+
+// 依應收金額算「快捷湊整」建議值：第一顆=進位整百，之後接更大的整鈔節點，封頂 5000
+function buildCashQuickValues(due){
+  if(due <= 0) return [];
+  const first = Math.ceil(due / 100) * 100;            // 進位到整百
+  const nodes = [500,1000,1500,2000,2500,3000,4000,5000];
+  const out = [first];
+  nodes.forEach(n=>{
+    if(n > first && out.length < 4 && out.indexOf(n) < 0) out.push(n);
+  });
+  return out;
+}
+
+function renderCashQuickButtons(){
+  const wrap = document.getElementById('cashQuickBtns');
+  if(!wrap) return;
+  const vals = buildCashQuickValues(_cashDue);
+  wrap.innerHTML = '';
+  vals.forEach(v=>{
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'cash-quick';
+    b.textContent = '$' + v;
+    b.onclick = ()=>{ _cashReceived = String(v); updateCashDisplay(); };
+    wrap.appendChild(b);
+  });
+}
+
+function updateCashDisplay(){
+  const dueEl = document.getElementById('cashDueText');
+  const recvEl = document.getElementById('cashReceivedText');
+  const changeEl = document.getElementById('cashChangeText');
+  if(dueEl) dueEl.textContent = money(_cashDue);
+  const hasInput = _cashReceived !== '';
+  const recv = hasInput ? Number(_cashReceived) : 0;
+  if(recvEl) recvEl.textContent = hasInput ? money(recv) : '—';
+  // 沒輸入 = 收剛好，找零 0；有輸入則算差額（不足顯示 $0，不顯示負數）
+  const change = hasInput ? Math.max(0, recv - _cashDue) : 0;
+  if(changeEl) changeEl.textContent = money(change);
+}
+
+function openCashPayModal(){
+  _cashReceived = '';
+  // v20260604：待付款訂單結帳時購物車是空的，應收要讀那筆訂單的 total，不能讀購物車
+  var _payMode = document.getElementById('paymentTargetMode').value || 'new';
+  if(_payMode === 'pending'){
+    var _payTargetId = document.getElementById('paymentTargetOrderId').value || '';
+    var _payOrder = state.orders.find(function(x){ return x.id === _payTargetId; });
+    _cashDue = _payOrder ? Math.max(0, Number(_payOrder.total || 0)) : 0;
+  } else {
+    _cashDue = getCartDueAmount();
+  }
+  renderCashQuickButtons();
+  updateCashDisplay();
+  const m = document.getElementById('cashPayModal');
+  if(m) m.classList.remove('hidden');
+}
+
+
+function closeCashPayModal(){
+  const m = document.getElementById('cashPayModal');
+  if(m) m.classList.add('hidden');
+}
+
+function bindCashPayModal(){
+  if(_cashBound) return;        // 只綁一次
+  _cashBound = true;
+
+  // 數字鍵盤
+  const pad = document.getElementById('cashKeypad');
+  if(pad){
+    pad.querySelectorAll('.cash-key').forEach(k=>{
+      k.onclick = ()=>{
+        const key = k.dataset.key;
+        if(key === 'del'){
+          _cashReceived = _cashReceived.slice(0, -1);
+        } else {
+          // 限制長度，避免爆位；開頭多個 0 自動正規化
+          if(_cashReceived.length < 7){
+            _cashReceived = String(Number(_cashReceived + key));
+          }
+        }
+        updateCashDisplay();
+      };
+    });
+  }
+
+  const clearBtn = document.getElementById('cashClearBtn');
+  if(clearBtn) clearBtn.onclick = ()=>{ _cashReceived = ''; updateCashDisplay(); };
+
+  const closeBtn = document.getElementById('cashPayCloseBtn');
+  if(closeBtn) closeBtn.onclick = closeCashPayModal;
+  const cancelBtn = document.getElementById('cashCancelBtn');
+  if(cancelBtn) cancelBtn.onclick = closeCashPayModal;
+  const backdrop = document.getElementById('cashPayBackdrop');
+  if(backdrop) backdrop.onclick = closeCashPayModal;
+
+  // 確認收款：沒輸入 = 收剛好；有輸入但不足應收則擋下
+  const confirmBtn = document.getElementById('cashConfirmBtn');
+  if(confirmBtn){
+    confirmBtn.onclick = ()=>{
+      const hasInput = _cashReceived !== '';
+      if(hasInput && Number(_cashReceived) < _cashDue){
+        alert('實收金額不足，請重新輸入或按快捷');
+        return;
+      }
+            closeCashPayModal();
+      finalizeOrder('現金');
+    };
+  }
+}
+
+// ============================================================
+// v20260620 通用數字輸入視窗（取代 prompt，不調用系統鍵盤）
+// 用法：openNumPad({ title, hint, onConfirm:(value:number)=>void })
+// 按確認時把輸入的整數傳給 onConfirm；輸入為空視為 0
+// ============================================================
+let _numPadValue = '';
+let _numPadOnConfirm = null;
+let _numPadBound = false;
+
+function updateNumPadDisplay(){
+  const el = document.getElementById('numPadValue');
+  if(el) el.textContent = _numPadValue === '' ? '0' : _numPadValue;
+}
+
+function closeNumPad(){
+  const m = document.getElementById('numPadModal');
+  if(m) m.classList.add('hidden');
+  _numPadOnConfirm = null;
+}
+
+function openNumPad(opts){
+  opts = opts || {};
+  _numPadValue = '';
+  _numPadOnConfirm = typeof opts.onConfirm === 'function' ? opts.onConfirm : null;
+  const titleEl = document.getElementById('numPadTitle');
+  const hintEl = document.getElementById('numPadHint');
+  if(titleEl) titleEl.textContent = opts.title || '輸入數字';
+  if(hintEl) hintEl.textContent = opts.hint || '';
+  updateNumPadDisplay();
+  bindNumPad();
+  const m = document.getElementById('numPadModal');
+  if(m) m.classList.remove('hidden');
+}
+// v20260603：點數查詢區跨檔呼叫用
+window.openNumPad = openNumPad;
+
+function bindNumPad(){
+  if(_numPadBound) return;     // 只綁一次
+  _numPadBound = true;
+
+  document.querySelectorAll('#numPadModal .np-key').forEach(k=>{
+    k.onclick = ()=>{
+      const key = k.dataset.key;
+      if(key === 'del'){
+        _numPadValue = _numPadValue.slice(0, -1);
+      } else if(_numPadValue.length < 7){
+        _numPadValue = String(Number(_numPadValue + key));
+      }
+      updateNumPadDisplay();
+    };
+  });
+
+  const closeBtn = document.getElementById('numPadCloseBtn');
+  if(closeBtn) closeBtn.onclick = closeNumPad;
+  const cancelBtn = document.getElementById('numPadCancelBtn');
+  if(cancelBtn) cancelBtn.onclick = closeNumPad;
+  const backdrop = document.getElementById('numPadBackdrop');
+  if(backdrop) backdrop.onclick = closeNumPad;
+
+  const confirmBtn = document.getElementById('numPadConfirmBtn');
+  if(confirmBtn){
+    confirmBtn.onclick = ()=>{
+      const v = _numPadValue === '' ? 0 : Number(_numPadValue);
+      const cb = _numPadOnConfirm;
+      closeNumPad();
+      if(cb) cb(v);
+    };
+  }
 }
 
 
 export function initPOSPage(){
+
     // 預約：訂單類型切換時切換時段選擇器
   const _otSel = document.getElementById('orderType');
   if(_otSel) _otSel.addEventListener('change', posTogglePosReservationBlock);
@@ -466,6 +670,26 @@ export function initPOSPage(){
     const p = state.products.find(x=>x.id===state.configTarget?.productId);
     if(p) updateItemPricePreview(p);
   });
+    // v20260620 點數量框 → 開自製數字鍵盤輸入數量（不調用系統鍵盤）
+  (function(){
+    const qtyEl = document.getElementById('itemQtyInput');
+    if(!qtyEl) return;
+    qtyEl.addEventListener('click', (e)=>{
+      e.preventDefault();
+      const cur = Math.max(1, parseInt(qtyEl.value, 10) || 1);
+      openNumPad({
+        title: '數量',
+        hint: '請輸入數量（最少 1）',
+        onConfirm: (val)=>{
+          const q = Math.max(1, Math.floor(Number(val) || 0));
+          qtyEl.value = q;
+          // 觸發既有的 input 監聽，更新小計預覽
+          qtyEl.dispatchEvent(new Event('input', { bubbles:true }));
+        }
+      });
+    });
+  })();
+
   document.getElementById('saveProductConfigBtn').onclick = ()=>{
     const product = state.products.find(p=>p.id===state.configTarget?.productId);
     if(!product) return closeProductConfig();
@@ -539,9 +763,18 @@ const selections = flattenSelections(product);
   };
 
 
-  document.getElementById('closePaymentModal').onclick = ()=> document.getElementById('paymentModal').classList.add('hidden');
+    document.getElementById('closePaymentModal').onclick = ()=> document.getElementById('paymentModal').classList.add('hidden');
   document.querySelector('#paymentModal .modal-backdrop').onclick = ()=> document.getElementById('paymentModal').classList.add('hidden');
-  document.querySelectorAll('.pay-btn').forEach(btn=> btn.onclick = ()=> finalizeOrder(btn.dataset.payment));
+  // v20260620 現金改走自製收款視窗（先輸入實收、算找零）；其它付款方式維持直接結帳
+  document.querySelectorAll('.pay-btn').forEach(btn=> btn.onclick = ()=>{
+    const pm = btn.dataset.payment;
+    if(pm === '現金'){
+      openCashPayModal();      // 先開收款鍵盤，確認後才 finalizeOrder('現金')
+    } else {
+      finalizeOrder(pm);
+    }
+  });
+  bindCashPayModal();          // 綁定收款視窗的鍵盤/快捷/確認（只綁一次）
   if(document.getElementById('cartModalBtn')){
     document.getElementById('cartModalBtn').onclick = ()=>{
       document.getElementById('cartModal').style.display = 'flex';
@@ -580,44 +813,53 @@ const selections = flattenSelections(product);
       renderCart();
     };
   }
-  document.getElementById('discountAmountBtn').onclick = ()=>{
-    const val = prompt('請輸入折扣金額（正數）');
-    if(!val) return;
+    document.getElementById('discountAmountBtn').onclick = ()=>{
+    openNumPad({
+      title: '折扣金額',
+      hint: '請輸入折扣金額（正整數）',
+      onConfirm: (val)=>{
+        const amount = Math.abs(Number(val));
+        if(!amount || amount <= 0) return alert('請輸入正確金額');
+        mergeOrPushCartItem({
+          rowId: id(),
+          productId: '_discount_',
+          name: '折扣 -$' + amount,
+          basePrice: -amount,
+          qty: 1,
+          note: '',
+          selections: [],
+          extraPrice: 0
+        });
+        renderCart();
+      }
+    });
+  };
 
-    const amount = Math.abs(Number(val));
-    if(!amount || amount <= 0) return alert('請輸入正確金額');
-    mergeOrPushCartItem({
-      rowId: id(),
-      productId: '_discount_',
-      name: '折扣 -$' + amount,
-      basePrice: -amount,
-      qty: 1,
-      note: '',
-      selections: [],
-      extraPrice: 0
+    document.getElementById('discountPercentBtn').onclick = ()=>{
+    openNumPad({
+      title: '折扣百分比',
+      hint: '請輸入 1～99（例如 10 表示打 9 折）',
+      onConfirm: (val)=>{
+        const percent = Math.abs(Number(val));
+        if(!percent || percent <= 0 || percent >= 100) return alert('請輸入 1～99 之間的數字');
+        const subtotal = state.cart.reduce((s,x)=> s + (x.basePrice + x.extraPrice) * x.qty, 0);
+        const discountAmount = Math.round(subtotal * percent / 100);
+        if(discountAmount <= 0) return alert('目前購物車金額為 0，無法計算折扣');
+        mergeOrPushCartItem({
+          rowId: id(),
+          productId: '_discount_',
+          name: '折扣 ' + percent + '% (-$' + discountAmount + ')',
+          basePrice: -discountAmount,
+          qty: 1,
+          note: '',
+          selections: [],
+          extraPrice: 0
+        });
+        renderCart();
+      }
     });
-    renderCart();
   };
-  document.getElementById('discountPercentBtn').onclick = ()=>{
-    const val = prompt('請輸入折扣百分比（例如：10 表示打9折）');
-    if(!val) return;
-    const percent = Math.abs(Number(val));
-    if(!percent || percent <= 0 || percent >= 100) return alert('請輸入 1～99 之間的數字');
-    const subtotal = state.cart.reduce((s,x)=> s + (x.basePrice + x.extraPrice) * x.qty, 0);
-    const discountAmount = Math.round(subtotal * percent / 100);
-    if(discountAmount <= 0) return alert('目前購物車金額為 0，無法計算折扣');
-    mergeOrPushCartItem({
-      rowId: id(),
-      productId: '_discount_',
-      name: '折扣 ' + percent + '% (-$' + discountAmount + ')',
-      basePrice: -discountAmount,
-      qty: 1,
-      note: '',
-      selections: [],
-      extraPrice: 0
-    });
-    renderCart();
-  };
+
   // ── 06.16/5：未開班鎖定 POS 頁 ──
   
   // 切換到 POS 頁時刷新鎖定狀態

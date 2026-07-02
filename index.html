@@ -350,10 +350,10 @@
       <span class="tile-label">即時接單</span>
       <span class="tile-desc">Firebase 線上點餐設定</span>
     </div>
-    <div class="setting-tile" data-modal="modalGoogle">
-      <span class="tile-icon">☁️</span>
-      <span class="tile-label">Google 備份</span>
-      <span class="tile-desc">Google Drive 備份與還原</span>
+       <div class="setting-tile" data-modal="modalGoogle">
+      <span class="tile-icon">🎯</span>
+      <span class="tile-label">會員點數查詢</span>
+      <span class="tile-desc">輸入電話查詢點數餘額與紀錄</span>
     </div>
     <div class="setting-tile" data-modal="modalLocalData">
       <span class="tile-icon">💾</span>
@@ -380,7 +380,13 @@
       <span class="tile-label">廣告促銷管理</span>
       <span class="tile-desc">Banner、優惠碼、線上點餐促銷</span>
     </div>
-  </div>
+  
+      <div class="setting-tile" data-customer-display-open="1">
+      <span class="tile-icon">🖥️</span>
+      <span class="tile-label">客顯設定</span>
+      <span class="tile-desc">顧客螢幕顯示購物車與付款資訊</span>
+    </div>
+</div>
 </section>
 
 
@@ -424,12 +430,51 @@
         <div class="sm-form-group"><label>標籤垂直位移(mm)</label><input id="printLabelOffsetY" type="number" step="0.5"></div>
       </div>
 
+            <div class="sm-section-title">廚房單字級（品名 / 選項分開設定）</div>
+      <div class="sm-info-box" style="font-size:12px;color:#64748b;margin-bottom:8px">
+        藍牙印表機字級為階梯式：24=正常、32=放大2倍、48=放大3倍。內建 Sunmi 則依數值縮放。
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="sm-form-group"><label>廚房單品名字級</label><input id="printFontKitchenItem" type="number" min="24" max="60" step="1"></div>
+        <div class="sm-form-group"><label>廚房單選項字級</label><input id="printFontKitchenInfo" type="number" min="24" max="60" step="1"></div>
+      </div>
+
       <div class="sm-section-title">自動列印</div>
       <div class="sm-form-group"><label>廚房單列印份數</label><input id="printKitchenCopies" type="number" min="1" max="5"></div>
-      <div class="sm-check-row"><input id="printAutoCheckout" type="checkbox"><span>結帳後自動列印顧客單</span></div>
-      <div class="sm-check-row"><input id="printAutoKitchen" type="checkbox"><span>點餐結帳或待付款時自動列印廚房單</span></div>
 
-                  <div class="sm-section-title">列印欄位（顧客單 / 廚房單 / 標籤 各自勾選）</div>
+      <div class="sm-check-row"><input id="printAutoCheckout" type="checkbox"><span>結帳後自動列印顧客單</span></div>
+            <div class="sm-check-row"><input id="printAutoKitchen" type="checkbox"><span>點餐結帳或待付款時自動列印廚房單</span></div>
+
+      <div class="sm-section-title">指定印表機（每種單別各自選擇）</div>
+      <div class="sm-info-box" style="font-size:12px;color:#64748b;margin-bottom:8px">
+        預設「自動」＝依序嘗試內建→藍牙→網路（目前 T2 行為不變）。日後不用 T2，可把廚房單改成「藍牙」。
+      </div>
+      <div class="sm-form-group"><label>顧客單印表機</label>
+        <select id="printRouteReceipt">
+          <option value="auto">自動（內建→藍牙→網路）</option>
+          <option value="sunmi">內建 Sunmi</option>
+          <option value="bluetooth">藍牙</option>
+          <option value="network">網路</option>
+        </select>
+      </div>
+      <div class="sm-form-group"><label>廚房單印表機</label>
+        <select id="printRouteKitchen">
+          <option value="auto">自動（內建→藍牙→網路）</option>
+          <option value="sunmi">內建 Sunmi</option>
+          <option value="bluetooth">藍牙</option>
+          <option value="network">網路</option>
+        </select>
+      </div>
+      <div class="sm-form-group"><label>標籤印表機</label>
+        <select id="printRouteLabel">
+          <option value="auto">自動（內建→藍牙→網路）</option>
+          <option value="sunmi">內建 Sunmi</option>
+          <option value="bluetooth">藍牙</option>
+          <option value="network">網路</option>
+        </select>
+      </div>
+
+      <div class="sm-section-title">列印欄位（顧客單 / 廚房單 / 標籤 各自勾選）</div>
       <div class="sm-info-box" style="font-size:12px;color:#64748b;margin-bottom:8px">
         每個欄位有三個勾：左 = 顧客單，中 = 廚房單，右 = 標籤。儲存後套用到全系統列印（訂單查詢、結帳、線上接單）。
       </div>
@@ -676,34 +721,90 @@
     </div>
   </div>
 </div>
+<!-- ===== 客顯設定 Modal（v20260525 新增） ===== -->
+<div id="customerDisplayModal" class="settings-modal-backdrop">
+  <div class="settings-modal" style="max-width:480px">
+    <div class="settings-modal-header">
+      <h3>🖥️ 客顯設定</h3>
+      <button class="close-modal-btn" data-close-modal="customerDisplayModal">✕</button>
+    </div>
+    <div class="settings-modal-body">
+      <div class="sm-info-box" style="font-size:13px;color:#475569;margin-bottom:14px">
+        客顯功能需搭配已更新的 Sunmi APK（v20260525+）。APK 會在 127.0.0.1:8081 啟動客顯 Server，購物車變動與付款完成時會自動推送畫面。
+      </div>
+
+      <div class="sm-check-row">
+        <input id="cdEnabled" type="checkbox">
+        <span>啟用客顯推送</span>
+      </div>
+      <div class="sm-form-group">
+        <label>客顯主機 IP</label>
+        <input id="cdHost" placeholder="POS 在另一台請填 T2 的區域 IP，例 192.168.1.101">
+      </div>
+
+      <div class="sm-section-title">連線設定</div>
+      <div class="sm-form-group">
+        <label>Port（預設 8081）</label>
+        <input id="cdPort" type="number" min="1024" max="65535" value="8081">
+      </div>
+
+            <div class="sm-section-title">待機畫面</div>
+      <div class="sm-form-group">
+        <label>待機訊息</label>
+        <input id="cdIdleMessage" type="text" maxlength="30" placeholder="歡迎光臨">
+      </div>
+
+      <div class="sm-section-title">輪播圖（最多 5 張）</div>
+      <div class="sm-form-group">
+        <label>輪播圖存放位置（結尾要有 /）</label>
+        <input id="cdSlidesBaseUrl" type="text" placeholder="https://lcym346-byte.github.io/2237-1/images/">
+      </div>
+      <div class="sm-form-group">
+        <label>圖片檔名（一格一張，例 slide1.jpg；留空略過）</label>
+        <input id="cdSlide1" type="text" placeholder="slide1.jpg" style="margin-bottom:6px">
+        <input id="cdSlide2" type="text" placeholder="slide2.jpg" style="margin-bottom:6px">
+        <input id="cdSlide3" type="text" placeholder="slide3.jpg" style="margin-bottom:6px">
+        <input id="cdSlide4" type="text" placeholder="slide4.jpg" style="margin-bottom:6px">
+        <input id="cdSlide5" type="text" placeholder="slide5.jpg">
+      </div>
+
+      <div class="sm-section-title">連線測試</div>
+
+      <div class="sm-btn-row">
+        <button id="cdPingBtn" class="sm-btn">🔍 偵測連線</button>
+      </div>
+    </div>
+    <div class="settings-modal-footer">
+      <button id="cdSaveBtn" class="sm-btn primary">儲存客顯設定</button>
+      <button class="sm-btn" data-close-modal="customerDisplayModal">關閉</button>
+    </div>
+  </div>
+</div>
 
 <!-- ===== Google 備份 Modal ===== -->
 <div id="modalGoogle" class="settings-modal-backdrop">
   <div class="settings-modal" style="max-width:640px">
-    <div class="settings-modal-header">
-      <h3>☁️ Google Drive 備份 / 還原</h3>
+        <div class="settings-modal-header">
+      <h3>🎯 會員點數查詢</h3>
       <button class="close-modal-btn" data-close-modal="modalGoogle">✕</button>
     </div>
     <div class="settings-modal-body">
-      <div class="sm-form-group"><label>Google OAuth Client ID</label><input id="googleClientId" placeholder="貼上 Client ID"></div>
-      <div class="sm-form-group"><label>Google Drive 資料夾 ID（可留空）</label><input id="googleFolderId"></div>
-      <div class="sm-check-row"><input id="googleAutoBackupEnabled" type="checkbox"><span>啟用定期自動備份</span></div>
-      <div class="sm-form-group"><label>備份間隔（分鐘）</label><input id="googleAutoBackupMinutes" type="number" min="5" max="1440"></div>
-
-      <div class="sm-section-title">帳號與操作</div>
+      <div class="sm-info-box" style="font-size:13px;color:#475569;margin-bottom:12px">
+        輸入顧客手機號碼，查詢目前點數餘額與最近交易紀錄。
+      </div>
+      <div class="sm-section-title">查詢</div>
+      <div class="sm-form-group">
+        <label>顧客手機號碼</label>
+        <input id="pointsQueryPhone" type="text" inputmode="none" readonly placeholder="點此用數字鍵盤輸入" style="cursor:pointer">
+      </div>
       <div class="sm-btn-row">
-        <button id="saveGoogleBackupSettingsBtn" class="sm-btn primary">儲存設定</button>
-        <button id="googleLoginBtn" class="sm-btn">登入 Google</button>
-        <button id="googleLogoutBtn" class="sm-btn">登出 Google</button>
+        <button id="pointsQueryBtn" class="sm-btn primary">查詢點數</button>
       </div>
-      <div class="sm-btn-row" style="margin-top:8px">
-        <button id="manualGoogleBackupBtn" class="sm-btn success">立即備份</button>
-        <button id="manualGoogleRestoreBtn" class="sm-btn danger">從雲端還原</button>
-      </div>
-      <div id="googleDriveAccountBox" class="sm-info-box" style="margin-top:10px">登入狀態：未登入</div>
-      <div id="googleBackupFileList" class="sm-info-box">備份清單：無</div>
-      <div id="googleBackupStatusBox" class="sm-info-box">備份狀態：無</div>
+      <div id="pointsQueryBalanceBox" class="sm-info-box" style="margin-top:10px">點數餘額：—</div>
+      <div class="sm-section-title">交易紀錄</div>
+      <div id="pointsQueryHistoryBox" style="max-height:280px;overflow:auto;border:1px solid #e2e8f0;border-radius:6px;padding:8px;font-size:13px;background:#f8fafc">（尚未查詢）</div>
     </div>
+
     <div class="settings-modal-footer">
       <button class="sm-btn" data-close-modal="modalGoogle">關閉</button>
     </div>
@@ -778,7 +879,7 @@
         <div style="display:flex;align-items:center;gap:10px;margin-top:12px">
       <label style="font-size:13px;font-weight:600;color:#475569">數量</label>
       <button type="button" id="qtyMinusBtn" onclick="(function(){var i=document.getElementById('itemQtyInput');var v=Math.max(1,(parseInt(i.value,10)||1)-1);i.value=v;i.dispatchEvent(new Event('input',{bubbles:true}));})()" style="width:36px;height:36px;border:1px solid #cbd5e1;background:#f1f5f9;border-radius:8px;font-size:18px;font-weight:700;cursor:pointer">−</button>
-      <input id="itemQtyInput" type="number" min="1" value="1" style="width:70px;text-align:center">
+      <input id="itemQtyInput" type="number" min="1" value="1" readonly inputmode="none" style="width:70px;text-align:center;background:#fff;cursor:pointer">
       <button type="button" id="qtyPlusBtn" onclick="(function(){var i=document.getElementById('itemQtyInput');var v=Math.max(1,(parseInt(i.value,10)||1)+1);i.value=v;i.dispatchEvent(new Event('input',{bubbles:true}));})()" style="width:36px;height:36px;border:1px solid #cbd5e1;background:#f1f5f9;border-radius:8px;font-size:18px;font-weight:700;cursor:pointer">＋</button>
       <span id="itemPricePreview" style="margin-left:auto;font-size:15px;font-weight:700;color:#1e293b">小計：$0</span>
     </div>
@@ -808,6 +909,111 @@
     </div>
   </div>
 </div>
+    <!-- ===== 現金收款 Modal（自製鍵盤，全程不調用系統鍵盤）v20260620 ===== -->
+<div id="cashPayModal" class="modal hidden">
+  <div class="modal-backdrop" id="cashPayBackdrop"></div>
+  <div class="modal-dialog" style="max-width:560px;width:94%">
+    <div class="row between wrap">
+      <h2 style="margin:0">現金收款</h2>
+      <button id="cashPayCloseBtn" class="ghost-btn">✕</button>
+    </div>
+
+    <div style="display:flex;gap:14px;margin-top:14px;flex-wrap:wrap">
+      <!-- 左半：金額顯示 + 快捷湊整 -->
+      <div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:10px">
+        <div style="background:#f1f5f9;border-radius:10px;padding:12px">
+          <div style="font-size:13px;color:#64748b">應收金額</div>
+          <div id="cashDueText" style="font-size:24px;font-weight:800;color:#0f172a">$0</div>
+        </div>
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px">
+          <div style="font-size:13px;color:#1d4ed8">實收金額</div>
+          <div id="cashReceivedText" style="font-size:28px;font-weight:800;color:#1e3a8a;min-height:34px">—</div>
+        </div>
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px">
+          <div style="font-size:13px;color:#15803d">找零</div>
+          <div id="cashChangeText" style="font-size:24px;font-weight:800;color:#166534">$0</div>
+        </div>
+        <div style="font-size:13px;color:#64748b;margin-top:2px">快捷收款</div>
+        <div id="cashQuickBtns" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+      </div>
+
+      <!-- 右半：自製數字鍵盤 -->
+      <div style="flex:1;min-width:200px">
+        <div id="cashKeypad" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+          <button type="button" class="cash-key" data-key="1">1</button>
+          <button type="button" class="cash-key" data-key="2">2</button>
+          <button type="button" class="cash-key" data-key="3">3</button>
+          <button type="button" class="cash-key" data-key="4">4</button>
+          <button type="button" class="cash-key" data-key="5">5</button>
+          <button type="button" class="cash-key" data-key="6">6</button>
+          <button type="button" class="cash-key" data-key="7">7</button>
+          <button type="button" class="cash-key" data-key="8">8</button>
+          <button type="button" class="cash-key" data-key="9">9</button>
+          <button type="button" class="cash-key" data-key="00">00</button>
+          <button type="button" class="cash-key" data-key="0">0</button>
+          <button type="button" class="cash-key" data-key="del" style="background:#fee2e2;color:#b91c1c">⌫</button>
+        </div>
+        <button type="button" id="cashClearBtn" class="cash-key" style="width:100%;margin-top:8px;background:#f1f5f9;color:#475569">清除</button>
+      </div>
+    </div>
+
+    <div class="form-actions" style="margin-top:16px">
+      <button id="cashConfirmBtn" class="primary-btn" style="flex:2;background:#10b981">確認收款</button>
+      <button id="cashCancelBtn" class="secondary-btn" style="flex:1">取消</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .cash-key{
+    padding:16px 0;font-size:22px;font-weight:700;border:1px solid #cbd5e1;
+    background:#fff;color:#0f172a;border-radius:10px;cursor:pointer;
+    user-select:none;-webkit-tap-highlight-color:transparent;
+  }
+  .cash-key:active{ background:#e2e8f0; }
+  .cash-quick{
+    padding:14px 0;font-size:18px;font-weight:700;border:1px solid #93c5fd;
+    background:#dbeafe;color:#1e40af;border-radius:10px;cursor:pointer;user-select:none;
+  }
+  .cash-quick:active{ background:#bfdbfe; }
+</style>
+<!-- ===== 通用數字輸入 Modal（折扣等用，自製鍵盤）v20260620 ===== -->
+<div id="numPadModal" class="modal hidden">
+  <div class="modal-backdrop" id="numPadBackdrop"></div>
+  <div class="modal-dialog" style="max-width:360px;width:92%">
+    <div class="row between wrap">
+      <h2 id="numPadTitle" style="margin:0">輸入數字</h2>
+      <button id="numPadCloseBtn" class="ghost-btn">✕</button>
+    </div>
+
+    <div id="numPadHint" style="font-size:13px;color:#64748b;margin-top:6px"></div>
+
+    <div style="background:#f1f5f9;border-radius:10px;padding:14px;margin-top:10px;text-align:right">
+      <span id="numPadValue" style="font-size:30px;font-weight:800;color:#0f172a">0</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px">
+      <button type="button" class="cash-key np-key" data-key="1">1</button>
+      <button type="button" class="cash-key np-key" data-key="2">2</button>
+      <button type="button" class="cash-key np-key" data-key="3">3</button>
+      <button type="button" class="cash-key np-key" data-key="4">4</button>
+      <button type="button" class="cash-key np-key" data-key="5">5</button>
+      <button type="button" class="cash-key np-key" data-key="6">6</button>
+      <button type="button" class="cash-key np-key" data-key="7">7</button>
+      <button type="button" class="cash-key np-key" data-key="8">8</button>
+      <button type="button" class="cash-key np-key" data-key="9">9</button>
+      <button type="button" class="cash-key np-key" data-key="00">00</button>
+      <button type="button" class="cash-key np-key" data-key="0">0</button>
+      <button type="button" class="cash-key np-key" data-key="del" style="background:#fee2e2;color:#b91c1c">⌫</button>
+    </div>
+
+    <div class="form-actions" style="margin-top:14px">
+      <button id="numPadConfirmBtn" class="primary-btn" style="flex:2;background:#10b981">確認</button>
+      <button id="numPadCancelBtn" class="secondary-btn" style="flex:1">取消</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== 開始值班 Modal ===== -->
 <div id="startSessionModal" class="modal hidden">
   <div class="modal-backdrop"></div>

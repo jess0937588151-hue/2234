@@ -87,7 +87,20 @@ function buildSettingsModalHtml(){
 '        <legend style="padding:0 8px;font-weight:600;color:#0f172a">優惠碼清單</legend>' +
 '        <div id="promoCouponList" style="display:flex;flex-direction:column;gap:8px"></div>' +
 '        <button id="promoAddCouponBtn" type="button" style="margin-top:10px;padding:6px 12px;background:#f1f5f9;border:1px dashed #94a3b8;border-radius:6px;cursor:pointer;width:100%">+ 新增優惠碼</button>' +
+'        <div style="margin-top:14px;padding-top:12px;border-top:1px dashed #cbd5e1">' +
+'          <div style="font-weight:600;color:#0f172a;margin-bottom:4px">付款方式回饋（不折現金，改送點數）</div>' +
+'          <div style="color:#64748b;font-size:12px;margin-bottom:8px">顧客在線上點餐按「現金／電子支付」時，自動套用所選優惠碼，折扣金額 1:1 轉成本次回饋點數（結帳完成才入帳）。不選＝不回饋。</div>' +
+'          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+'            <label style="display:block"><div style="font-size:13px;color:#475569;margin-bottom:4px">現金按鈕套用</div>' +
+'              <select id="promoCashCouponSelect" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;box-sizing:border-box"></select>' +
+'            </label>' +
+'            <label style="display:block"><div style="font-size:13px;color:#475569;margin-bottom:4px">電子支付按鈕套用</div>' +
+'              <select id="promoEpayCouponSelect" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;box-sizing:border-box"></select>' +
+'            </label>' +
+'          </div>' +
+'        </div>' +
 '      </fieldset>' +
+
 '      <div id="promoLastSave" style="font-size:12px;color:#64748b;margin-bottom:12px"></div>' +
 '    </div>' +
 '    <div style="padding:14px 20px;border-top:1px solid #e2e8f0;display:flex;gap:8px;justify-content:flex-end;position:sticky;bottom:0;background:#fff">' +
@@ -101,7 +114,7 @@ function buildSettingsModalHtml(){
 function renderCouponRow(coupon){
   var c = coupon || {};
   return '' +
-'<div class="promo-coupon-row" data-id="' + esc(c.id || '') + '" style="display:grid;grid-template-columns:auto 1.2fr 1.5fr 1fr 1fr 1fr auto;gap:6px;align-items:center;padding:8px;background:#f8fafc;border-radius:6px">' +
+'<div class="promo-coupon-row" data-id="' + esc(c.id || '') + '" style="display:grid;grid-template-columns:auto 1.2fr 1.5fr 1fr 1fr 1fr auto auto;gap:6px;align-items:center;padding:8px;background:#f8fafc;border-radius:6px">' +
 '  <label style="display:flex;align-items:center"><input type="checkbox" class="cp-enabled" ' + (c.enabled !== false ? 'checked' : '') + '></label>' +
 '  <input type="text" class="cp-code" placeholder="代碼" value="' + esc(c.code || '') + '" maxlength="24" style="padding:6px;border:1px solid #cbd5e1;border-radius:4px;font-family:monospace;text-transform:uppercase">' +
 '  <input type="text" class="cp-title" placeholder="顯示名稱" value="' + esc(c.title || '') + '" maxlength="80" style="padding:6px;border:1px solid #cbd5e1;border-radius:4px">' +
@@ -111,8 +124,10 @@ function renderCouponRow(coupon){
 '  </select>' +
 '  <input type="number" class="cp-value" placeholder="折扣值" value="' + Number(c.value || 0) + '" min="0" style="padding:6px;border:1px solid #cbd5e1;border-radius:4px">' +
 '  <input type="number" class="cp-minspend" placeholder="最低消費" value="' + Number(c.minSpend || 0) + '" min="0" style="padding:6px;border:1px solid #cbd5e1;border-radius:4px">' +
-'  <button type="button" class="cp-del" style="background:#fee2e2;color:#dc2626;border:none;border-radius:4px;padding:6px 10px;cursor:pointer">刪</button>' +
+'  <label class="cp-show-wrap" title="是否顯示在客人點餐頁的可用優惠碼清單" style="display:flex;flex-direction:column;align-items:center;font-size:11px;color:#475569;gap:2px"><input type="checkbox" class="cp-show" ' + (c.showToCustomer !== false ? 'checked' : '') + '><span>顯示</span></label>' +
+'  <button type="button" class="cp-del" style="background:#fee2e2;color:#dc2626;border-radius:4px;padding:6px 10px;cursor:pointer">刪</button>' +
 '</div>';
+
 }
 
 function loadFormFromConfig(){
@@ -127,8 +142,27 @@ function loadFormFromConfig(){
   var list = document.getElementById('promoCouponList');
   list.innerHTML = (cfg.coupons || []).map(renderCouponRow).join('') || '<div style="color:#94a3b8;font-size:13px;padding:8px;text-align:center">尚未設定優惠碼</div>';
 
+  // v20260603-v2：填入「現金／電支回饋碼」兩個下拉（選項來自目前優惠碼清單）
+  fillRewardCouponSelects(cfg);
+
   var saveLbl = document.getElementById('promoLastSave');
   saveLbl.textContent = cfg.updatedAt ? '最後儲存：' + new Date(cfg.updatedAt).toLocaleString('zh-TW') : '尚未儲存';
+}
+
+// v20260603-v2：用目前優惠碼清單填入現金/電支回饋碼下拉，並選回已存的 id
+function fillRewardCouponSelects(cfg){
+  var cashSel = document.getElementById('promoCashCouponSelect');
+  var epaySel = document.getElementById('promoEpayCouponSelect');
+  if(!cashSel || !epaySel) return;
+  var opts = '<option value="">不回饋（不套用）</option>' +
+    (cfg.coupons || []).map(function(c){
+      var label = (c.code || '') + '（' + (c.title || '') + '・' + (c.type === 'percent' ? c.value + '%' : '折' + c.value) + '）';
+      return '<option value="' + esc(c.id || '') + '">' + esc(label) + '</option>';
+    }).join('');
+  cashSel.innerHTML = opts;
+  epaySel.innerHTML = opts;
+  cashSel.value = cfg.cashCouponId || '';
+  epaySel.value = cfg.epayCouponId || '';
 }
 
 function collectFormToConfig(){
@@ -143,14 +177,16 @@ function collectFormToConfig(){
     coupons.push({
       id: row.dataset.id || '',
       enabled: row.querySelector('.cp-enabled').checked,
+      showToCustomer: row.querySelector('.cp-show') ? row.querySelector('.cp-show').checked : true,
       code: code,
       title: (row.querySelector('.cp-title').value || '').trim(),
       type: row.querySelector('.cp-type').value,
       value: Number(row.querySelector('.cp-value').value || 0),
       minSpend: Number(row.querySelector('.cp-minspend').value || 0)
     });
+
   });
-  return {
+    return {
     enabled: document.getElementById('promoEnabledChk').checked,
     heroTitle: heroTitle,
     heroSubtitle: heroSubtitle,
@@ -168,9 +204,12 @@ function collectFormToConfig(){
       startsAt: '',
       endsAt: ''
     }],
-    coupons: coupons
+    coupons: coupons,
+    cashCouponId: (document.getElementById('promoCashCouponSelect') || {}).value || '',
+    epayCouponId: (document.getElementById('promoEpayCouponSelect') || {}).value || ''
   };
 }
+
 
 function fillTemplateSelect(){
   var sel = document.getElementById('promoTemplateSelect');
@@ -305,11 +344,13 @@ function renderBannerArea(){
     area.innerHTML = '';
     return;
   }
-  var couponText = (Array.isArray(promo.coupons) && promo.coupons.length)
-    ? '<div style="font-size:12px;margin-top:6px;opacity:.9">可用優惠碼：' + promo.coupons.map(function(c){
+  var visibleCoupons = (Array.isArray(promo.coupons) ? promo.coupons : []).filter(function(c){ return c && c.showToCustomer !== false; });
+  var couponText = visibleCoupons.length
+    ? '<div style="font-size:12px;margin-top:6px;opacity:.9">可用優惠碼：' + visibleCoupons.map(function(c){
         return esc(c.code) + '（' + esc(c.title || '') + '）';
       }).join('、') + '</div>'
     : '';
+
   area.style.display = 'block';
   area.innerHTML = promo.banners.slice(0, 3).map(function(b){
     var color = themeColor(b.theme || promo.theme);
@@ -336,15 +377,12 @@ function buildCouponBoxHtml(){
 '    <button id="onlineCouponClearBtn" type="button" style="padding:8px 10px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer">清除</button>' +
 '  </div>' +
 '  <div id="onlineCouponMessage" style="margin-top:6px;font-size:12px;color:#64748b">若有店家提供的優惠碼，可在此輸入。</div>' +
-'  <div id="onlineDiscountRow" style="display:none;margin-top:8px;display:flex;justify-content:space-between;font-size:14px">' +
+'  <div id="onlineDiscountRow" style="display:none;margin-top:8px;justify-content:space-between;font-size:14px">' +
 '    <span style="color:#475569">折扣</span>' +
 '    <strong id="onlineDiscountText" style="color:#16a34a">-0</strong>' +
 '  </div>' +
-'  <div style="margin-top:6px;display:flex;justify-content:space-between;font-size:15px;font-weight:700;border-top:1px dashed #cbd5e1;padding-top:8px">' +
-'    <span>應付合計</span>' +
-'    <span id="onlineGrandTotalText" style="color:#dc2626">0</span>' +
-'  </div>' +
 '</div>';
+
 }
 
 function applyCoupon(){
@@ -352,7 +390,9 @@ function applyCoupon(){
   onlinePromoState.couponCode = (input ? input.value : '').trim().toUpperCase();
   refreshPromotionDisplay();
   if(typeof onlinePromoState.onChange === 'function') onlinePromoState.onChange(getCurrentPromotion());
+  if(typeof window !== 'undefined' && typeof window.__refreshOnlinePromotion === 'function') window.__refreshOnlinePromotion();
 }
+
 
 function clearCoupon(){
   onlinePromoState.couponCode = '';
@@ -360,7 +400,9 @@ function clearCoupon(){
   if(input) input.value = '';
   refreshPromotionDisplay();
   if(typeof onlinePromoState.onChange === 'function') onlinePromoState.onChange(getCurrentPromotion());
+  if(typeof window !== 'undefined' && typeof window.__refreshOnlinePromotion === 'function') window.__refreshOnlinePromotion();
 }
+
 
 function getCurrentPromotion(){
   var cart = typeof onlinePromoState.cartGetter === 'function' ? onlinePromoState.cartGetter() : [];
@@ -431,11 +473,11 @@ export function mountPromotionOnlineUI(opts){
   }
   renderBannerArea();
 
-      // 2. 優惠碼輸入區（插在送出訂單按鈕「之前」）
+        // 2. 優惠碼輸入區（v20260603-v3：插在捲動區小計下、點數列之前）
   if(!document.getElementById('onlineCouponBox')){
-    var submitBtn = document.getElementById('submitOnlineOrderBtn');
-    if(submitBtn && submitBtn.parentNode){
-      submitBtn.insertAdjacentHTML('beforebegin', buildCouponBoxHtml());
+    var pointsRow = document.getElementById('onlinePointsRow');
+    if(pointsRow && pointsRow.parentNode){
+      pointsRow.insertAdjacentHTML('beforebegin', buildCouponBoxHtml());
     } else {
       var couponHost =
         document.querySelector('.online-summary') ||
@@ -443,6 +485,7 @@ export function mountPromotionOnlineUI(opts){
         document.body;
       couponHost.insertAdjacentHTML('beforeend', buildCouponBoxHtml());
     }
+
     document.getElementById('onlineCouponApplyBtn').onclick = applyCoupon;
     document.getElementById('onlineCouponClearBtn').onclick = clearCoupon;
     document.getElementById('onlineCouponInput').addEventListener('keydown', function(e){

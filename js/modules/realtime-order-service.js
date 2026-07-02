@@ -235,7 +235,13 @@ function showOnlineOrderOverlay(orderId){
       const result = await confirmOnlineOrder(orderId, prepTime, msg);
       stopAlarm();
       if(result){
-        const posOrder = buildRealtimeOrderForPOS(result);
+                const posOrder = buildRealtimeOrderForPOS(result);
+        try {
+          const cust = await import('./customer-service.js');
+          // 接單預扣折抵點數（以真實餘額為上限），並把應付調整為 小計 − 實際折抵
+          const used = await cust.deductPointsOnConfirm(posOrder);
+          if(used > 0) posOrder.total = Math.max(0, Number(posOrder.subtotal || 0) - used);
+        } catch (e) { console.warn('接單預扣點數失敗：', e); }
         if(!Array.isArray(state.orders)) state.orders = [];
         state.orders.unshift(posOrder);
         persistAll();
@@ -245,6 +251,7 @@ function showOnlineOrderOverlay(orderId){
           cust.upsertCustomerFromOrder(posOrder);
           cust.syncCustomerToFirebase(posOrder);
         } catch (e) { console.warn('顧客主檔更新失敗：', e); }
+
 
         if(!isReservation){
           try{
@@ -320,7 +327,12 @@ function startAlarm(orderId){
     try{
       const result = await confirmOnlineOrder(autoOrderId, 20, '系統自動接單，預計準備時間 20 分鐘');
       if(result){
-        const posOrder = buildRealtimeOrderForPOS(result);
+                const posOrder = buildRealtimeOrderForPOS(result);
+        try {
+          const cust = await import('./customer-service.js');
+          const used = await cust.deductPointsOnConfirm(posOrder);
+          if(used > 0) posOrder.total = Math.max(0, Number(posOrder.subtotal || 0) - used);
+        } catch (e) { console.warn('接單預扣點數失敗：', e); }
         if(!Array.isArray(state.orders)) state.orders = [];
         state.orders.unshift(posOrder);
         persistAll();
@@ -330,6 +342,7 @@ function startAlarm(orderId){
           cust.upsertCustomerFromOrder(posOrder);
           cust.syncCustomerToFirebase(posOrder);
         } catch (e) { console.warn('顧客主檔更新失敗：', e); }
+
 
         try{
           const { printOrderReceipt, printKitchenCopies } = await import('./print-service.js');
@@ -438,19 +451,41 @@ export async function pushOnlineOrder(order, storeCode){
     console.warn('buildLookupKeyForOrder failed:', e);
   }
 
+    const nowIso = new Date().toISOString();
   await dbApi.set(newRef, Object.assign({}, order, {
     storeCode: code,
     customerUid: user.uid,
     customerLookupKey,
     status: 'pending_confirm',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: nowIso,
+    updatedAt: nowIso,
     prepTimeMinutes: null,
     estimatedReadyAt: null,
     replyMessage: ''
   }));
 
+  // 加寫顧客反查表 customerOrderLookup/{code}/{lookupKey}/{orderId}
+  // 顧客查單只讀自己 lookupKey 底下這批，不必讀整店 onlineOrders（符合 rules）
+  if(customerLookupKey){
+    try{
+      const lookupRef = await getRef(`customerOrderLookup/${code}/${customerLookupKey}/${newRef.key}`);
+      await dbApi.set(lookupRef, {
+        id: newRef.key,
+        orderNo: order.orderNo || ('ON' + Date.now()),
+        createdAt: nowIso,
+        updatedAt: nowIso,
+        status: 'pending_confirm',
+        total: Number(order.total || 0),
+        customerUid: user.uid,
+        items: Array.isArray(order.items) ? order.items : []
+      });
+    }catch(e){
+      console.warn('寫 customerOrderLookup 失敗（不影響下單）：', e && e.message);
+    }
+  }
+
   cfg.lastOrderAt = new Date().toISOString();
+
   cfg.lastSyncStatus = `顧客訂單已送出（${code}）`;
   persistAll();
   return newRef.key;
@@ -614,10 +649,14 @@ export function buildRealtimeOrderForPOS(remote){
     // ===== 套用線上訂單帶來的優惠碼／折扣 =====
   // 顧客送單時 payload 已寫入 discount / couponCode / couponMessage
   // 折扣不可超過小計、不可為負
-  const remoteDiscount = Math.max(0, Math.min(Number(remote.discount || 0), subtotal));
+        // v20260603-v2：手動優惠碼直接折現金（total 要扣 discount）；
+    // 折抵點數於接單 deductPointsOnConfirm 時再從 total 減。
+  const remoteDiscount = Math.max(0, Number(remote.discount || 0));
   const remoteCouponCode = String(remote.couponCode || '').toUpperCase();
   const remoteCouponMessage = String(remote.couponMessage || '');
   const grandTotal = Math.max(0, subtotal - remoteDiscount);
+
+
 
   return {
     id: 'online_' + remote.id,
@@ -642,12 +681,64 @@ export function buildRealtimeOrderForPOS(remote){
     discountAmount: remoteDiscount,
     couponCode: remoteCouponCode,
     couponMessage: remoteCouponMessage,
+    pointsRequested: Math.max(0, Math.round(Number(remote.pointsRequested || 0))),
+    payMethod: (remote.payMethod === '現金' || remote.payMethod === '電子支付') ? remote.payMethod : '',
+    pointsEarnReward: 0,
+    pointsUsed: 0,
+    pointsEarned: 0,
+    pointsSettled: false,
+
     sessionId: getCurrentSession()?.id || null,
+
     subtotal,
     total: grandTotal,
     items
   };
 }
+// ============================================================
+// 各店獨立營業時間（路徑 storeHours/{storeCode}，與共用菜單分開）
+// ============================================================
+/**
+ * 上傳「本店」營業時間到 storeHours/{storeCode}。
+ * 不受「只有主機能傳菜單」限制，每台 POS 都能傳自己店的營業時間。
+ */
+export async function syncStoreHoursToFirebase(){
+  await loadFirebaseModules();
+  const user = authInstance.currentUser || await waitForAuthReady();
+  if(!user) throw new Error('請先使用 POS Google 登入');
+  await verifyPOSAccess();
+
+  const code = getStoreCode();
+  const hours = (state.settings && state.settings.businessHours) || {};
+  const ref = await getRef('storeHours/' + code);
+  await dbApi.set(ref, {
+    businessHours: hours,
+    updatedAt: new Date().toISOString()
+  });
+
+  const cfg = ensureRealtimeConfig();
+  cfg.lastSyncStatus = `營業時間已上傳（${code}）`;
+  persistAll();
+}
+
+/**
+ * 讀取指定店的營業時間。
+ * 顧客端傳入 URL 的 storeCode；POS 端不傳則用本機 getStoreCode()。
+ */
+export async function fetchStoreHoursFromFirebase(storeCode){
+  await loadFirebaseModules();
+  const code = storeCode ? validateStoreCode(storeCode) : getStoreCode();
+  const ref = await getRef('storeHours/' + code);
+  const snapshot = await dbApi.get(ref);
+  const data = snapshot.val();
+  if(data && data.businessHours && typeof data.businessHours === 'object'){
+    if(!state.settings) state.settings = {};
+    state.settings.businessHours = data.businessHours;
+    persistAll();
+  }
+  return data;
+}
+
 
 
 // ============================================================
@@ -683,12 +774,12 @@ export async function syncMenuToFirebase(){
     soldOut: p.soldOut === true
   };
 }),
-
     modules: state.modules || [],
     updatedAt: new Date().toISOString()
   };
 
   const menuRef = await getRef('menu/' + menuKey);
+
   await dbApi.set(menuRef, menuData);
   cfg.lastSyncStatus = '菜單同步成功';
   cfg.lastSyncTime = new Date().toISOString();
@@ -716,7 +807,9 @@ export async function fetchMenuFromFirebase(){
   return data;
 }
 
+
 export async function fetchAndMergeMenuFromFirebase(){
+
   await loadFirebaseModules();
   const cfg = ensureRealtimeConfig();
   const menuKey = cfg.projectId || 'default';
@@ -874,6 +967,7 @@ export async function watchMenuFromFirebase(callback){
     if(callback) callback(data);
   });
 }
+
 
 // ============================================================
 // 預約 30 分鐘前提醒
