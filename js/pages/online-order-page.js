@@ -77,8 +77,9 @@ function showOnlineToast(message){
 }
 
 function getStoreName(){
-  return state.settings?.realtimeOrder?.onlineStoreTitle || state.settings?.printConfig?.storeName || '立即點餐';
+  return '中壢民族店';
 }
+
 
 function getStoreMeta(){
   return state.settings?.realtimeOrder?.onlineStoreSubtitle || '內用 / 外帶皆可';
@@ -717,7 +718,8 @@ async function init(){
   try{
     const params = new URLSearchParams(window.location.search);
     const urlStoreName = params.get('storeName');
-    document.getElementById('onlineStoreName').textContent = urlStoreName || getStoreName();
+    document.getElementById('onlineStoreName').textContent = getStoreName();
+    document.title = getStoreName();
     document.getElementById('onlineStoreMeta').textContent = `${getStoreMeta()}（${code}）`;
   }catch(e){
     document.getElementById('onlineStoreName').textContent = getStoreName();
