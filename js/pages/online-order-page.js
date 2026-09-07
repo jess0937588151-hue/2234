@@ -78,7 +78,7 @@ function showOnlineToast(message){
 }
 
 function getStoreName(){
-  return '花蓮和平店';  //線上點餐店名顯示這裡修改
+  return '中壢民族店';  //線上點餐店名顯示這裡修改
 }
 
 
