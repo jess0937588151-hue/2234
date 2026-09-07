@@ -14,6 +14,7 @@ import { pullPromotionsFromCloud, getPaymentRewardPoints } from '../modules/prom
 
 const onlineState = {
   selectedCategory: '全部',
+  currentSizeIndex: -1,
   cart: [],
   currentSelections: {},
   configTarget: null,
@@ -77,7 +78,7 @@ function showOnlineToast(message){
 }
 
 function getStoreName(){
-  return '中壢民族店';
+  return '花蓮和平店';  //線上點餐店名顯示這裡修改
 }
 
 
@@ -111,6 +112,18 @@ function flattenSelections(product){
     }
   }
   return rows;
+}
+function getEffectiveBasePrice(product){
+  const sizes = Array.isArray(product.sizes) ? product.sizes : [];
+  const i = onlineState.currentSizeIndex;
+  if(i >= 0 && sizes[i]) return Number(sizes[i].price || 0);
+  return Number(product.price || 0);
+}
+function getSizeSuffix(product){
+  const sizes = Array.isArray(product.sizes) ? product.sizes : [];
+  const i = onlineState.currentSizeIndex;
+  if(i >= 0 && sizes[i] && sizes[i].name) return '(' + sizes[i].name + ')';
+  return '';
 }
 
 function sameSelections(a=[], b=[]){
@@ -185,8 +198,8 @@ function updateItemPricePreview(product){
   const selections = flattenSelections(product);
   selections.forEach(s=> add += Number(s.price || 0));
   const qty = Math.max(1, Number(document.getElementById('onlineItemQtyInput').value || 1));
-  document.getElementById('onlineItemPricePreview').textContent = '小計：' + money((Number(product.price||0) + add) * qty);
-}
+  document.getElementById('onlineItemPricePreview').textContent = '小計：' + money((getEffectiveBasePrice(product) + add) * qty);}
+
 
 function renderProductConfig(product){
   document.getElementById('onlineModalTitle').textContent = product.name;
@@ -196,6 +209,27 @@ function renderProductConfig(product){
 
   const wrap = document.getElementById('onlineModalModules');
   wrap.innerHTML = '';
+  const sizes = Array.isArray(product.sizes) ? product.sizes : [];
+if(sizes.length){
+  const sizeBlock = document.createElement('div');
+  sizeBlock.className = 'config-module';
+  sizeBlock.innerHTML = '<div class="config-module-title">份量</div>';
+  const sizeList = document.createElement('div');
+  sizeList.className = 'config-options';
+  sizes.forEach((sz, idx) => {
+    const b = document.createElement('button');
+    b.className = 'option-btn' + (onlineState.currentSizeIndex === idx ? ' active' : '');
+    b.textContent = sz.name + '（$' + Number(sz.price||0) + '）';
+    b.onclick = () => {
+      onlineState.currentSizeIndex = (onlineState.currentSizeIndex === idx ? -1 : idx);
+      renderProductConfig(product);
+    };
+    sizeList.appendChild(b);
+  });
+  sizeBlock.appendChild(sizeList);
+  wrap.appendChild(sizeBlock);
+}
+
   (product.modules || []).forEach(att=>{
     const mod = state.modules.find(m=>m.id===att.moduleId);
     if(!mod) return;
@@ -247,11 +281,15 @@ function openProductConfigForNew(productId){
   document.getElementById('onlineItemNoteInput').value = '';
   document.getElementById('onlineItemQtyInput').value = 1;
   renderProductConfig(product);
+  onlineState.currentSizeIndex = -1;
+
   document.getElementById('onlineProductModal').classList.remove('hidden');
 }
 
 function openProductConfigForEdit(rowId){
   const item = onlineState.cart.find(x=>x.rowId===rowId);
+  onlineState.currentSizeIndex = (item.sizeIndex ?? -1);
+
   if(!item) return;
   const product = state.products.find(p=>p.id===item.productId && p.enabled!==false);
   if(!product) return;
@@ -271,6 +309,8 @@ function closeProductConfig(){
   document.getElementById('onlineProductModal').classList.add('hidden');
   onlineState.configTarget = null;
   onlineState.currentSelections = {};
+  onlineState.currentSizeIndex = -1;
+
 }
 
 function renderCart(){
@@ -523,17 +563,22 @@ function refreshOnlineTotals(){
 
   // 本次可得點數：依客人選的付款別，用對應回饋碼算（不折現金、純預覽、結帳完成才入帳）
   let reward = 0;
+  let payCashDiscount = 0;
   if(onlineState.payMethod){
     try{
       const r = getPaymentRewardPoints(onlineState.cart, onlineState.payMethod);
-      reward = Math.max(0, Number(r && r.points || 0));
-    }catch(e){ reward = 0; }
+      if(r && r.rewardMode === 'cash'){
+        payCashDiscount = Math.max(0, Number(r.cashDiscount || 0));
+        reward = 0;
+      } else {
+        reward = Math.max(0, Number(r && r.points || 0));
+      }
+    }catch(e){ reward = 0; payCashDiscount = 0; }
   }
-
-  const grand = Math.max(0, subtotal - couponDiscount - pointsUse);
-
+  onlineState._payCashDiscount = payCashDiscount;
+  const grand = Math.max(0, subtotal - couponDiscount - payCashDiscount - pointsUse);
   const dEl = document.getElementById('onlineDiscountSummaryText');
-  if(dEl) dEl.textContent = '-' + money(couponDiscount + pointsUse);
+  if(dEl) dEl.textContent = '-' + money(couponDiscount + payCashDiscount + pointsUse);
   const rEl = document.getElementById('onlineRewardPointsText');
   if(rEl) rEl.textContent = fmtPts(reward);
   const gEl = document.getElementById('onlineGrandTotalSummaryText');
@@ -632,12 +677,20 @@ async function submitOnlineOrder(){
   }
   // v20260603-v2：折抵點數（受餘額與「小計−折扣」上限約束）
   const pointsRequested = getOnlinePointsUse();
-  const grandTotal = Math.max(0, subtotal - promoDiscount - pointsRequested);
-
+  // v20260906：直接折扣（rewardMode=cash）當次折現金，一起扣
+  let payCashDiscount = 0;
+  if(onlineState.payMethod){
+    try{
+      const r = getPaymentRewardPoints(onlineState.cart, onlineState.payMethod);
+      if(r && r.rewardMode === 'cash') payCashDiscount = Math.max(0, Number(r.cashDiscount || 0));
+    }catch(e){ payCashDiscount = 0; }
+  }
+  const grandTotal = Math.max(0, subtotal - promoDiscount - payCashDiscount - pointsRequested);
   const payload = {
     orderNo: 'ON' + Date.now(),
     customerName: name,
     customerPhone: phone,
+    customerLookupKey: String(phone || '').replace(/\D/g,''),
     customerNote,
     orderType: '線上點餐-' + orderType,
     reservationAt,
@@ -649,6 +702,7 @@ async function submitOnlineOrder(){
     couponMessage: promoMessage,
     payMethod: onlineState.payMethod,          // v20260603-v2：客人選的付款別（回饋點數依據）
     pointsRequested: pointsRequested,          // v20260603-v2：要折抵的點數（POS 接單以真實餘額為上限預扣）
+    payCashDiscount: payCashDiscount,
     total: grandTotal
   };
 
@@ -662,7 +716,15 @@ async function submitOnlineOrder(){
 
     const { signInCustomerAnonymously } = await import('../modules/realtime-order-service.js');
         await signInCustomerAnonymously();
-    const stopWatch = await watchCustomerOrder(orderId, (remote)=>{
+        let _pollTimer = null;
+    let _stopWatch = null;
+    function _finishWatch(){
+      try{ if(_stopWatch) _stopWatch(); }catch(e){}
+      if(_pollTimer){ clearInterval(_pollTimer); _pollTimer = null; }
+      window.removeEventListener('beforeunload', onlineState._cleanupWatch);
+      onlineState._cleanupWatch = null;
+    }
+    function applyRemoteStatus(remote){
       if(!remote) return;
       if(remote.status === 'confirmed'){
         onlineState.cart = [];
@@ -670,22 +732,32 @@ async function submitOnlineOrder(){
         closeCartDrawer();
         document.getElementById('onlineCustomerNote').value = '';
         openStatusOverlay('店家已確認訂單', buildConfirmedMessage(remote, orderId), true);
-        try{ stopWatch(); }catch(e){}
-        window.removeEventListener('beforeunload', onlineState._cleanupWatch);
-        onlineState._cleanupWatch = null;
+        _finishWatch();
       }else if(remote.status === 'rejected'){
         openStatusOverlay('店家已拒絕訂單', remote.replyMessage || '很抱歉，店家目前無法接單，請稍後再試。', true);
-        try{ stopWatch(); }catch(e){}
-        window.removeEventListener('beforeunload', onlineState._cleanupWatch);
-        onlineState._cleanupWatch = null;
+        _finishWatch();
       }else{
         const pendingText = remote.replyMessage || '訂單已送出，請稍候店家確認。';
         openStatusOverlay('等待店家確認訂單', pendingText);
       }
-    }, onlineState.storeCode);
+    }
+    _stopWatch = await watchCustomerOrder(orderId, applyRemoteStatus, onlineState.storeCode);
     // 頁面關閉時自動解除監聽，避免記憶體洩漏
-    onlineState._cleanupWatch = ()=>{ try{ stopWatch(); }catch(e){} };
+    onlineState._cleanupWatch = ()=>{ _finishWatch(); };
     window.addEventListener('beforeunload', onlineState._cleanupWatch);
+
+    // v20260906：背景凍結備援 — 每 30 秒主動補讀最新狀態（仿 startMenuAutoWatch 輪詢）
+    // 手機切背景使 onValue 長連線被凍結時，回前景後最多 30 秒內補回最新 status，避免卡在待接單
+    const rt = await import('../modules/realtime-order-service.js');
+    _pollTimer = setInterval(async ()=>{
+      try{
+        const ref = await rt._getRef(`onlineOrders/${onlineState.storeCode}/${orderId}`);
+        const snap = await rt._dbApi().get(ref);
+        const remote = snap.val();
+        if(remote) applyRemoteStatus(remote);
+      }catch(e){ /* 靜默 */ }
+    }, 30000);
+
   }catch(err){
 
     closeStatusOverlay();
@@ -733,7 +805,7 @@ async function init(){
   let menuLoaded = false;
   for(let attempt = 1; attempt <= 3 && !menuLoaded; attempt++){
     try{
-      await fetchMenuFromFirebase();
+      await fetchMenuFromFirebase(onlineState.storeCode);
       menuLoaded = true;
     }catch(err){
       console.warn(`讀取雲端菜單失敗（第 ${attempt} 次）：`, err);
@@ -765,7 +837,7 @@ async function init(){
       if(document.getElementById('onlineOrderType')?.value === '預約'){
         renderReservationSlots();
       }
-    });
+    }, onlineState.storeCode);
     }catch(err){
     console.warn('啟動菜單監聽失敗（不影響顯示）：', err);
   }
@@ -891,8 +963,10 @@ async function init(){
     const payload = {
       rowId: onlineState.configTarget?.mode === 'edit' ? onlineState.configTarget.rowId : id(),
       productId: product.id,
-      name: product.name,
-      basePrice: Number(product.price||0),
+      name: product.name + getSizeSuffix(product),
+basePrice: getEffectiveBasePrice(product),
+sizeIndex: onlineState.currentSizeIndex,
+
       qty: Math.max(1, Number(document.getElementById('onlineItemQtyInput').value || 1)),
       note: document.getElementById('onlineItemNoteInput').value.trim(),
       selections,
@@ -989,8 +1063,14 @@ function renderMyOrdersList(list){
     const created = o.createdAt ? fmtLocalDateTime(o.createdAt) : '';
     const resv = o.reservationAt ? `<div style="color:#10b981;font-size:13px">📅 預約取餐：${fmtLocalDateTime(o.reservationAt)}</div>` : '';
     const itemsText = Array.isArray(o.items)
-      ? o.items.map(it => `${it.name} x${it.qty}`).join('、')
-      : '';
+    ? o.items.map(it => {
+        const lineTotal = (Number(it.basePrice || 0) + Number(it.extraPrice || 0)) * Number(it.qty || 0);
+        return `<div style="display:flex;justify-content:space-between">`
+             + `<span>${escapeHtml(it.name)} x${it.qty}</span>`
+             + `<span>$${lineTotal}</span>`
+             + `</div>`;
+      }).join('')
+    : '';
     const reply = o.replyMessage ? `<div style="font-size:12px;color:#475569;margin-top:4px">店家訊息：${o.replyMessage}</div>` : '';
     return `
       <div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px;background:#fff">
